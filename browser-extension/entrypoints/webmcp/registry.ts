@@ -1,0 +1,350 @@
+// ============================================================
+// WebMCP tab registry — background-side, event-fed snapshot
+// of which tabs currently expose which WebMCP tools.
+//
+// Replaces scan-on-demand as the primary discovery source:
+// static content scripts (webmcp-injected.content.ts MAIN world
+// + webmcp.content.ts ISOLATED relay) push `ready`/`snapshot`
+// reports at page load and on every toolset change, so the
+// popup/web app read an always-fresh cache instead of waiting
+// for a full-window tab scan (the old 5s-per-tab probe).
+//
+// Fallback: tabs opened before the extension (re)loaded have no
+// content script. `webmcp_discover_tools` merges registry data
+// with a legacy chrome.scripting probe of registry-silent tabs
+// (see discovery.ts fallbackForRegistrySilentTabs).
+//
+// Persistence: chrome.storage.session (survives service-worker
+// restarts, cleared on browser restart). Disabled hosts/groups
+// stay in storage.local via authorization.ts — unchanged.
+// ============================================================
+
+import type { WebMCPApiMode, WebMCPDiscoveredTool, WebMCPToolMeta } from './types'
+import { buildWebMCPGroupKey } from './group-key'
+import { buildToolsetSignature } from './toolset-signature'
+import { buildSafeFullName } from './tool-name'
+import { WEBMCP_REGISTRY_UPDATED_TYPE } from './relay-protocol'
+
+// Local copy of discovery.ts#parseHostname's URL check to avoid a
+// registry ↔ discovery import cycle (discovery imports this module
+// for the legacy fallback path).
+function isSupportedTabUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+export interface WebMCPRegisteredTabEntry {
+  tabId: number
+  /** Browser-verified from sender.tab (page content cannot forge it). */
+  hostname: string
+  tabTitle: string
+  tabUrl: string
+  windowId?: number
+  apiMode: WebMCPApiMode
+  tools: WebMCPToolMeta[]
+  toolsetSignature: string
+  groupKey: string
+  updatedAt: number
+}
+
+const STORAGE_KEY = 'webmcp_tab_registry'
+const SEEN_STORAGE_KEY = 'webmcp_tab_registry_seen'
+const MAX_ENTRIES = 60
+
+/** In-memory mirror; storage.session is the durability layer. */
+let entries = new Map<number, WebMCPRegisteredTabEntry>()
+/** Tabs whose static content script has reported at least once — including
+ * tool-less pages. Distinguishes "reported, no tools" (skip legacy probe)
+ * from "never reported" (tab predates extension load → probe fallback). */
+let seenTabs = new Set<number>()
+let hydrated = false
+let hydrationPromise: Promise<void> | null = null
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return
+  if (hydrationPromise) return hydrationPromise
+  hydrationPromise = (async () => {
+    try {
+      const result = await chrome.storage.session.get([STORAGE_KEY, SEEN_STORAGE_KEY])
+      const raw = result?.[STORAGE_KEY]
+      if (Array.isArray(raw)) {
+        for (const item of raw) {
+          const entry = sanitizeEntry(item, item?.tabId)
+          if (entry) {
+            entries.set(entry.tabId, entry)
+            seenTabs.add(entry.tabId)
+          }
+        }
+      }
+      const seenRaw = result?.[SEEN_STORAGE_KEY]
+      if (Array.isArray(seenRaw)) {
+        for (const tabId of seenRaw) {
+          if (typeof tabId === 'number') seenTabs.add(tabId)
+        }
+      }
+    } catch {
+      // storage.session unavailable (old Chrome) — registry stays memory-only
+    }
+    hydrated = true
+  })()
+  return hydrationPromise
+}
+
+function sanitizeTool(raw: unknown): WebMCPToolMeta | null {
+  if (!raw || typeof raw !== 'object') return null
+  const tool = raw as Record<string, unknown>
+  if (typeof tool.name !== 'string' || tool.name.trim().length === 0) return null
+
+  let inputSchema: Record<string, unknown> = { type: 'object', properties: {} }
+  if (typeof tool.inputSchema === 'string') {
+    try {
+      const parsed = JSON.parse(tool.inputSchema)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        inputSchema = parsed as Record<string, unknown>
+      }
+    } catch {
+      // keep default empty schema
+    }
+  } else if (tool.inputSchema && typeof tool.inputSchema === 'object' && !Array.isArray(tool.inputSchema)) {
+    inputSchema = tool.inputSchema as Record<string, unknown>
+  }
+
+  const annotations =
+    tool.annotations && typeof tool.annotations === 'object'
+      ? {
+          readOnlyHint: !!(tool.annotations as Record<string, unknown>).readOnlyHint,
+          untrustedContentHint: !!(tool.annotations as Record<string, unknown>).untrustedContentHint,
+        }
+      : undefined
+
+  return {
+    name: tool.name,
+    description: typeof tool.description === 'string' ? tool.description : '',
+    inputSchema,
+    annotations,
+  }
+}
+
+function sanitizeEntry(raw: unknown, tabId: unknown): WebMCPRegisteredTabEntry | null {
+  if (!raw || typeof raw !== 'object') return null
+  if (typeof tabId !== 'number') return null
+  const item = raw as Record<string, unknown>
+  if (typeof item.hostname !== 'string' || item.hostname.length === 0) return null
+
+  const tools = Array.isArray(item.tools)
+    ? (item.tools.map(sanitizeTool).filter(Boolean) as WebMCPToolMeta[])
+    : []
+  if (tools.length === 0) return null
+
+  const hostname = item.hostname
+  const toolsetSignature =
+    typeof item.toolsetSignature === 'string' && item.toolsetSignature.length === 8
+      ? item.toolsetSignature
+      : buildToolsetSignature(tools)
+  const now = Date.now()
+
+  return {
+    tabId,
+    hostname,
+    tabTitle: typeof item.tabTitle === 'string' ? item.tabTitle : '',
+    tabUrl: typeof item.tabUrl === 'string' ? item.tabUrl : '',
+    windowId: typeof item.windowId === 'number' ? item.windowId : undefined,
+    apiMode:
+      typeof item.apiMode === 'string' && item.apiMode.length > 0
+        ? (item.apiMode as WebMCPApiMode)
+        : 'documentModelContext',
+    tools,
+    toolsetSignature,
+    groupKey: buildWebMCPGroupKey(hostname, toolsetSignature),
+    updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : now,
+  }
+}
+
+async function persist(): Promise<void> {
+  try {
+    const all = [...entries.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_ENTRIES)
+    await chrome.storage.session.set({
+      [STORAGE_KEY]: all,
+      [SEEN_STORAGE_KEY]: [...seenTabs].slice(-200),
+    })
+  } catch {
+    // memory-only registry still works for this SW lifetime
+  }
+}
+
+function notifyRegistryUpdated(): void {
+  // Runtime broadcast: popup (if open) re-reads the snapshot and re-renders
+  // incrementally. Pages ignore this message — their bridge surfaces stay
+  // request/response (they re-query on demand).
+  try {
+    chrome.runtime.sendMessage({ type: WEBMCP_REGISTRY_UPDATED_TYPE }).catch(() => {})
+  } catch {
+    // no receivers — fine
+  }
+}
+
+export interface RegisterTabInput {
+  tabId: number
+  hostname: string
+  tabTitle: string
+  tabUrl: string
+  windowId?: number
+  apiMode?: WebMCPApiMode
+  tools: Array<{
+    name: string
+    description?: string
+    inputSchema?: unknown
+    annotations?: {
+      readOnlyHint?: boolean
+      untrustedContentHint?: boolean
+    }
+  }>
+}
+
+/**
+ * Record/replace a tab's tool snapshot. Empty toolsets REMOVE the tab
+ * (a page that unregistered all tools no longer exists for discovery).
+ */
+export async function registerTab(input: RegisterTabInput): Promise<void> {
+  await hydrate()
+  seenTabs.add(input.tabId)
+
+  if (input.tools.length === 0) {
+    if (entries.delete(input.tabId)) {
+      await persist()
+      notifyRegistryUpdated()
+    } else {
+      await persist() // still record "seen" even if nothing to remove
+    }
+    return
+  }
+
+  const tools = input.tools
+    .map((tool) => sanitizeTool(tool))
+    .filter(Boolean) as WebMCPToolMeta[]
+  if (tools.length === 0) return
+
+  const toolsetSignature = buildToolsetSignature(tools)
+  const entry: WebMCPRegisteredTabEntry = {
+    tabId: input.tabId,
+    hostname: input.hostname,
+    tabTitle: input.tabTitle,
+    tabUrl: input.tabUrl,
+    windowId: input.windowId,
+    apiMode: input.apiMode || 'documentModelContext',
+    tools,
+    toolsetSignature,
+    groupKey: buildWebMCPGroupKey(input.hostname, toolsetSignature),
+    updatedAt: Date.now(),
+  }
+
+  const previous = entries.get(input.tabId)
+  // Suppress no-op churn: identical toolset + still-live tab → keep entry,
+  // only refresh timestamps if metadata changed (title/url).
+  const unchanged =
+    previous &&
+    previous.groupKey === entry.groupKey &&
+    previous.tabTitle === entry.tabTitle &&
+    previous.tabUrl === entry.tabUrl
+  if (unchanged) {
+    previous.updatedAt = entry.updatedAt
+    return
+  }
+
+  entries.set(input.tabId, entry)
+  await persist()
+  notifyRegistryUpdated()
+}
+
+export async function unregisterTab(tabId: number): Promise<void> {
+  await hydrate()
+  seenTabs.delete(tabId)
+  if (entries.delete(tabId)) {
+    await persist()
+    notifyRegistryUpdated()
+  }
+}
+
+export async function clearRegistry(): Promise<void> {
+  await hydrate()
+  entries.clear()
+  seenTabs.clear()
+  await persist()
+  notifyRegistryUpdated()
+}
+
+/** Live tabs per current registry state (queried fresh so closed tabs drop out). */
+export async function getRegistryEntries(): Promise<WebMCPRegisteredTabEntry[]> {
+  await hydrate()
+  let tabsById = new Map<number, chrome.tabs.Tab>()
+  try {
+    const tabs = await chrome.tabs.query({})
+    for (const tab of tabs) {
+      if (typeof tab.id === 'number') tabsById.set(tab.id, tab)
+    }
+  } catch {
+    // tabs API hiccup (rare) — fall back to raw entries
+    return [...entries.values()].sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+
+  const alive: WebMCPRegisteredTabEntry[] = []
+  for (const entry of entries.values()) {
+    const tab = tabsById.get(entry.tabId)
+    if (!tab) continue // closed
+    alive.push({
+      ...entry,
+      tabTitle: tab.title || entry.tabTitle,
+      tabUrl: tab.url || entry.tabUrl,
+      windowId: tab.windowId ?? entry.windowId,
+    })
+  }
+  return alive.sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+/** Expand registry entries into the discovered-tool shape consumers expect. */
+export function entriesToDiscoveredTools(
+  registryEntries: WebMCPRegisteredTabEntry[],
+): WebMCPDiscoveredTool[] {
+  const now = Date.now()
+  const tools: WebMCPDiscoveredTool[] = []
+  for (const entry of registryEntries) {
+    for (const tool of entry.tools) {
+      tools.push({
+        ...tool,
+        hostname: entry.hostname,
+        groupKey: entry.groupKey,
+        toolsetSignature: entry.toolsetSignature,
+        fullName: buildSafeFullName(entry.hostname, tool.name),
+        tabId: entry.tabId,
+        tabTitle: entry.tabTitle,
+        tabUrl: entry.tabUrl,
+        discoveredAt: entry.updatedAt || now,
+        apiMode: entry.apiMode,
+      })
+    }
+  }
+  return tools
+}
+
+/** Tab IDs of supported (http/https) tabs that never reported to the
+ * registry. Tool-less pages report an empty snapshot once, so they are
+ * NOT silent — only tabs without our static content script are. */
+export async function getRegistrySilentTabs(): Promise<Array<{ tabId: number; windowId?: number }>> {
+  await hydrate()
+  try {
+    const tabs = await chrome.tabs.query({})
+    return tabs
+      .filter(
+        (tab): tab is chrome.tabs.Tab & { id: number; url: string } =>
+          typeof tab.id === 'number' && typeof tab.url === 'string' && isSupportedTabUrl(tab.url),
+      )
+      .filter((tab) => !seenTabs.has(tab.id))
+      .map((tab) => ({ tabId: tab.id, windowId: tab.windowId }))
+  } catch {
+    return []
+  }
+}

@@ -13,6 +13,8 @@ import {
 } from './webmcp/authorization'
 import { streamPluginDownload } from './webmcp/plugin-download-transfer'
 import type { WebMCPPluginDownloadPlan } from './webmcp/types'
+import { registerTab, unregisterTab } from './webmcp/registry'
+import { WEBMCP_TAB_REPORT_TYPE } from './webmcp/relay-protocol'
 import {
   isSidePanelBindingId,
   isTrustedCreatorWeaveSenderUrl,
@@ -853,6 +855,9 @@ export default defineBackground(() => {
 
   chrome.tabs.onRemoved.addListener((tabId) => {
     _sidePanelTabs.delete(tabId)
+    // Tab closed → its WebMCP registry entry is stale; drop it so the
+    // popup/discover snapshot never lists tools from dead tabs.
+    unregisterTab(tabId).catch(() => {})
   })
 
   /**
@@ -1315,6 +1320,50 @@ export default defineBackground(() => {
             sendResponse({ ok: resp.ok, status: resp.status, statusText: resp.statusText, headers: responseHeaders, text });
           } catch (err: any) {
             sendResponse({ ok: false, status: 0, error: err?.message || String(err) });
+          }
+          return;
+        }
+
+        // ── WebMCP registry feed (static content scripts) ──
+        // Tab reports arrive from webmcp.content.ts (ISOLATED relay) with
+        // the browser-verified sender.tab. Identity (tabId/hostname/title/
+        // url/windowId) comes ONLY from _sender — the page payload carries
+        // nothing but the validated tool list, so a hostile page cannot
+        // forge reports about other tabs. Empty toolset → unregister.
+        if (message.type === WEBMCP_TAB_REPORT_TYPE) {
+          const tab = _sender?.tab;
+          if (!tab || typeof tab.id !== 'number' || typeof tab.url !== 'string') {
+            sendResponse({ ok: false, error: 'webmcp_tab_report requires a tab sender' });
+            return;
+          }
+          let hostname = '';
+          try {
+            const parsed = new URL(tab.url);
+            hostname = parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.hostname : '';
+          } catch {
+            hostname = '';
+          }
+          if (!hostname) {
+            sendResponse({ ok: false, error: 'webmcp_tab_report sender is not an http(s) tab' });
+            return;
+          }
+          const tools = Array.isArray(message.tools) ? message.tools : [];
+          try {
+            // Empty toolset → registerTab keeps the tab in the "seen" set
+            // (so legacy probe skips it) while removing any stale entry.
+            // unregisterTab is reserved for tab-close cleanup.
+            await registerTab({
+              tabId: tab.id,
+              hostname,
+              tabTitle: tab.title || '',
+              tabUrl: tab.url,
+              windowId: tab.windowId,
+              apiMode: typeof message.apiMode === 'string' ? message.apiMode : undefined,
+              tools,
+            });
+            sendResponse({ ok: true });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
           }
           return;
         }

@@ -6,14 +6,101 @@ import {
   parseHostname,
   rememberSuccessfulInvocation,
 } from './discovery'
+import { getRegistryEntries } from './registry'
 import { buildSafeFullName } from './tool-name'
 import { isHostEnabled, isGroupEnabled, hostDisabledError, groupDisabledError } from './authorization'
 import type {
+  WebMCPApiMode,
   WebMCPInvokeRequest,
   WebMCPInvokeResponse,
   WebMCPPluginDownloadPlan,
 } from './types'
 import { runWebMCPPageProbe } from './page-api'
+import { WEBMCP_INVOKE_IN_TAB_TYPE } from './relay-protocol'
+
+// Relay-channel invoke timeout. Longer than the old executeScript path
+// (which serialized the whole probe func) because tools may legitimately
+// take a while (navigation-triggering tools, downloads, …).
+const INVOKE_RELAY_TIMEOUT_MS = 60_000
+
+/**
+ * Invoke via the static content-script relay (mcp-b style):
+ * background → tabs.sendMessage(webmcp_invoke_in_tab) → ISOLATED relay
+ * → window.postMessage → MAIN agent → executeToolByName → response.
+ * Only tabs WITHOUT the static scripts (opened before extension load)
+ * fall back to the legacy chrome.scripting.executeScript probe.
+ */
+async function invokeViaRelay(
+  tabId: number,
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<{
+  ok: boolean
+  result?: unknown
+  apiMode?: WebMCPApiMode
+  errorCode?: string
+  error?: string
+}> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (value: {
+      ok: boolean
+      result?: unknown
+      apiMode?: WebMCPApiMode
+      errorCode?: string
+      error?: string
+    }) => {
+      if (settled) return
+      settled = true
+      resolve(value)
+    }
+
+    const timeout = setTimeout(() => {
+      finish({
+        ok: false,
+        errorCode: 'RELAY_TIMEOUT',
+        error: `WebMCP relay invoke timed out after ${INVOKE_RELAY_TIMEOUT_MS}ms`,
+      })
+    }, INVOKE_RELAY_TIMEOUT_MS)
+
+    try {
+      chrome.tabs.sendMessage(
+        tabId,
+        { type: WEBMCP_INVOKE_IN_TAB_TYPE, toolName, args },
+        (response: any) => {
+          clearTimeout(timeout)
+          if (chrome.runtime.lastError) {
+            // No receiver (tab without our content scripts) or channel closed.
+            finish({
+              ok: false,
+              errorCode: 'RELAY_UNREACHABLE',
+              error: chrome.runtime.lastError.message || 'relay unreachable',
+            })
+            return
+          }
+          if (!response) {
+            finish({ ok: false, errorCode: 'RELAY_NO_RESPONSE', error: 'Empty relay response' })
+            return
+          }
+          finish({
+            ok: response.ok === true,
+            result: response.result,
+            apiMode: response.apiMode,
+            errorCode: response.errorCode,
+            error: response.error,
+          })
+        },
+      )
+    } catch (error: any) {
+      clearTimeout(timeout)
+      finish({
+        ok: false,
+        errorCode: 'RELAY_ERROR',
+        error: typeof error?.message === 'string' ? error.message : String(error),
+      })
+    }
+  })
+}
 
 function randomTransferId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -177,7 +264,33 @@ async function resolveRouteFromTabs(
 export async function invokeWebMCPTool(
   request: WebMCPInvokeRequest
 ): Promise<WebMCPInvokeResponse> {
+  // Route via the registry first: the background's tab registry is the
+  // authoritative snapshot of which tabs expose which tools. The legacy
+  // resolveRouteFromTabs (probe-based) remains as a fallback for tabs the
+  // registry hasn't seen (pre-extension-load tabs probed via fallbackScan).
   let route = getRecentRoute(request.groupKey || '', request.fullToolName || '')
+  if (!route) {
+    const registryEntries = await getRegistryEntries()
+    const registryMatch = registryEntries.find(
+      (entry) =>
+        entry.groupKey === request.groupKey &&
+        entry.tools.some((tool) => buildSafeFullName(entry.hostname, tool.name) === request.fullToolName),
+    )
+    if (registryMatch) {
+      const matchedTool = registryMatch.tools.find(
+        (tool) => buildSafeFullName(registryMatch.hostname, tool.name) === request.fullToolName,
+      )!
+      route = {
+        tabId: registryMatch.tabId,
+        hostname: registryMatch.hostname,
+        groupKey: registryMatch.groupKey,
+        toolName: matchedTool.name,
+        fullToolName: request.fullToolName,
+        toolsetSignature: registryMatch.toolsetSignature,
+        seenAt: registryMatch.updatedAt,
+      }
+    }
+  }
   if (!route) {
     const resolved = await resolveRouteFromTabs(request)
     if (resolved) {
@@ -236,14 +349,30 @@ export async function invokeWebMCPTool(
   }
 
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: 'MAIN',
-      args: [{ type: 'invoke', toolName, args: request.args || {} }],
-      func: runWebMCPPageProbe,
-    })
+    // Relay channel first (static content scripts, mcp-b style). The legacy
+    // executeScript probe only runs when the tab has no relay receiver
+    // (opened before the extension (re)loaded).
+    let result: {
+      ok: boolean
+      result?: unknown
+      apiMode?: WebMCPApiMode
+      errorCode?: string
+      error?: string
+    } = await invokeViaRelay(tabId, toolName, request.args || {})
 
-    const result = (results?.[0]?.result as any) || {}
+    if (
+      !result.ok &&
+      (result.errorCode === 'RELAY_UNREACHABLE' || result.errorCode === 'RELAY_NO_RESPONSE')
+    ) {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        args: [{ type: 'invoke', toolName, args: request.args || {} }],
+        func: runWebMCPPageProbe,
+      })
+      result = (results?.[0]?.result as any) || { ok: false, errorCode: 'INVOKE_FAILED', error: 'Tool execution failed' }
+    }
+
     if (!result.ok) {
       return {
         ok: false,

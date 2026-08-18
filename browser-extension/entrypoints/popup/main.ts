@@ -345,28 +345,53 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   // includeDisabled: the popup IS the management surface — it must see
   // disabled hosts/groups so the user can re-enable them. Regular pages
   // get the filtered view (disabled sites simply don't exist for them).
-  chrome.runtime.sendMessage(
-    { type: 'webmcp_discover_tools', options: { includeDisabled: true } },
-    function (resp: any) {
-    if (chrome.runtime.lastError) {
-      renderError(chrome.runtime.lastError.message || 'runtime error');
-      return;
+  //
+  // Discovery is now registry-backed (event-fed by the static content
+  // scripts), so this first read is fast (no per-tab scan). The registry
+  // broadcast below re-triggers it whenever a tab reports new tools.
+  function loadTools() {
+    chrome.runtime.sendMessage(
+      { type: 'webmcp_discover_tools', options: { includeDisabled: true } },
+      function (resp: any) {
+        if (chrome.runtime.lastError) {
+          renderError(chrome.runtime.lastError.message || 'runtime error');
+          return;
+        }
+        if (!resp) {
+          renderError('no response from background');
+          return;
+        }
+        if (!resp.ok) {
+          renderError(resp.error || 'unknown error');
+          return;
+        }
+        const tools = resp.tools || [];
+        if (tools.length === 0) {
+          renderNoTools(resp.scannedTabs != null ? `${resp.scannedTabs} tab(s) scanned, 0 tools` : undefined);
+          return;
+        }
+        renderList(tools);
+      }
+    );
+  }
+
+  // Incremental refresh: background broadcasts webmcp_registry_updated
+  // whenever a tab pushes a new snapshot (ready/toolchange/poll-diff).
+  // Debounced so a burst of tab reports coalesces into one re-render.
+  var refreshTimer: number | null = null;
+  chrome.runtime.onMessage.addListener(function (message: any) {
+    if (message?.type === 'webmcp_registry_updated') {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(function () {
+        refreshTimer = null;
+        loadTools();
+      }, 150);
+      return false;
     }
-    if (!resp) {
-      renderError('no response from background');
-      return;
-    }
-    if (!resp.ok) {
-      renderError(resp.error || 'unknown error');
-      return;
-    }
-    const tools = resp.tools || [];
-    if (tools.length === 0) {
-      renderNoTools(resp.scannedTabs != null ? `${resp.scannedTabs} tab(s) scanned, 0 tools` : undefined);
-      return;
-    }
-    renderList(tools);
+    return false;
   });
+
+  loadTools();
 })();
 
 // Check injection status
