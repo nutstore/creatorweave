@@ -1,5 +1,5 @@
 {
-  "extensionName": { "message": "eo2weave" },
+  "extensionName": { "message": "EO2Weave" },
   "webmcpFoundSummary": {
     "message": "WebMCP: $HOSTS$ site(s), $TOOLS$ tool(s) available",
     "placeholders": {
@@ -51,8 +51,8 @@
   "resetLogin": { "message": "Start over (clear state)" },
   "documentation": { "message": "Documentation" },
   "github": { "message": "GitHub" },
-  "sidePanelButtonLabel": { "message": "eo2weave" },
-  "sidePanelButtonTitle": { "message": "Open eo2weave in the side panel" },
+  "sidePanelButtonLabel": { "message": "EO2Weave" },
+  "sidePanelButtonTitle": { "message": "Open EO2Weave in the side panel" },
   "resetCreditsAvailable": { "message": "Banked reset credits" },
   "availableCount": { "message": "$COUNT$ available", "placeholders": { "count": { "content": "$1" } } },
   "resetCreditExpires": { "message": "Expires $DATE$", "placeholders": { "date": { "content": "$1" } } },

@@ -97,13 +97,13 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       enabled: true,
     }).catch(function (err: any) {
       // eslint-disable-next-line no-console
-      console.warn('[eo2weave popup] sidePanel.setOptions failed:', err);
+      console.warn('[EO2Weave popup] sidePanel.setOptions failed:', err);
     });
     chrome.sidePanel.open({ tabId: tabId }).then(function () {
       window.close();
     }).catch(function (err: any) {
       // eslint-disable-next-line no-console
-      console.warn('[eo2weave popup] side panel open failed, falling back to new tab:', err);
+      console.warn('[EO2Weave popup] side panel open failed, falling back to new tab:', err);
       chrome.tabs.create({ url: cwBase + '/#/' }).catch(function () {});
       window.close();
     });
