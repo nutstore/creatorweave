@@ -153,16 +153,6 @@ export interface WebMCPBridge {
     enabledByGroup?: Record<string, boolean>
     error?: string
   }>
-  webMCPSetHostEnabled?: (payload: { hostname: string; enabled: boolean }) => Promise<{
-    ok: boolean
-    enabledByHost?: Record<string, boolean>
-    error?: string
-  }>
-  webMCPSetGroupEnabled?: (payload: { groupKey: string; enabled: boolean }) => Promise<{
-    ok: boolean
-    enabledByGroup?: Record<string, boolean>
-    error?: string
-  }>
   webMCPPluginDownloadStream?: (payload: {
     transferId: string
     downloadUrl: string

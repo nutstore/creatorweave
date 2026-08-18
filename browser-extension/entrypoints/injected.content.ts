@@ -731,26 +731,11 @@ export default defineContentScript({
        * Get the extension-side WebMCP authorization state.
        * The extension storage is the single source of truth for host/group
        * switches (enforced by the background invoke gate); the web app only
-       * renders this state.
+       * renders this state. Management (toggling) lives exclusively in the
+       * extension popup — no set methods are exposed to the page.
        */
       async webMCPGetAuthorization() {
         return sendToBridge('webmcp_get_host_authorization', {});
-      },
-
-      /**
-       * Toggle a host's WebMCP authorization (writes the extension-side
-       * authoritative store). Returns the updated maps.
-       */
-      async webMCPSetHostEnabled(payload: { hostname: string; enabled: boolean }) {
-        return sendToBridge('webmcp_set_host_enabled', payload);
-      },
-
-      /**
-       * Toggle a tool group's WebMCP authorization (writes the extension-side
-       * authoritative store). Returns the updated group map.
-       */
-      async webMCPSetGroupEnabled(payload: { groupKey: string; enabled: boolean }) {
-        return sendToBridge('webmcp_set_group_enabled', payload);
       },
 
       /**

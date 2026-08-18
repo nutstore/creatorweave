@@ -94,43 +94,10 @@ export async function refreshWebMCPCatalog(): Promise<WebMCPRegisteredTool[]> {
   return discoverWebMCPCatalog(true)
 }
 
-export async function applyWebMCPHostToggle(
-  hostname: string,
-  enabled: boolean,
-): Promise<number> {
-  // Write-through to the extension-side authoritative store; the web
-  // localStorage copy is only a mirror synced from discovery annotations.
-  const bridge = getWebMCPBridge()
-  if (bridge?.webMCPSetHostEnabled) {
-    const resp = await bridge.webMCPSetHostEnabled({ hostname, enabled })
-    if (!resp?.ok) {
-      throw new Error(resp?.error || 'Extension rejected the host toggle')
-    }
-  } else {
-    // Old extension without bridge methods: keep local-only behavior so the
-    // UI keeps working (catalog filtering) until the extension updates.
-    useWebMCPStore.getState().setHostEnabled(hostname, enabled)
-  }
-  const tools = await discoverAndCacheTools(true)
-  return tools.length
-}
-
-export async function applyWebMCPGroupToggle(
-  groupKey: string,
-  enabled: boolean,
-): Promise<void> {
-  // Write-through to the extension-side authoritative store (same pattern
-  // as host toggles).
-  const bridge = getWebMCPBridge()
-  if (bridge?.webMCPSetGroupEnabled) {
-    const resp = await bridge.webMCPSetGroupEnabled({ groupKey, enabled })
-    if (!resp?.ok) {
-      throw new Error(resp?.error || 'Extension rejected the group toggle')
-    }
-  } else {
-    useWebMCPStore.getState().setGroupEnabled(groupKey, enabled)
-  }
-}
+// NOTE: host/group authorization toggles were removed from the web app.
+// The extension popup is the only management surface; the extension-side
+// store is the single source of truth, mirrored into the web store via
+// discovery annotations (syncAuthorizationFromTools).
 
 export async function applyWebMCPGlobalToggle(
   enabled: boolean,

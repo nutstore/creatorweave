@@ -4,8 +4,6 @@ import { useT } from '@/i18n'
 import { useWebMCPStore } from '@/webmcp'
 import {
   applyWebMCPGlobalToggle,
-  applyWebMCPGroupToggle,
-  applyWebMCPHostToggle,
   isWebMCPBridgeAvailable,
   refreshWebMCPCatalog,
 } from '@/webmcp'
@@ -15,6 +13,13 @@ import { WebMCPGlobalToggleCard } from './WebMCPGlobalToggleCard'
 import { WebMCPHostList } from './WebMCPHostList'
 import { WebMCPSetupGuideCard } from './WebMCPSetupGuideCard'
 
+/**
+ * WebMCP settings — read-only authorization view.
+ * Host/group switches are managed exclusively in the extension popup
+ * (extension storage is the single source of truth; the background invoke
+ * gate enforces it). The web side only shows the mirrored state synced
+ * from discovery annotations and manages the global on/off + refresh.
+ */
 export function WebMCPSettings() {
   const t = useT()
   const catalogByHost = useWebMCPStore((state) => state.catalogByHost)
@@ -26,8 +31,6 @@ export function WebMCPSettings() {
   const extensionInstalled = extensionStatus === 'installed'
   const [refreshing, setRefreshing] = useState(false)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
-  const [togglingHost, setTogglingHost] = useState<string | null>(null)
-  const [togglingGroup, setTogglingGroup] = useState<string | null>(null)
 
   const bridgeAvailable = isWebMCPBridgeAvailable()
 
@@ -81,34 +84,6 @@ export function WebMCPSettings() {
     }
   }
 
-  const handleToggleHost = async (hostname: string, enabled: boolean) => {
-    if (!globalEnabled) return
-    setTogglingHost(hostname)
-    try {
-      await applyWebMCPHostToggle(hostname, enabled)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
-    } finally {
-      setTogglingHost(null)
-    }
-  }
-
-  const handleToggleGroup = async (groupKey: string, enabled: boolean) => {
-    if (!globalEnabled) return
-    setTogglingGroup(groupKey)
-    try {
-      // Write-through to the extension-side authoritative store; the local
-      // mirror updates on the next discovery annotation sync.
-      await applyWebMCPGroupToggle(groupKey, enabled)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
-    } finally {
-      setTogglingGroup(null)
-    }
-  }
-
   const handleInstallExtension = () => {
     useExtensionStore.getState().openInstallGuide()
   }
@@ -146,11 +121,6 @@ export function WebMCPSettings() {
         hosts={hosts}
         enabledByHost={enabledByHost}
         enabledByGroup={enabledByGroup}
-        togglingHost={togglingHost}
-        togglingGroup={togglingGroup}
-        globalEnabled={globalEnabled && !togglingGlobal}
-        onToggleHost={handleToggleHost}
-        onToggleGroup={handleToggleGroup}
       />
     </div>
   )

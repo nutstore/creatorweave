@@ -1,5 +1,4 @@
-import { Globe, Layers3 } from 'lucide-react'
-import { BrandSwitch } from '@creatorweave/ui'
+import { Globe, Layers3, ShieldCheck, ShieldOff } from 'lucide-react'
 import type { WebMCPHostCatalog, WebMCPToolGroupCatalog } from '@/webmcp'
 
 interface WebMCPHostListProps {
@@ -7,11 +6,6 @@ interface WebMCPHostListProps {
   hosts: WebMCPHostCatalog[]
   enabledByHost: Record<string, boolean>
   enabledByGroup: Record<string, boolean>
-  togglingHost: string | null
-  togglingGroup: string | null
-  globalEnabled: boolean
-  onToggleHost: (hostname: string, enabled: boolean) => void
-  onToggleGroup: (groupKey: string, enabled: boolean) => void
 }
 
 function summarizeTabs(group: WebMCPToolGroupCatalog): string {
@@ -28,16 +22,32 @@ function summarizeTabs(group: WebMCPToolGroupCatalog): string {
     .join(' · ')
 }
 
+/**
+ * Read-only authorization badge.
+ * The switches live ONLY in the extension popup — the extension-side store
+ * (chrome.storage.local) is the single source of truth and the background
+ * invoke gate enforces it. The web app renders the mirrored state and
+ * points users to the popup for management.
+ */
+function AuthBadge({ t, enabled }: { t: (key: string) => string; enabled: boolean }) {
+  return enabled ? (
+    <span className="inline-flex flex-none items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+      <ShieldCheck className="h-3 w-3" />
+      {t('settings.webMCPAuthAllowed')}
+    </span>
+  ) : (
+    <span className="inline-flex flex-none items-center gap-1 rounded-full border border-neutral-300 bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
+      <ShieldOff className="h-3 w-3" />
+      {t('settings.webMCPAuthBlocked')}
+    </span>
+  )
+}
+
 export function WebMCPHostList({
   t,
   hosts,
   enabledByHost,
   enabledByGroup,
-  togglingHost,
-  togglingGroup,
-  globalEnabled,
-  onToggleHost,
-  onToggleGroup,
 }: WebMCPHostListProps) {
   if (hosts.length === 0) {
     return (
@@ -49,19 +59,20 @@ export function WebMCPHostList({
 
   return (
     <div className="space-y-3">
-      {!globalEnabled && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-          {t('settings.webMCPHostControlsDisabled')}
-        </div>
-      )}
+      <div className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300">
+        {t('settings.webMCPManageInExtension')}
+      </div>
       {hosts.map((host) => {
-        const checked = enabledByHost[host.hostname] !== false
+        const hostAllowed = enabledByHost[host.hostname] !== false
         const totalTools = host.groups.reduce((sum, group) => sum + group.registeredTools.length, 0)
         const totalTabs = host.groups.reduce((sum, group) => sum + group.tabs.length, 0)
         return (
           <div
             key={host.hostname}
-            className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800"
+            className={
+              'rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800' +
+              (hostAllowed ? '' : ' opacity-60')
+            }
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -78,20 +89,19 @@ export function WebMCPHostList({
                     .replace('{tabs}', String(totalTabs))}
                 </p>
               </div>
-              <BrandSwitch
-                checked={checked}
-                disabled={!globalEnabled || togglingHost === host.hostname}
-                onCheckedChange={(value) => onToggleHost(host.hostname, value)}
-              />
+              <AuthBadge t={t} enabled={hostAllowed} />
             </div>
 
             <div className="mt-3 space-y-2">
               {host.groups.map((group) => {
-                const groupChecked = checked && enabledByGroup[group.groupKey] !== false
+                const groupAllowed = hostAllowed && enabledByGroup[group.groupKey] !== false
                 return (
                   <div
                     key={group.groupKey}
-                    className="rounded-lg border border-neutral-200 bg-muted/40 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900/40"
+                    className={
+                      'rounded-lg border border-neutral-200 bg-muted/40 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900/40' +
+                      (groupAllowed ? '' : ' opacity-60')
+                    }
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -107,11 +117,7 @@ export function WebMCPHostList({
                             .replace('{tabs}', String(group.tabs.length))}
                         </p>
                       </div>
-                      <BrandSwitch
-                        checked={groupChecked}
-                        disabled={!globalEnabled || !checked || togglingGroup === group.groupKey}
-                        onCheckedChange={(value) => onToggleGroup(group.groupKey, value)}
-                      />
+                      <AuthBadge t={t} enabled={groupAllowed} />
                     </div>
 
                     <div className="mt-2 rounded bg-white/80 px-2 py-1.5 text-[11px] text-tertiary dark:bg-neutral-950/40">
