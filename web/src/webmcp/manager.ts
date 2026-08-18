@@ -89,9 +89,14 @@ export async function discoverWebMCPCatalog(force = false): Promise<WebMCPRegist
   return discoverAndCacheTools(force)
 }
 
-/** Refresh WebMCP catalog (force re-discovery). */
+/** Refresh WebMCP catalog (force re-discovery). Returns AUTHORIZED tools. */
 export async function refreshWebMCPCatalog(): Promise<WebMCPRegisteredTool[]> {
-  return discoverWebMCPCatalog(true)
+  // The settings page and callers treat this count as "tools you can use",
+  // so filter to authorized tools (host && group on). Discovery itself still
+  // caches the full catalog — authorization is enforced by the extension
+  // invoke gate and mirrored here via annotations.
+  await discoverWebMCPCatalog(true)
+  return useWebMCPStore.getState().getEnabledTools()
 }
 
 // NOTE: host/group authorization toggles were removed from the web app.
