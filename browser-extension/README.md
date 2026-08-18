@@ -1,4 +1,4 @@
-# Browser Extension (eo2weave)
+# Browser Extension (EO2Weave)
 
 The browser extension powering CreatorWeave: `web_search` / `web_fetch` for in-browser agents, **WebMCP tool discovery** (any website can expose agent-callable tools via the standard WebMCP API), Rust native-host disk/exec access, and an optional **Codex OAuth proxy**.
 
