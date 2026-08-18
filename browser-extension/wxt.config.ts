@@ -81,11 +81,14 @@ export default defineConfig({
           },
         ],
   }),
-  // Dev mode outputs to `dist/chrome-mv3` (not the default `chrome-mv3-dev`),
-  // so the web app's vite-plugin-extension-serve (which watches dist/chrome-mv3)
-  // serves the DEV build. Without this, dev artifacts land in chrome-mv3-dev and
-  // the web keeps serving the stale PROD build → popup shows PROD.
-  outDirTemplate: '{{browser}}-mv{{manifestVersion}}',
+  // Dev (`wxt`) and build (`wxt build`) output to DIFFERENT directories:
+  //   dev   → dist/chrome-mv3-dev   (WXT default; live-reload artifacts)
+  //   build → dist/chrome-mv3       (production artifacts; also what the
+  //                                  web app's copy:extension script zips)
+  // This lets Chrome hold an unpacked stable build and a dev build side by
+  // side without them overwriting each other. The web app's dev server
+  // (vite-plugin-extension-serve) prefers chrome-mv3-dev when present —
+  // see web/vite-plugin-extension-serve.ts.
   // Don't auto-launch a separate browser during `wxt dev`. CreatorWeave loads
   // the extension via a zip downloaded from the web app, not via web-ext's
   // managed browser. The manual runner just logs the output path.

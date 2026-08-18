@@ -5,7 +5,8 @@
  * the copy:extension npm script. In dev mode, this plugin:
  *
  * 1. Auto-builds the browser extension on first request (if not built yet)
- * 2. Serves files from browser-extension/dist/chrome-mv3/ at /extension/*
+ * 2. Serves files from browser-extension/dist/chrome-mv3-dev/ (dev build,
+ *    preferred when present) or dist/chrome-mv3/ at /extension/*
  * 3. Generates and serves a /chrome-extension.zip on demand
  *
  * This allows the install guide to work in dev mode — users can download
@@ -25,7 +26,20 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const EXTENSION_DIR = path.resolve(__dirname, '../browser-extension/dist/chrome-mv3')
+// Dev (`wxt`) and production (`wxt build`) extension builds live in different
+// directories (see browser-extension/wxt.config.ts). The dev server prefers
+// the dev build when present so the install guide serves the DEV extension
+// (which points at localhost:5173); otherwise it falls back to the production
+// build (also built on demand below).
+const EXTENSION_DIR_PROD = path.resolve(__dirname, '../browser-extension/dist/chrome-mv3')
+const EXTENSION_DIR_DEV = path.resolve(__dirname, '../browser-extension/dist/chrome-mv3-dev')
+
+/** Directory of the extension build to serve: dev build if it exists, else prod. */
+function extensionDir(): string {
+  if (fs.existsSync(path.join(EXTENSION_DIR_DEV, 'manifest.json'))) return EXTENSION_DIR_DEV
+  return EXTENSION_DIR_PROD
+}
+
 const ROOT_DIR = path.resolve(__dirname, '..')
 
 const MIME_TYPES: Record<string, string> = {
@@ -39,7 +53,9 @@ const MIME_TYPES: Record<string, string> = {
 }
 
 function ensureExtensionBuilt(): boolean {
-  if (fs.existsSync(path.join(EXTENSION_DIR, 'manifest.json'))) {
+  // Re-resolve on every call: a `wxt` dev build may have appeared after the
+  // vite server started (module-load-time EXTENSION_DIR would be stale).
+  if (fs.existsSync(path.join(extensionDir(), 'manifest.json'))) {
     return true
   }
 
@@ -84,13 +100,14 @@ async function createZipBuffer(): Promise<Buffer | null> {
 
   try {
     // Try system zip command
-    execSync(`zip -r "${zipPath}" .`, { cwd: EXTENSION_DIR, stdio: 'pipe' })
+    execSync(`zip -r "${zipPath}" .`, { cwd: extensionDir(), stdio: 'pipe' })
     return fs.readFileSync(zipPath)
   } catch {
     // zip command not available — try powershell on Windows
     try {
+      const dir = extensionDir()
       execSync(
-        `Compress-Archive -Path "${EXTENSION_DIR}/*" -DestinationPath "${zipPath}" -Force`,
+        `Compress-Archive -Path "${dir}/*" -DestinationPath "${zipPath}" -Force`,
         { shell: 'powershell.exe', stdio: 'pipe' }
       )
       return fs.readFileSync(zipPath)
@@ -109,11 +126,12 @@ export function extensionServePlugin(): Plugin {
       // Serve /extension/* files
       server.middlewares.use('/extension', async (req, res, next) => {
         const urlPath = (req.url || '/').replace(/^\//, '')
-        const filePath = path.join(EXTENSION_DIR, urlPath)
+        const dir = extensionDir()
+        const filePath = path.join(dir, urlPath)
         const resolved = path.resolve(filePath)
 
         // Security: ensure we don't serve files outside extension dir
-        if (!resolved.startsWith(path.resolve(EXTENSION_DIR))) {
+        if (!resolved.startsWith(path.resolve(dir))) {
           res.statusCode = 403
           res.end('Forbidden')
           return
