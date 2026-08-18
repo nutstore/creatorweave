@@ -1322,18 +1322,32 @@ export default defineBackground(() => {
         if (message.type === 'webmcp_discover_tools') {
           const senderWindowId = _sender?.tab?.windowId;
           const response = await discoverWebMCPToolsInCurrentWindow(senderWindowId);
-          // Annotate tools with extension-side per-host/per-group authorization
-          // state so clients (web app, popup) render one consistent truth.
+          // Authorization is enforced at DISCOVERY time: tools from disabled
+          // hosts/groups are filtered out entirely — a disabled site simply
+          // does not exist for consumers. Unauthorized metadata (names,
+          // schemas, source tabs) must not leak to pages either.
+          // The popup is exempt: it needs the full picture to let the user
+          // re-enable hidden sites, so it passes includeDisabled.
           if (response.ok) {
             const [hostMap, groupMap] = await Promise.all([
               getHostAuthorizationMap(),
               getGroupAuthorizationMap(),
             ]);
-            (response as any).tools = annotateToolsWithHostAuthorization(
+            const annotated = annotateToolsWithHostAuthorization(
               response.tools || [],
               hostMap,
               groupMap
             );
+            // includeDisabled is honored ONLY for extension-internal senders
+            // (popup/background pages have no sender.tab). Messages relayed
+            // from web pages always carry sender.tab — even if a page forges
+            // the flag, it is ignored here. Disabled tools must not exist
+            // for web content.
+            const isExtensionInternal = !_sender?.tab;
+            const includeDisabled = isExtensionInternal && message?.options?.includeDisabled === true;
+            (response as any).tools = includeDisabled
+              ? annotated
+              : annotated.filter((tool: any) => tool.hostEnabled !== false && tool.groupEnabled !== false);
           }
           sendResponse(response);
           return;

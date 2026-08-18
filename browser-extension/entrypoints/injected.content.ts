@@ -712,7 +712,12 @@ export default defineContentScript({
        * Discover WebMCP tools across tabs in current browser window.
        */
       async webMCPDiscover(options?: { force?: boolean }) {
-        return sendToBridge('webmcp_discover_tools', { options: options || {} });
+        // Only `force` is honored from pages. includeDisabled is a popup-only
+        // escape hatch — a page must never see disabled (unauthorized) tools,
+        // so it is stripped here regardless of what the caller sends.
+        return sendToBridge('webmcp_discover_tools', {
+          options: { force: options?.force === true },
+        });
       },
 
       /**

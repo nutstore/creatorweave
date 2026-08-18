@@ -342,7 +342,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   }
 
   renderIdle();
-  chrome.runtime.sendMessage({ type: 'webmcp_discover_tools' }, function (resp: any) {
+  // includeDisabled: the popup IS the management surface — it must see
+  // disabled hosts/groups so the user can re-enable them. Regular pages
+  // get the filtered view (disabled sites simply don't exist for them).
+  chrome.runtime.sendMessage(
+    { type: 'webmcp_discover_tools', options: { includeDisabled: true } },
+    function (resp: any) {
     if (chrome.runtime.lastError) {
       renderError(chrome.runtime.lastError.message || 'runtime error');
       return;
