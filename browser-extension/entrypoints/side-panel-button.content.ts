@@ -71,28 +71,30 @@ export default defineContentScript({
         'color: #fff',
         'border: 1px solid rgba(255,255,255,0.2)',
         'border-radius: 10px',
-        'padding: 8px 7px',
+        'padding: 8px',
+        'width: 32px',
+        'height: 32px',
         'cursor: pointer',
-        'font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
-        'font-size: 12px',
-        'font-weight: 500',
         'box-shadow: 0 2px 10px rgba(0,0,0,0.2)',
-        'display: flex',
-        'flex-direction: column',
+        'display: inline-flex',
         'align-items: center',
-        'gap: 3px',
+        'justify-content: center',
         'transition: background 0.2s, opacity 0.3s',
         'user-select: none',
         'touch-action: none',
         'opacity: 0',
       ].join(';')
-      container.title = '点击唤起怡氧知知 AI 助手'
+      // Brand mark: the official eo2weave logo (icon.svg) embedded inline so
+      // the button needs no extra HTTP request. The white-tipped weave reads
+      // clearly at 16×16 against the teal button background. The SVG uses
+      // currentColor so the lane-flip transform below can recolor it on
+      // hover without re-rendering the path.
+      container.title = chrome.i18n.getMessage('sidePanelButtonTitle') || 'Open eo2weave in the side panel'
 
       container.innerHTML = `
-        <svg id="cw-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 5l7 7-7 7"/>
+        <svg width="16" height="16" viewBox="0 0 128 128" fill="currentColor" aria-hidden="true">
+          <path d="M85.22 21.5C82.19 25.26 76.62 27.15 80.04 33.5C78.19 34.93 73.81 34.11 71.5 34.11C65.76 34.11 60.05 34.17 55.18 37.34C52.36 39.18 49.2 42.78 48.17 45.99C46.01 52.69 48.29 60.04 43.93 66.12C37.35 75.31 21.27 74.04 17.14 63.1C15.27 58.17 15.83 52.75 15.82 47.5C15.82 42.49 14.88 36.37 16.09 31.5C20.73 12.77 38.87 15.83 54.17 15.82C62.61 15.82 79.9 13.51 85.22 21.5ZM97.5 42.99C96.68 42.49 95.87 42 95.05 41.5C93.4 33.97 86.39 34.77 84.93 30.5C85.62 27.08 90.45 26.49 92.71 24.21C94.39 22.52 94.33 19.78 96.1 18.26C96.94 17.54 98.77 17.51 99.66 18.19C101.5 19.58 101.71 22.69 103.38 24.42C105.13 26.24 108.03 26.39 109.66 28.18C110.35 28.94 110.36 30.54 109.89 31.42C108.69 33.71 104.24 34.45 102.39 36.56C100.46 38.76 100.78 42.04 97.5 42.99ZM88.83 42.01C92.64 50.68 97.62 49.41 104.5 45.74C114.19 51.39 112.18 64.92 112.18 74.5C112.18 89.53 115 107.5 96.5 111.92C92.59 112.85 87.84 112.17 83.83 112.18C80.17 112.18 74.17 113.31 70.83 111.83C70.91 109.21 77.03 105.44 77.83 101.68C78.82 96.96 78.25 91.63 78.24 86.83C78.22 76.7 80.6 62.57 70.59 56.25C68.55 54.95 65.63 53.26 63.17 53.07C60.82 52.88 57.93 53.56 55.84 52.5C55.51 50.62 56.06 49.23 56.82 47.67C60.85 39.37 72.48 41.77 80.17 41.77C82.87 41.77 86.25 41.25 88.83 42.01ZM16.5 71.87C20.68 74.1 22.96 78.83 27.92 79.86C37.9 81.95 50.27 78.09 59.83 81.07C69.15 83.99 73.48 95.56 68.77 103.93C63.94 112.51 54.86 112.18 46.17 112.18C32.45 112.18 19.97 112.46 16.08 96.5C15.35 93.5 15.82 89.91 15.82 86.83C15.82 84.11 15.05 73.39 16.5 71.87Z" fill="currentColor" stroke="currentColor" stroke-width="0.25" stroke-linejoin="round" fill-rule="evenodd"/>
         </svg>
-        <span style="writing-mode: vertical-rl; letter-spacing: 1px;">怡氧知知</span>
       `
 
       // ── Position logic ──
@@ -134,11 +136,10 @@ export default defineContentScript({
         container.style.top = `${clampedY}px`
         container.style.transform = edge === 'left' ? 'translate(0, -50%)' : 'translate(-100%, -50%)'
 
-        // Arrow points toward the side panel direction: → on right edge,
-        // ← on left edge. Flips via scaleX(-1) for instant re-rendering
-        // without rebuilding the DOM node.
-        const arrow = container.querySelector('#cw-arrow')
-        if (arrow) arrow.style.transform = edge === 'left' ? 'scaleX(-1)' : 'none'
+        // The brand mark is intentionally not flipped on the left edge:
+        // a mirrored logo hides the sparkle (top-right corner) and reads
+        // as a different wordmark on the other side. The translate(-100%)
+        // on the right edge already keeps the button flush to the edge.
       }
       reposition()
 
