@@ -263,7 +263,18 @@ export async function discoverWebMCPToolsInCurrentWindow(windowId?: number): Pro
         : await getRegistryEntries()
 
     const discoveredAt = Date.now()
-    const tools = entriesToDiscoveredTools(registryEntries)
+    const rawTools = entriesToDiscoveredTools(registryEntries)
+    // Dedup: the same site (groupKey) opened in N tabs reports identical
+    // tools N times — surface each tool ONCE in the flat list so the model
+    // doesn't see phantom duplicates. Invoke routing below still learns
+    // every tab via rememberGroupTab/rememberRoute for fallback dispatch.
+    const seenKeys = new Set<string>()
+    const tools = rawTools.filter((t) => {
+      const key = `${t.groupKey ?? t.hostname}::${t.fullName ?? t.name}`
+      if (seenKeys.has(key)) return false
+      seenKeys.add(key)
+      return true
+    })
     const discoveredTabs = new Set(registryEntries.map((entry) => entry.tabId))
 
     // Refresh the invoke route cache from registry data (consumed by

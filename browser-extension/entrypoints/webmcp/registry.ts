@@ -277,7 +277,13 @@ export async function clearRegistry(): Promise<void> {
   notifyRegistryUpdated()
 }
 
-/** Live tabs per current registry state (queried fresh so closed tabs drop out). */
+/** Live tabs per current registry state (queried fresh so closed tabs drop out).
+ *
+ * Also drops GHOST entries: a tab that navigated away from its WebMCP host
+ * (e.g. site → chrome:// page). The static content script no longer runs on
+ * the new URL, so no empty-snapshot report ever arrives — without this
+ * hostname check the stale entry would ride the still-alive tabId forever.
+ */
 export async function getRegistryEntries(): Promise<WebMCPRegisteredTabEntry[]> {
   await hydrate()
   let tabsById = new Map<number, chrome.tabs.Tab>()
@@ -292,15 +298,38 @@ export async function getRegistryEntries(): Promise<WebMCPRegisteredTabEntry[]> 
   }
 
   const alive: WebMCPRegisteredTabEntry[] = []
+  let ghosts: number[] = []
   for (const entry of entries.values()) {
     const tab = tabsById.get(entry.tabId)
     if (!tab) continue // closed
+    // Ghost check: tab must still be on the entry's hostname. A tab that
+    // navigated elsewhere (or to an unsupported URL) loses its content
+    // script and can never send the empty-snapshot deregistration.
+    let tabHost: string | null = null
+    try {
+      tabHost = typeof tab.url === 'string' ? new URL(tab.url).hostname : null
+    } catch {
+      tabHost = null
+    }
+    if (!tabHost || tabHost !== entry.hostname) {
+      ghosts.push(entry.tabId)
+      continue
+    }
     alive.push({
       ...entry,
       tabTitle: tab.title || entry.tabTitle,
       tabUrl: tab.url || entry.tabUrl,
       windowId: tab.windowId ?? entry.windowId,
     })
+  }
+  // Reap ghost entries so they don't resurface on the next read.
+  if (ghosts.length > 0) {
+    for (const tabId of ghosts) {
+      entries.delete(tabId)
+      seenTabs.delete(tabId)
+    }
+    await persist()
+    notifyRegistryUpdated()
   }
   return alive.sort((a, b) => b.updatedAt - a.updatedAt)
 }

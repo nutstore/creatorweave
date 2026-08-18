@@ -504,6 +504,36 @@ async function handleFetchRender(message) {
 declare const __CW_CODEX_OAUTH__: boolean;
 const CODEX_OAUTH_ENABLED: boolean = __CW_CODEX_OAUTH__;
 
+// Module-level holder for the Codex block's exports. The block below keeps
+// its original `if (CODEX_OAUTH_ENABLED) {}` scoping (store build: block is
+// folded away, CODEX stays null, no OpenAI strings ship). Dev build (no
+// minify): the block RUNS and populates CODEX, so call sites inside
+// defineBackground can access the helpers via CODEX.xxx — fixing the
+// ReferenceError where bare names leaked across the block boundary.
+interface CodexTokensLike { access_token?: string | null; refresh_token?: string; [k: string]: unknown }
+interface CodexBlockExports {
+  getCodexTokens(): Promise<CodexTokensLike | null>;
+  decodeJwtPayload(token: string): Record<string, any> | null;
+  refreshCodexAccessToken(tokens: CodexTokensLike): Promise<CodexTokensLike>;
+  saveCodexTokens(tokens: unknown): Promise<void>;
+  getPendingCodexAuth(): Promise<Record<string, any> | null>;
+  savePendingCodexAuth(data: unknown): Promise<void>;
+  clearPendingCodexAuth(): Promise<void>;
+  pollCodexAuthOnce(deviceAuthId: string, userCode: string): Promise<Record<string, any>>;
+  parseJsonSafe(resp: Response): Promise<{ text: string; json: any }>;
+  codexHeaders(tokens: CodexTokensLike): Record<string, string>;
+  getCodexResetCredits(tokens: CodexTokensLike): Promise<unknown>;
+  consumeCodexResetCredit(tokens: CodexTokensLike, creditId: string): Promise<unknown>;
+  DEVICEAUTH_USERCODE_URL: string;
+  DEVICE_VERIFY_URL: string;
+  CODEX_CLIENT_ID: string;
+  CODEX_AUTH_POLL_ALARM: string;
+  CODEX_RESPONSES_URL: string;
+  TOKEN_REFRESH_MARGIN_MS: number;
+  CODEX_DEFAULT_MODELS: unknown;
+}
+let CODEX = null as null | CodexBlockExports;
+
 // The entire Codex block below is wrapped in `if (CODEX_OAUTH_ENABLED) {}`.
 // This is what makes the store build (CW_CODEX_OAUTH=0) actually DROP the
 // code: esbuild folds `if (false) { ... }` at block level and eliminates the
@@ -736,6 +766,31 @@ async function pollCodexAuthOnce(deviceAuthId: string, userCode: string) {
   return { ok: true, done: true };
 }
 
+// Populate the module-level holder so defineBackground call sites can reach
+// these block-scoped helpers. Runs only when CODEX_OAUTH_ENABLED (dev/prod
+// internal builds); the store build folds the whole block away.
+CODEX = {
+  getCodexTokens,
+  decodeJwtPayload,
+  refreshCodexAccessToken,
+  saveCodexTokens,
+  getPendingCodexAuth,
+  savePendingCodexAuth,
+  clearPendingCodexAuth,
+  pollCodexAuthOnce,
+  parseJsonSafe,
+  codexHeaders,
+  getCodexResetCredits,
+  consumeCodexResetCredit,
+  DEVICEAUTH_USERCODE_URL,
+  DEVICE_VERIFY_URL,
+  CODEX_CLIENT_ID,
+  CODEX_AUTH_POLL_ALARM,
+  CODEX_RESPONSES_URL,
+  TOKEN_REFRESH_MARGIN_MS,
+  CODEX_DEFAULT_MODELS,
+};
+
 }
 
 // ============================================================
@@ -753,25 +808,25 @@ export default defineBackground(() => {
 
   async function proactiveRefreshIfNeeded() {
     try {
-      const tokens = await getCodexTokens();
+      const tokens = await CODEX!.getCodexTokens();
       if (!tokens?.access_token) return;
 
-      const payload = decodeJwtPayload(tokens.access_token);
+      const payload = CODEX!.decodeJwtPayload(tokens.access_token);
       if (!payload?.exp) return; // can't determine expiry, skip
 
       const expiresAt = payload.exp * 1000; // JWT exp is in seconds
       const now = Date.now();
 
-      if (now >= expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+      if (now >= expiresAt - CODEX!.TOKEN_REFRESH_MARGIN_MS) {
         // Token is expired or about to expire — try refresh
         if (tokens.refresh_token) {
           try {
-            await refreshCodexAccessToken(tokens);
+            await CODEX!.refreshCodexAccessToken(tokens);
           } catch (err) {
             console.warn('[Codex] Proactive refresh failed:', err instanceof Error ? err.message : err);
             // Clear tokens if refresh fails and token is already expired
             if (now >= expiresAt) {
-              await saveCodexTokens({ ...tokens, access_token: null });
+              await CODEX!.saveCodexTokens({ ...tokens, access_token: null });
             }
           }
         }
@@ -800,18 +855,18 @@ export default defineBackground(() => {
       return
     }
 
-    if (!CODEX_OAUTH_ENABLED || alarm.name !== CODEX_AUTH_POLL_ALARM) return;
+    if (!CODEX_OAUTH_ENABLED || alarm.name !== CODEX!.CODEX_AUTH_POLL_ALARM) return;
     try {
-      const pending = await getPendingCodexAuth();
+      const pending = await CODEX!.getPendingCodexAuth();
       if (!pending) {
-        await chrome.alarms.clear(CODEX_AUTH_POLL_ALARM);
+        await chrome.alarms.clear(CODEX!.CODEX_AUTH_POLL_ALARM);
         return;
       }
       if (!pending.expires_at || pending.expires_at <= Date.now()) {
-        await clearPendingCodexAuth();
+        await CODEX!.clearPendingCodexAuth();
         return;
       }
-      await pollCodexAuthOnce(pending.device_auth_id, pending.user_code);
+      await CODEX!.pollCodexAuthOnce(pending.device_auth_id, pending.user_code);
     } catch {
       // keep alarm for next retry
     }
@@ -965,6 +1020,52 @@ export default defineBackground(() => {
     _agentNotifTabs.delete(notifId)
   })
 
+  // ── Side panel open (shared: floating page button toggle + popup CTA) ──
+  // Synchronous on purpose: chrome.sidePanel.open() must be called within
+  // the user-gesture call stack of the triggering onMessage handler.
+  function openSidePanelForTab(tabId: number, pageUrl: string): void {
+    const bindingId = crypto.randomUUID()
+    rememberSidePanelBinding(bindingId, tabId)
+
+    const params = new URLSearchParams()
+    params.set('source', 'side_panel')
+    params.set('binding', bindingId)
+    if (pageUrl) {
+      try {
+        params.set('origin', new URL(pageUrl).origin)
+      } catch {}
+    }
+
+    const isDev = import.meta.env.MODE === 'development'
+    const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
+    const cwUrl = `${cwBase}/#/?${params.toString()}`
+    // eslint-disable-next-line no-console
+    console.log('[CreatorWeave][bg] opening side panel', {
+      tabId,
+      pageUrl,
+      cwUrl,
+    })
+
+    // setOptions must run BEFORE open; do NOT await (preserves user gesture).
+    // Pattern from Chrome's official sample + the user-gesture thread:
+    // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
+    chrome.sidePanel.setOptions({
+      tabId,
+      path: cwUrl,
+      enabled: true,
+    })
+
+    chrome.sidePanel.open({ tabId }).then(() => {
+      _sidePanelTabs.add(tabId)
+    }).catch((err: any) => {
+      console.warn(
+        '[CreatorWeave] Side panel open failed, falling back to new tab:',
+        err,
+      )
+      chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
+    })
+  }
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // ── Side Panel: toggle open/close on user click ──
     // Per Chrome's official sample, chrome.sidePanel.open() can be called
@@ -1003,47 +1104,31 @@ export default defineBackground(() => {
       }
 
       // ── Toggle open ──
-      const pageUrl = typeof message.url === 'string' ? message.url : ''
-      const bindingId = crypto.randomUUID()
-      rememberSidePanelBinding(bindingId, tabId)
+      openSidePanelForTab(tabId, typeof message.url === 'string' ? message.url : '')
+      return false
+    }
 
-      const params = new URLSearchParams()
-      params.set('source', 'side_panel')
-      params.set('binding', bindingId)
-      if (pageUrl) {
-        try {
-          params.set('origin', new URL(pageUrl).origin)
-        } catch {}
+    // ── Side panel: binding registration, from the popup CTA ──
+    // The popup calls chrome.sidePanel.open() DIRECTLY (in its own click
+    // handler) because the user gesture required by open() does NOT survive
+    // the popup → background message hop (it does for the floating button's
+    // content-script click → background hop, which is the documented special
+    // case this listener was built for). The popup still needs the binding
+    // registered here (storage) and the tab marked as panel-open so the
+    // floating button's toggle semantics stay correct.
+    // Fire-and-forget from the popup: storage.local writes settle in ~ms,
+    // while the panel's web app resolves the binding much later (at the
+    // first page-context pull), so the race window is negligible.
+    if (message.type === 'cw_side_panel_register_binding') {
+      const bindingId = message.bindingId
+      const tabId = message.tabId
+      if (typeof bindingId !== 'string' || typeof tabId !== 'number') {
+        sendResponse({ ok: false, error: 'missing bindingId or tabId' })
+        return false
       }
-
-      const isDev = import.meta.env.MODE === 'development'
-      const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
-      const cwUrl = `${cwBase}/#/?${params.toString()}`
-      // eslint-disable-next-line no-console
-      console.log('[CreatorWeave][bg] opening side panel', {
-        tabId,
-        pageUrl,
-        cwUrl,
-      })
-
-      // setOptions must run BEFORE open; do NOT await (preserves user gesture).
-      // Pattern from Chrome's official sample + the user-gesture thread:
-      // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
-      chrome.sidePanel.setOptions({
-        tabId,
-        path: cwUrl,
-        enabled: true,
-      })
-
-      chrome.sidePanel.open({ tabId }).then(() => {
-        _sidePanelTabs.add(tabId)
-      }).catch((err: any) => {
-        console.warn(
-          '[CreatorWeave] Side panel open failed, falling back to new tab:',
-          err,
-        )
-        chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
-      })
+      rememberSidePanelBinding(bindingId, tabId)
+      _sidePanelTabs.add(tabId)
+      sendResponse({ ok: true })
       return false
     }
 
@@ -1369,7 +1454,17 @@ export default defineBackground(() => {
         }
 
         if (message.type === 'webmcp_discover_tools') {
-          const senderWindowId = _sender?.tab?.windowId;
+          // Window scoping: a web page sender is scoped to ITS window via
+          // sender.tab.windowId. The popup (no sender.tab) must scope itself
+          // explicitly — it passes options.windowId from its own
+          // chrome.windows.getCurrent(). Without this the popup's discover
+          // returned a CROSS-WINDOW global list (“ghost” sites from other
+          // windows). Only trusted extension-internal senders may override.
+          const isExtensionInternalSender = !_sender?.tab;
+          const senderWindowId = _sender?.tab?.windowId
+            ?? (isExtensionInternalSender && typeof message?.options?.windowId === 'number'
+              ? message.options.windowId
+              : undefined);
           const response = await discoverWebMCPToolsInCurrentWindow(senderWindowId);
           // Authorization is enforced at DISCOVERY time: tools from disabled
           // hosts/groups are filtered out entirely — a disabled site simply
@@ -1469,12 +1564,12 @@ export default defineBackground(() => {
         }
 
         if (CODEX_OAUTH_ENABLED && message.type === 'codex_auth_start') {
-          const resp = await fetch(DEVICEAUTH_USERCODE_URL, {
+          const resp = await fetch(CODEX!.DEVICEAUTH_USERCODE_URL, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ client_id: CODEX_CLIENT_ID }),
+            body: JSON.stringify({ client_id: CODEX!.CODEX_CLIENT_ID }),
           });
-          const { text, json } = await parseJsonSafe(resp);
+          const { text, json } = await CODEX!.parseJsonSafe(resp);
           if (!resp.ok) {
             sendResponse({ ok: false, status: resp.status, error: json || text });
             return;
@@ -1482,11 +1577,11 @@ export default defineBackground(() => {
 
           const data = {
             ...json,
-            verification_uri: DEVICE_VERIFY_URL,
-            verification_uri_complete: DEVICE_VERIFY_URL,
+            verification_uri: CODEX!.DEVICE_VERIFY_URL,
+            verification_uri_complete: CODEX!.DEVICE_VERIFY_URL,
           };
 
-          await savePendingCodexAuth({
+          await CODEX!.savePendingCodexAuth({
             user_code: data.user_code,
             device_auth_id: data.device_auth_id,
             verification_uri: data.verification_uri,
@@ -1495,7 +1590,7 @@ export default defineBackground(() => {
             interval: data.interval || 5,
           });
 
-          await chrome.alarms.create(CODEX_AUTH_POLL_ALARM, { periodInMinutes: 1 });
+          await chrome.alarms.create(CODEX!.CODEX_AUTH_POLL_ALARM, { periodInMinutes: 1 });
 
           sendResponse({ ok: true, data });
           return;
@@ -1506,7 +1601,7 @@ export default defineBackground(() => {
           let userCode = message.userCode;
 
           if (!deviceAuthId || !userCode) {
-            const pending = await getPendingCodexAuth();
+            const pending = await CODEX!.getPendingCodexAuth();
             deviceAuthId = pending?.device_auth_id;
             userCode = pending?.user_code;
           }
@@ -1516,28 +1611,28 @@ export default defineBackground(() => {
             return;
           }
 
-          const result = await pollCodexAuthOnce(deviceAuthId, userCode);
+          const result = await CODEX!.pollCodexAuthOnce(deviceAuthId, userCode);
           sendResponse(result);
           return;
         }
 
         if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_status') {
-          const tokens = await getCodexTokens();
-          const pending = await getPendingCodexAuth();
+          const tokens = await CODEX!.getCodexTokens();
+          const pending = await CODEX!.getPendingCodexAuth();
           let authState: string = 'idle';
           let authorized = false;
 
           if (tokens?.access_token) {
             // Check if access token is actually still valid (JWT exp)
-            const payload = decodeJwtPayload(tokens.access_token);
+            const payload = CODEX!.decodeJwtPayload(tokens.access_token);
             const expiresAt = payload?.exp ? payload.exp * 1000 : 0;
             const now = Date.now();
 
-            if (expiresAt && now >= expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+            if (expiresAt && now >= expiresAt - CODEX!.TOKEN_REFRESH_MARGIN_MS) {
               // Token expired or about to expire — try proactive refresh
               if (tokens.refresh_token) {
                 try {
-                  await refreshCodexAccessToken(tokens);
+                  await CODEX!.refreshCodexAccessToken(tokens);
                   authState = 'authorized';
                   authorized = true;
                 } catch {
@@ -1557,7 +1652,7 @@ export default defineBackground(() => {
           } else if (pending) {
             // Remove expired/orphaned device-code state so the popup cannot
             // keep polling an old login attempt forever.
-            await clearPendingCodexAuth();
+            await CODEX!.clearPendingCodexAuth();
             if (tokens && !tokens.access_token) authState = 'expired';
           } else if (tokens && !tokens.access_token) {
             authState = 'expired';
@@ -1568,7 +1663,7 @@ export default defineBackground(() => {
             data: {
               authorized,
               authState,
-              models: CODEX_DEFAULT_MODELS,
+              models: CODEX!.CODEX_DEFAULT_MODELS,
               updatedAt: tokens ? await chrome.storage.local.get('codex_token_saved_at').then(r => r.codex_token_saved_at || null) : null,
             },
           });
@@ -1582,13 +1677,13 @@ export default defineBackground(() => {
         }
 
         if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_reset_credits') {
-          const tokens = await getCodexTokens();
+          const tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
             return;
           }
           try {
-            const data = await getCodexResetCredits(tokens);
+            const data = await CODEX!.getCodexResetCredits(tokens);
             sendResponse({ ok: true, data });
           } catch (err: any) {
             sendResponse({ ok: false, errorCode: 'RESET_CREDITS_UNAVAILABLE', status: 502, message: String(err?.message || err) });
@@ -1597,7 +1692,7 @@ export default defineBackground(() => {
         }
 
         if (CODEX_OAUTH_ENABLED && message.type === 'codex_consume_reset_credit') {
-          const tokens = await getCodexTokens();
+          const tokens = await CODEX!.getCodexTokens();
           const creditId = typeof message.creditId === 'string' ? message.creditId : '';
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
@@ -1608,7 +1703,7 @@ export default defineBackground(() => {
             return;
           }
           try {
-            const data = await consumeCodexResetCredit(tokens, creditId);
+            const data = await CODEX!.consumeCodexResetCredit(tokens, creditId);
             sendResponse({ ok: true, data });
           } catch (err: any) {
             sendResponse({ ok: false, errorCode: 'RESET_CREDIT_CONSUME_FAILED', status: 502, message: String(err?.message || err) });
@@ -1617,13 +1712,13 @@ export default defineBackground(() => {
         }
 
         if (CODEX_OAUTH_ENABLED && message.type === 'codex_proxy_fetch') {
-          let tokens = await getCodexTokens();
+          let tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
             return;
           }
 
-          const requestUrl = message.url || CODEX_RESPONSES_URL;
+          const requestUrl = message.url || CODEX!.CODEX_RESPONSES_URL;
           const requestInit: RequestInit = {
             method: message.method || 'POST',
             body: message.body ? JSON.stringify(message.body) : undefined,
@@ -1631,15 +1726,15 @@ export default defineBackground(() => {
 
           let resp = await fetch(requestUrl, {
             ...requestInit,
-            headers: codexHeaders(tokens.access_token, message.headers || {}),
+            headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
           });
 
           if (resp.status === 401 && tokens?.refresh_token) {
             try {
-              tokens = await refreshCodexAccessToken(tokens);
+              tokens = await CODEX!.refreshCodexAccessToken(tokens);
               resp = await fetch(requestUrl, {
                 ...requestInit,
-                headers: codexHeaders(tokens.access_token, message.headers || {}),
+                headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
               });
             } catch (refreshErr) {
               sendResponse({ ok: false, errorCode: 'REAUTH_REQUIRED', status: 401, message: 'Token refresh failed. Please re-authorize in the extension popup.' });
@@ -1909,7 +2004,7 @@ export default defineBackground(() => {
         }, STREAM_TIMEOUT_MS);
 
         try {
-          let tokens = await getCodexTokens();
+          let tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
             clearTimeout(timeoutId);
             port.postMessage({ type: 'error', errorCode: 'NOT_AUTHORIZED', message: 'Not authorized. Please complete device code login first.' });
@@ -1917,23 +2012,23 @@ export default defineBackground(() => {
             return;
           }
 
-          const requestUrl = message.url || CODEX_RESPONSES_URL;
+          const requestUrl = message.url || CODEX!.CODEX_RESPONSES_URL;
           const body = { ...(message.body || {}), stream: true };
 
           let resp = await fetch(requestUrl, {
             method: 'POST',
             body: JSON.stringify(body),
-            headers: codexHeaders(tokens.access_token, message.headers || {}),
+            headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
           });
 
           // Auto-refresh on 401
           if (resp.status === 401 && tokens?.refresh_token) {
             try {
-              tokens = await refreshCodexAccessToken(tokens);
+              tokens = await CODEX!.refreshCodexAccessToken(tokens);
               resp = await fetch(requestUrl, {
                 method: 'POST',
                 body: JSON.stringify(body),
-                headers: codexHeaders(tokens.access_token, message.headers || {}),
+                headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
               });
             } catch (refreshErr) {
               clearTimeout(timeoutId);

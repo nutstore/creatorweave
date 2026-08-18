@@ -210,6 +210,31 @@ export default defineContentScript({
             respond({ ok: true, result: normalized, apiMode: api!.mode })
           } catch (error: any) {
             const message = typeof error?.message === 'string' ? error.message : String(error)
+            // The @mcp-b/global polyfill cancels an invocation when the
+            // tool's definition is replaced mid-flight. The dominant cause
+            // is the page navigating DURING the tool (form submit, router.push,
+            // window.location.assign) — the tool's handleClick ran and likely
+            // completed its work (POST succeeded), but the page tore itself
+            // down and re-registered the tool with a fresh signature before
+            // the polyfill could hand the result back. Reporting this as a
+            // hard failure makes the popup/side panel say "tool failed" even
+            // though the operation silently succeeded on the server.
+            //
+            // Surface it as a soft-success with a `note` so the UI can show
+            // "tool likely succeeded — page changed; verify on the destination
+            // page" instead of a red error. The `result` field carries the
+            // marker so callers can branch on it without parsing strings.
+            if (message.includes('Tool execution cancelled, since tool definition was updated')) {
+              respond({
+                ok: true,
+                result: {
+                  _toolExecutionStatus: 'tool_likely_succeeded_after_navigation',
+                  note: 'The tool call appears to have completed; the page navigated before the result stream came back. Verify the operation on the destination page.',
+                },
+                apiMode: api!.mode,
+              })
+              return
+            }
             respond({
               ok: false,
               errorCode: message.startsWith('Tool not found in tab:') ? 'TOOL_NOT_FOUND' : 'INVOKE_FAILED',
