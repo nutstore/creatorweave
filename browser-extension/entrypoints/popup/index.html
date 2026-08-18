@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EO2Weave</title>
+  <!-- No <title> on purpose: WXT derives the toolbar tooltip
+       (action.default_title) from the popup <title> and it OVERRIDES the
+       per-mode default_title set in wxt.config.ts (dev vs prod naming).
+       Omitting it lets the manifest config control the tooltip. -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     /* Slim scrollbars — the narrow 360px popup makes the default chunky

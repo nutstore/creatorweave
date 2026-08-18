@@ -1,5 +1,6 @@
 {
   "extensionName": { "message": "EO2Weave" },
+  "extensionNameDev": { "message": "EO2Weave Dev" },
   "webmcpFoundSummary": {
     "message": "WebMCP: $HOSTS$ site(s), $TOOLS$ tool(s) available",
     "placeholders": {
