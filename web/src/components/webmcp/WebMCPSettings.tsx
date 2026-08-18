@@ -1,52 +1,35 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
-import { useWebMCPStore } from '@/webmcp'
 import {
-  applyWebMCPGlobalToggle,
   isWebMCPBridgeAvailable,
   refreshWebMCPCatalog,
+  useWebMCPStore,
 } from '@/webmcp'
 import { useSettingsStore } from '@/store/settings.store'
 import { useExtensionStore } from '@/store/extension.store'
 import { WebMCPGlobalToggleCard } from './WebMCPGlobalToggleCard'
-import { WebMCPHostList } from './WebMCPHostList'
-import { WebMCPSetupGuideCard } from './WebMCPSetupGuideCard'
 
 /**
- * WebMCP settings — read-only authorization view.
- * Host/group switches are managed exclusively in the extension popup
- * (extension storage is the single source of truth; the background invoke
- * gate enforces it). The web side only shows the mirrored state synced
- * from discovery annotations and manages the global on/off + refresh.
+ * WebMCP settings — connection status only.
+ *
+ * Everything else (host/group authorization switches, per-site management)
+ * lives exclusively in the extension popup. The extension-side store
+ * (chrome.storage.local) is the single source of truth and the background
+ * invoke gate enforces it; this page exists to tell the user whether the
+ * bridge is alive and to refresh the catalog.
  */
 export function WebMCPSettings() {
   const t = useT()
-  const catalogByHost = useWebMCPStore((state) => state.catalogByHost)
-  const enabledByHost = useWebMCPStore((state) => state.enabledByHost)
-  const enabledByGroup = useWebMCPStore((state) => state.enabledByGroup)
   const lastScanAt = useWebMCPStore((state) => state.lastScanAt)
   const globalEnabled = useSettingsStore((state) => state.enableWebMCP)
   const extensionStatus = useExtensionStore((state) => state.status)
   const extensionInstalled = extensionStatus === 'installed'
   const [refreshing, setRefreshing] = useState(false)
-  const [togglingGlobal, setTogglingGlobal] = useState(false)
 
   const bridgeAvailable = isWebMCPBridgeAvailable()
 
-  const hosts = useMemo(
-    () =>
-      Object.values(catalogByHost).sort((a, b) =>
-        a.hostname.localeCompare(b.hostname)
-      ),
-    [catalogByHost]
-  )
-
   const handleRefresh = async () => {
-    if (!globalEnabled) {
-      toast.error(t('settings.webMCPDisabled'))
-      return
-    }
     if (!bridgeAvailable) {
       toast.error(t('settings.webMCPBridgeUnavailable'))
       return
@@ -67,23 +50,6 @@ export function WebMCPSettings() {
     }
   }
 
-  const handleToggleGlobal = async (enabled: boolean) => {
-    setTogglingGlobal(true)
-    try {
-      const count = await applyWebMCPGlobalToggle(enabled)
-      if (enabled) {
-        toast.success(
-          t('settings.webMCPRefreshSuccess').replace('{count}', String(count))
-        )
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
-    } finally {
-      setTogglingGlobal(false)
-    }
-  }
-
   const handleInstallExtension = () => {
     useExtensionStore.getState().openInstallGuide()
   }
@@ -98,29 +64,18 @@ export function WebMCPSettings() {
 
   return (
     <div className="space-y-4 py-1">
-      <p className="text-xs text-tertiary">{t('settings.webMCPDescription')}</p>
-
       <WebMCPGlobalToggleCard
         t={t}
         globalEnabled={globalEnabled}
-        togglingGlobal={togglingGlobal}
+        togglingGlobal={false}
         bridgeAvailable={bridgeAvailable}
         extensionInstalled={extensionInstalled}
         lastScanAt={lastScanAt}
         refreshing={refreshing}
-        onToggleGlobal={handleToggleGlobal}
+        onToggleGlobal={undefined}
         onRefresh={handleRefresh}
         onInstallExtension={handleInstallExtension}
         formatTime={formatTime}
-      />
-
-      <WebMCPSetupGuideCard t={t} />
-
-      <WebMCPHostList
-        t={t}
-        hosts={hosts}
-        enabledByHost={enabledByHost}
-        enabledByGroup={enabledByGroup}
       />
     </div>
   )

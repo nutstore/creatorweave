@@ -9,12 +9,19 @@ interface WebMCPGlobalToggleCardProps {
   extensionInstalled: boolean
   lastScanAt: number | null
   refreshing: boolean
-  onToggleGlobal: (enabled: boolean) => void
+  onToggleGlobal?: (enabled: boolean) => void
   onRefresh: () => void
   onInstallExtension: () => void
   formatTime: (timestamp: number) => string
 }
 
+/**
+ * WebMCP connection card — status + local discovery toggle only.
+ *
+ * Per-site / per-group authorization is managed exclusively in the
+ * extension popup; this card only tells the user whether the extension
+ * bridge is alive and offers a catalog refresh.
+ */
 export function WebMCPGlobalToggleCard({
   t,
   globalEnabled,
@@ -39,11 +46,13 @@ export function WebMCPGlobalToggleCard({
             {t('settings.webMCPGlobalToggleDesc')}
           </p>
         </div>
-        <BrandSwitch
-          checked={globalEnabled}
-          disabled={togglingGlobal}
-          onCheckedChange={onToggleGlobal}
-        />
+        {onToggleGlobal && (
+          <BrandSwitch
+            checked={globalEnabled}
+            disabled={togglingGlobal}
+            onCheckedChange={onToggleGlobal}
+          />
+        )}
       </div>
 
       <div className="mt-3 flex items-center justify-between rounded-md border border-neutral-200 bg-muted p-2.5 dark:border-neutral-700 dark:bg-neutral-900/40">
@@ -61,7 +70,7 @@ export function WebMCPGlobalToggleCard({
           variant="outline"
           className="h-8 gap-2 text-xs"
           onClick={onRefresh}
-          disabled={togglingGlobal || refreshing || !bridgeAvailable || !globalEnabled}
+          disabled={refreshing || !bridgeAvailable || !globalEnabled}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           {t('settings.webMCPRefresh')}
