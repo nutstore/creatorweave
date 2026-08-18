@@ -1,19 +1,28 @@
-# Browser Extension
+# Browser Extension (eo2weave)
 
-A browser extension that provides `web_search`, `web_fetch`, **Codex OAuth proxy**, and **WebMCP tool discovery** capabilities for CreatorWeave.
+The browser extension powering CreatorWeave: `web_search` / `web_fetch` for in-browser agents, **WebMCP tool discovery** (any website can expose agent-callable tools via the standard WebMCP API), Rust native-host disk/exec access, and an optional **Codex OAuth proxy**.
 
 Built with [WXT](https://wxt.dev/).
 
-## Setup
+## Distribution
+
+| Variant | Codex OAuth | How to get |
+|---------|-------------|------------|
+| Chrome Web Store | ❌ stripped at build time | Web Store listing |
+| Open-source community version | ✅ included | Build from source / GitHub release |
+
+```bash
+npm run build          # Full build (community version, Codex OAuth included)
+npm run zip            # Full .zip package
+npm run build:store    # Store build (CW_CODEX_OAUTH=0, strips Codex OAuth entirely)
+npm run zip:store      # Store .zip (Codex-stripped)
+```
+
+## Setup & Development
 
 ```bash
 cd browser-extension
 npm install
-```
-
-## Development (Recommended)
-
-```bash
 npm run watch
 ```
 
@@ -26,19 +35,13 @@ Then load the extension **once** in your own Chrome:
 
 After that, code changes trigger automatic extension reload — no need to reload manually.
 
-## Other Commands
+Other commands:
 
 ```bash
 npm run dev            # Auto-launch a new Chrome instance with extension loaded
-npm run build          # Production build to dist/chrome-mv3/
-npm run zip            # Package as .zip for Chrome Web Store
-npm run build:store    # Store build (CW_CODEX_OAUTH=0, strips Codex OAuth)
-npm run zip:store      # Store zip (Codex-stripped)
 ```
 
 ## Features
-
-Core features — identical in every distribution (community & store):
 
 ### Web Search & Fetch
 
@@ -62,6 +65,12 @@ if (window.__agentWeb?.ready) {
   // parser to extract the rendered content.
 }
 ```
+
+### WebMCP Tool Discovery
+
+Any website can expose tools (functions the AI agent can call) to CreatorWeave by registering them via the **standard WebMCP API** (`document.modelContext`). No private protocol, no allowlist, no registration process — the extension discovers standard-conforming tools automatically, keeps a live per-tab registry, and lets users grant/revoke per-site and per-tool-group authorization from the popup.
+
+→ Full integration guide for websites: [WebMCP Tools — Integration Guide](#webmcp-tools--integration-guide-for-websites)
 
 ## WebMCP Tools — Integration Guide for Websites
 
@@ -117,6 +126,41 @@ page registers tools
 
 The legacy scan-on-demand probe still exists as a fallback for tabs opened before the extension was (re)loaded; new tabs are pure push.
 
+### How the agent host invokes a tool
+
+Sites only **register** tools. **Calling** them is done by the agent host (the CreatorWeave web app) through the same `window.__agentWeb` bridge:
+
+```javascript
+// 1. Discover (flat list; each entry carries its own routing identity)
+const { tools } = await window.__agentWeb.webMCPDiscover();
+
+// 2. Pick a tool (inputSchema describes the expected arguments)
+const target = tools.find(
+  (t) => t.hostname === 'workspace.jianguoyun.com' && t.name === 'fetch_ticket_messages'
+);
+
+// 3. Invoke
+const resp = await window.__agentWeb.webMCPInvoke({
+  groupKey: target.groupKey,        // hostname_toolsetSignature
+  fullToolName: target.fullName,    // hostname__toolName (provider-safe)
+  args: { public_id: '175157', count: 30 },  // per the tool's inputSchema
+  preferredTabId: target.tabId,     // optional: pin execution to a specific tab
+});
+// → { ok, result, tabId, hostname, errorCode?, error? }
+```
+
+Under the hood: `webMCPInvoke` → background authorization gates (host + group; disabled tools are refused before any page script runs) → routing (`preferredTabId` → last successful route → any tab in the group) → relayed into the source tab → the page agent executes `executeTool(descriptor, JSON.stringify(args))` → result returns the same way.
+
+**Error codes worth handling:**
+
+| errorCode | Meaning | Recovery |
+|-----------|---------|----------|
+| `HOST_DISABLED` / `GROUP_DISABLED` | The user revoked authorization for this site/tool group | Ask the user to re-enable it in the extension popup |
+| `TOOL_TARGET_NOT_FOUND` | No open tab provides this group anymore | Ask the user to reopen the page, then re-invoke |
+| `TOOL_NOT_FOUND` | The page's toolset changed | Re-run `webMCPDiscover()` |
+
+Why the discovery response is a **flat list** (not host→group→tools): every consumer folds it differently — the agent registry uses it as-is, the popup and settings page group by host/group, and per-tool authorization filtering happens at the flat-record level in the background before the response leaves the extension. Nesting would only serve one view and lose the rest.
+
 ### Authorization model
 
 - **Default allow, opt-out per site and per tool group.** Users manage switches in the extension popup.
@@ -144,7 +188,7 @@ The legacy scan-on-demand probe still exists as a fallback for tabs opened befor
 - Test shim: `navigator.modelContextTesting` is also detected (listTools/executeTool), useful for pages that can't install the real API.
 - The registry is per-tab: navigate away or unregister tools and the tab disappears from the catalog automatically.
 
-## API
+## Bridge API Reference
 
 ### `window.__agentWeb.search(query, options?)`
 
@@ -175,11 +219,35 @@ Returns the page rendered as **clean Markdown** (via [Mozilla Readability](https
 }
 ```
 
+### `window.__agentWeb.codexGetStatus()` *(community version only)*
+
+Returns the current Codex OAuth authorization status:
+
+```javascript
+const resp = await window.__agentWeb.codexGetStatus();
+// { ok: true, data: { authorized: true, authState: 'authorized', models: [...] } }
+```
+
+### `window.__agentWeb.codexProxyFetchStream(body)` *(community version only)*
+
+Proxies a Codex Responses API request through the extension with SSE streaming:
+
+```javascript
+const stream = window.__agentWeb.codexProxyFetchStream({
+  model: 'gpt-5.4',
+  instructions: 'You are a helpful assistant.',
+  stream: true,
+  input: [...],
+});
+for await (const chunk of stream) {
+  // SSE text chunks
+}
+stream.cancel(); // Abort early if needed
+```
+
 ## Codex OAuth Proxy (Open-Source Community Version)
 
 > **Distribution note:** this feature ships with the **open-source community version** (build from source or grab the release from GitHub). The **Chrome Web Store version does not include it** — the store build (`build:store` / `zip:store`) strips the Codex OAuth feature entirely at build time (popup box, background handlers, i18n keys).
->
-> **Roadmap:** this proxy is planned to migrate into the Rust **native host**. Once it lives behind the native-messaging channel, the extension side reduces to a thin relay and the build-time strip becomes unnecessary.
 
 The extension enables using OpenAI Codex models directly from CreatorWeave, without exposing OAuth tokens to the web app.
 
@@ -203,31 +271,7 @@ The extension enables using OpenAI Codex models directly from CreatorWeave, with
 
 **Security:** OAuth tokens never leave the extension boundary. The web app only communicates through the extension bridge (`window.__agentWeb`).
 
-### `window.__agentWeb.codexGetStatus()` (community version)
-
-Returns the current Codex OAuth authorization status:
-
-```javascript
-const resp = await window.__agentWeb.codexGetStatus();
-// { ok: true, data: { authorized: true, authState: 'authorized', models: [...] } }
-```
-
-### `window.__agentWeb.codexProxyFetchStream(body)` (community version)
-
-Proxies a Codex Responses API request through the extension with SSE streaming:
-
-```javascript
-const stream = window.__agentWeb.codexProxyFetchStream({
-  model: 'gpt-5.4',
-  instructions: 'You are a helpful assistant.',
-  stream: true,
-  input: [...],
-});
-for await (const chunk of stream) {
-  // SSE text chunks
-}
-stream.cancel(); // Abort early if needed
-```
+> **Roadmap:** the Codex OAuth proxy may migrate from the extension background into the Rust native host (`native-host/`). The extension would become a pure relay, and the store build would no longer need build-time feature stripping.
 
 ## Project Structure
 
@@ -319,7 +363,7 @@ invoke: web app → webmcpInvokeTool → invoke.ts
   (legacy executeScript probe only for tabs predating extension load)
 ```
 
-### Codex Request Flow (community version)
+### Codex Request Flow *(community version)*
 
 ```
 Web App → fetch(chatgpt.com/...)
