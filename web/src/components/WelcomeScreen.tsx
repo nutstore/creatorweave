@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import { Send, FolderOpen, Sparkles, KeyRound, ChevronRight, Shield, Loader2, ImageIcon, ArrowRight, Check } from 'lucide-react'
+import { Send, FolderOpen, Sparkles, KeyRound, ChevronRight, Shield, Loader2, ImageIcon, ArrowRight, Check, Cable } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
@@ -18,6 +18,7 @@ import { useT } from '@/i18n'
 import { AgentRichInput, type AgentRichInputValue, type AgentInfo } from './agent/AgentRichInput'
 import type { FileMentionItem } from './agent/FileMentionExtension'
 import { useGatewayLogin, isLLMGatewayConfigured } from '@/hooks/useGatewayLogin'
+import { useNativeHostPing } from '@/hooks/useNativeHostPing'
 import { DeviceCodeFlowDialog } from './agent/DeviceCodeFlowDialog'
 import { PageScreenshotCropDialog } from './agent/PageScreenshotCropDialog'
 import type { SettingsTab } from '@/components/settings/SettingsDialog'
@@ -57,7 +58,14 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
   const modelName = useSettingsStore((s) => s.modelName)
   const folderRoots = useFolderAccessStore((s) => s.roots)
   const addRoot = useFolderAccessStore((s) => s.addRoot)
+  const addNativeHostRoot = useFolderAccessStore((s) => s.addNativeHostRoot)
+  const [isAddingNativeHost, setIsAddingNativeHost] = useState(false)
   const t = useT()
+  // Availability = full-chain ping (page → extension → Rust host), not just
+  // "bridge function exists" — hides the entry when the Rust app is not
+  // installed (click would fail with a raw Chrome "host not found" error).
+  // Re-probes on window focus.
+  const nativeHostAvailable = useNativeHostPing() === 'available'
   const gatewayAvailable = isLLMGatewayConfigured()
   const supportsVision = supportsImageInput(modelName)
   const canCaptureScreenshot = supportsVision && isPageActionAvailable()
@@ -118,6 +126,16 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
       console.error('Failed to open folder:', error)
     }
   }, [addRoot])
+
+  const handleAddNativeHostRoot = useCallback(async () => {
+    if (!nativeHostAvailable || isAddingNativeHost) return
+    setIsAddingNativeHost(true)
+    try {
+      await addNativeHostRoot()
+    } finally {
+      setIsAddingNativeHost(false)
+    }
+  }, [addNativeHostRoot, isAddingNativeHost, nativeHostAvailable])
 
   const handleInputChange = useCallback(
     ({ text }: AgentRichInputValue) => {
@@ -273,6 +291,21 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-neutral-400" />
             </button>
+
+            {/* Skip — users who already configured a key and came Back from
+                step 3 have no auto-advance; this is their forward exit. */}
+            <div className="flex justify-center px-4 pb-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (folderRoots.length === 0) setStep('mount-folder')
+                  else setStep('ready')
+                }}
+                className="inline-flex h-8 items-center text-xs text-neutral-500 transition-colors hover:text-foreground"
+              >
+                {t('welcome.skipButton')}
+              </button>
+            </div>
           </div>
         ) : step === 'mount-folder' ? (
           /* ── Step 3/3: Mount Local Folder ── */
@@ -298,6 +331,20 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               <FolderOpen className="h-4 w-4" />
               {t('welcome.mountFolderButton')}
             </button>
+            {nativeHostAvailable && (
+              <button
+                type="button"
+                onClick={() => void handleAddNativeHostRoot()}
+                disabled={isAddingNativeHost}
+                title={t('folderSelector.localConnectionDescription')}
+                className="ml-3 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-primary-200 bg-white px-5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 disabled:cursor-wait disabled:opacity-70 dark:border-primary-800 dark:bg-card dark:text-primary-300 dark:hover:bg-muted"
+              >
+                {isAddingNativeHost
+                  ? <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+                  : <Cable className="h-4 w-4" />}
+                {t('folderSelector.localConnection')}
+              </button>
+            )}
             {/* Already mounted folders */}
             {folderRoots.length > 0 && (
               <div className="mt-4 space-y-2">

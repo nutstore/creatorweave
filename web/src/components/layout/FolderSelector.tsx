@@ -24,6 +24,7 @@ import { useFolderAccessStore } from '@/store/folder-access.store'
 import { getRuntimeCapability } from '@/storage/runtime-capability'
 import { bindRuntimeDirectoryHandle } from '@/native-fs'
 import { useT } from '@/i18n'
+import { useNativeHostPing } from '@/hooks/useNativeHostPing'
 import { cn } from '@/lib/utils'
 import type { RootInfo } from '@/types/folder-access'
 
@@ -63,8 +64,10 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
 
   const runtimeCapability = getRuntimeCapability()
   const canPickDirectory = runtimeCapability.canPickDirectory
-  const nativeHostAvailable = typeof window !== 'undefined' &&
-    typeof (window as unknown as { __agentWeb?: { nativeHostCall?: unknown } }).__agentWeb?.nativeHostCall === 'function'
+  // Full-chain ping (page → extension → Rust host) instead of a shallow
+  // bridge-existence probe: hides the "Local connection" button when the
+  // Rust app is not installed. Re-probes on window focus.
+  const nativeHostAvailable = useNativeHostPing() === 'available'
 
   // Click outside to close dropdown
   useEffect(() => {

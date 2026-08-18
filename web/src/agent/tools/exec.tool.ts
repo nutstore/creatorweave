@@ -24,6 +24,7 @@
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 import { useExecAuthStore } from './exec-auth.store'
+import { isNativeHostReachable, probeNativeHost } from '@/lib/native-host-probe'
 
 // ─── Bridge types ──────────────────────────────────────────────
 
@@ -41,18 +42,29 @@ interface AgentWebBridge {
 
 /**
  * Check if the Native Host exec bridge is available.
- * Requires BOTH nativeHostCall and nativeHostCheckPolicy on __agentWeb.
+ * Requires BOTH nativeHostCall and nativeHostCheckPolicy on __agentWeb,
+ * AND a verified-ping native host (see native-host-probe.ts). The shallow
+ * bridge check alone would register exec with the extension installed but
+ * the Rust binary missing — every call would then fail with a raw Chrome
+ * "Native messaging host not found" error instead of the tool simply not
+ * existing for the model.
  */
 export function isExecBridgeAvailable(): boolean {
   const w = typeof window !== 'undefined'
     ? (window as unknown as { __agentWeb?: Partial<AgentWebBridge> })
     : undefined
   if (!w?.__agentWeb) return false
-  return (
+  const bridgePresent =
     typeof w.__agentWeb.nativeHostCall === 'function' &&
     typeof w.__agentWeb.nativeHostCheckPolicy === 'function'
-  )
+  if (!bridgePresent) return false
+  // Kick the cached probe (idempotent, dedup'd) and gate on its result.
+  // getToolRegistry() retries registerExecTool() on every access, so a
+  // successful ping registers exec on the next access after boot.
+  void probeNativeHost()
+  return isNativeHostReachable()
 }
+
 
 function getExecBridge(): AgentWebBridge | null {
   if (!isExecBridgeAvailable()) return null
