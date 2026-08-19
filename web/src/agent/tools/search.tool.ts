@@ -1,4 +1,5 @@
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
+import micromatch from 'micromatch'
 import { getSearchWorkerManager } from '@/workers/search-worker-manager'
 import type { PendingFileOverlay, SearchInDirectoryResult, FileSearchResult, SearchHit } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
@@ -125,6 +126,188 @@ function parseStructuredError(error: unknown): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+const NATIVE_SEARCH_DEFAULT_EXCLUDED_DIRS = [
+  '.git',
+  'node_modules',
+  'dist',
+  'build',
+  '.next',
+  'coverage',
+  '.cache',
+  '.turbo',
+  '.pnpm-store',
+]
+
+function buildTextMatcher(
+  query: string,
+  options: { regex: boolean; caseSensitive: boolean; wholeWord: boolean }
+): RegExp {
+  const flags = options.caseSensitive ? 'g' : 'gi'
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const source = options.regex ? query : escaped
+  return new RegExp(options.wholeWord ? `\\b(?:${source})\\b` : source, flags)
+}
+
+function findTextMatches(
+  path: string,
+  text: string,
+  matcher: RegExp,
+  contextLines: number,
+  maxMatches: number
+): SearchHit[] {
+  const lines = text.split('\n')
+  const hits: SearchHit[] = []
+  for (let index = 0; index < lines.length && hits.length < maxMatches; index++) {
+    const line = lines[index]
+    matcher.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = matcher.exec(line)) !== null && hits.length < maxMatches) {
+      const start = Math.max(0, index - contextLines)
+      const end = Math.min(lines.length, index + contextLines + 1)
+      hits.push({
+        path,
+        line: index + 1,
+        column: (match.index ?? 0) + 1,
+        match: match[0],
+        preview: contextLines > 0
+          ? lines.slice(start, end).join('\n')
+          : truncateSearchPreview(line, (match.index ?? 0) + 1),
+      })
+      if (match.index === matcher.lastIndex) matcher.lastIndex++
+    }
+  }
+  return hits
+}
+
+function truncateSearchPreview(line: string, column: number): string {
+  const maxLength = 200
+  if (line.length <= maxLength) return line
+  const budget = maxLength - 6
+  const start = Math.max(0, column - 1 - Math.floor(budget / 2))
+  const end = start + budget
+  return `${start > 0 ? '...' : ''}${line.slice(start, end)}${end < line.length ? '...' : ''}`
+}
+
+function asSearchText(content: unknown): string | null {
+  if (typeof content === 'string') return content
+  if (content instanceof Uint8Array) return new TextDecoder().decode(content)
+  if (content instanceof ArrayBuffer) return new TextDecoder().decode(content)
+  return null
+}
+
+/**
+ * Search roots backed by the Native Messaging host. These roots deliberately do
+ * not expose FileSystemDirectoryHandle, so they cannot be passed to the search
+ * worker; scan and read through WorkspaceRuntime instead.
+ */
+async function searchNativeHostRoots(
+  context: { workspaceId?: string | null; projectId?: string | null },
+  searchPath: string,
+  options: {
+    query: string
+    regex: boolean
+    caseSensitive: boolean
+    wholeWord: boolean
+    glob?: string
+    maxResults: number
+    contextLines: number
+    deadlineMs: number
+    maxFileSize: number
+    excludeDirs: string[]
+  }
+): Promise<SearchInDirectoryResult | null> {
+  if (!context.workspaceId || !context.projectId) return null
+
+  const manager = await getWorkspaceManager()
+  const workspace = await manager.getWorkspace(context.workspaceId)
+  if (!workspace) return null
+
+  const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+  const roots = (await getProjectRootRepository().findByProject(context.projectId))
+    .filter(root => root.backend === 'native-host')
+  if (roots.length === 0) return null
+
+  const requestedRoot = searchPath.split('/')[0]
+  const scopes = searchPath
+    ? roots.filter(root => root.name === requestedRoot).map(() => ({ path: searchPath, prefix: searchPath }))
+    : roots.map(root => ({ path: root.name, prefix: root.name }))
+  if (scopes.length === 0) return null
+
+  const result: SearchInDirectoryResult = {
+    results: [],
+    files: [],
+    totalMatches: 0,
+    scannedFiles: 0,
+    skippedFiles: 0,
+    truncated: false,
+    deadlineExceeded: false,
+  }
+  const deadlineAt = Date.now() + Math.max(1000, options.deadlineMs)
+  const matcher = buildTextMatcher(options.query, options)
+  const excludeDirs = [...NATIVE_SEARCH_DEFAULT_EXCLUDED_DIRS, ...options.excludeDirs]
+
+  for (const scope of scopes) {
+    if (Date.now() > deadlineAt) {
+      result.deadlineExceeded = true
+      break
+    }
+    const entries = await workspace.scanDiskTree(scope.path, 50, context.projectId, {
+      includeSizes: true,
+      excludeDirs,
+      maxEntries: 20_000,
+      deadlineMs: Math.max(1000, deadlineAt - Date.now()),
+    })
+    if (entries === null) return null
+    if (entries.length >= 20_000) result.truncated = true
+
+    // scanDiskTree lists directory contents. If the requested path is a file,
+    // fall back to reading that file directly.
+    const files = entries.filter(entry => entry.type === 'file').map(entry => ({
+      relativePath: entry.path,
+      path: `${scope.prefix}/${entry.path}`,
+      size: entry.size,
+    }))
+    if (searchPath && files.length === 0) {
+      files.push({ relativePath: '', path: searchPath, size: 0 })
+    }
+
+    for (const file of files) {
+      if (Date.now() > deadlineAt) {
+        result.deadlineExceeded = true
+        break
+      }
+      if (options.glob && !micromatch.isMatch(file.relativePath || file.path.split('/').pop()!, options.glob, { dot: true })) continue
+      if (file.size > options.maxFileSize) {
+        result.skippedFiles++
+        continue
+      }
+      try {
+        const read = await workspace.readFile(file.path, null, { projectId: context.projectId })
+        const text = asSearchText(read.content)
+        if (text === null || text.slice(0, 1024).includes('\0') || new TextEncoder().encode(text).length > options.maxFileSize) {
+          result.skippedFiles++
+          continue
+        }
+        result.scannedFiles++
+        const remaining = Math.max(0, options.maxResults - result.results.length)
+        const hits = findTextMatches(file.path, text, matcher, options.contextLines, remaining)
+        result.results.push(...hits)
+        result.totalMatches += hits.length
+        if (result.results.length >= options.maxResults) {
+          result.truncated = true
+          break
+        }
+      } catch {
+        // A directory or unreadable file is simply not searchable.
+        result.skippedFiles++
+      }
+    }
+    if (result.truncated || result.deadlineExceeded) break
+  }
+
+  return result
 }
 
 /**
@@ -492,7 +675,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     }
   }
 
-  if (!directoryHandle) {
+  if (!directoryHandle && searchPath.startsWith('vfs://')) {
     return toolErrorJson('search', 'no_active_workspace', 'No active workspace')
   }
 
@@ -549,10 +732,34 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     // Determine whether to search a single root or all roots
     let result: SearchInDirectoryResult
 
-    // The heavy I/O (search worker + overlay collection) is wrapped with a
-    // wall-clock timeout so a stalled worker doesn't hang the agent loop.
-    result = await withToolTimeout(
-      (async () => {
+    if (!directoryHandle) {
+      const nativeResult = await withToolTimeout(
+        searchNativeHostRoots(context, searchPath, {
+          query,
+          regex: useRegex,
+          caseSensitive: args.case_sensitive === true,
+          wholeWord: args.whole_word === true,
+          glob: typeof args.glob === 'string' ? args.glob : undefined,
+          maxResults: internalMaxResults,
+          contextLines,
+          deadlineMs: typeof args.deadline_ms === 'number' ? args.deadline_ms : 60000,
+          maxFileSize: Math.max(1, typeof args.max_file_size === 'number' ? args.max_file_size : 1024 * 1024),
+          excludeDirs: Array.isArray(args.exclude_dirs)
+            ? args.exclude_dirs.filter((v): v is string => typeof v === 'string')
+            : [],
+        }),
+        timeoutMs,
+        'search',
+      )
+      if (!nativeResult) {
+        return toolErrorJson('search', 'no_active_workspace', 'No active workspace')
+      }
+      result = nativeResult
+    } else {
+      // The heavy I/O (search worker + overlay collection) is wrapped with a
+      // wall-clock timeout so a stalled worker doesn't hang the agent loop.
+      result = await withToolTimeout(
+        (async () => {
         if (searchPath) {
           // Specific path provided — search single resolved root
           // Use resolvedRootName (the actual root handle name, e.g. "creatorweave")
@@ -586,10 +793,11 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
             return searchAllRoots(manager, allHandles, buildSearchOptions(), internalMaxResults)
           }
         }
-      })(),
-      timeoutMs,
-      'search',
-    )
+        })(),
+        timeoutMs,
+        'search',
+      )
+    }
 
     // Aggregate raw hits into file-level results
     let files = aggregateResultsToFiles(

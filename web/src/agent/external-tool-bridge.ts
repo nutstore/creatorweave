@@ -22,6 +22,7 @@ import { getMCPManager } from '@/mcp/mcp-manager'
 import { useWebMCPStore } from '@/webmcp/store'
 import { getWebMCPBridge } from '@/webmcp/bridge-client'
 import { consumeAndSavePluginDownload } from '@/webmcp/plugin-download'
+import { isSidePanelMode, getSidePanelHostname } from './workspace-assistant-context'
 
 // Zod validation (for WebMCP)
 import { z } from 'zod'
@@ -1133,6 +1134,172 @@ function validateToolArgs(
 //=============================================================================
 // Exports
 //=============================================================================
+
+//=============================================================================
+// Tool 3: get_page_tools (side-panel fast path)
+//=============================================================================
+//
+// In side-panel mode the task is almost always "operate the page the user is
+// browsing". Forcing the LLM through search_tools (cross-host BM25 / LLM
+// semantic search, 3ms-33s) just to learn this page's tool names is wasteful,
+// and call_tool requires the exact `${groupKey}_${fullName}` lookup name that
+// cannot be guessed. This tool returns the current page's enabled WebMCP
+// tools with full schemas in one cheap local store read — no search, no LLM.
+
+interface WebMCPRegisteredToolLike {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+  annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean }
+  hostname: string
+  groupKey: string
+  fullName: string
+  representativeTabId?: number
+}
+
+/**
+ * The tab id of the side-panel's bound upstream tab, as reported by the
+ * background's requestBoundPageContext response. Set by capturePageContext
+ * on every context pull; null when unknown (older plugin builds didn't
+ * attach it — falls back to hostname-only matching below).
+ */
+let _sidePanelBoundTabId: number | null = null
+
+export function setSidePanelBoundTabId(tabId: number | null): void {
+  _sidePanelBoundTabId = typeof tabId === 'number' ? tabId : null
+}
+
+/** Enabled WebMCP tools for the side-panel's bound upstream tab (empty otherwise).
+ *  Tab-scoped when the bound tab id is known: same-hostname tabs in different
+ *  apps (jmail.world / vs /messages) expose disjoint tool groups, and
+ *  hostname-only filtering would merge them. Falls back to hostname-only
+ *  for plugin builds that don't report the tab id. */
+export function collectSidePanelPageTools(): WebMCPRegisteredToolLike[] {
+  if (!isSidePanelMode()) return []
+  const hostname = getSidePanelHostname()
+  if (!hostname) return []
+  try {
+    const store = useWebMCPStore.getState()
+    return store
+      .getEnabledTools()
+      .filter(
+        (t) =>
+          t.hostname === hostname &&
+          (_sidePanelBoundTabId === null || t.representativeTabId === _sidePanelBoundTabId),
+      )
+  } catch {
+    return []
+  }
+}
+
+/** The exact string call_tool resolves for a page tool. */
+export function pageToolCallName(tool: WebMCPRegisteredToolLike): string {
+  return `${tool.groupKey}_${tool.fullName}`
+}
+
+export const getPageToolsDefinition: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'get_page_tools',
+    description:
+      'Get the WebMCP tools exposed by the page the user is currently browsing (side-panel mode), with their full parameter schemas and the exact call_tool names — no search needed. ' +
+      'This is the fastest path for tasks that operate on the current page. Returns the tool list only in side-panel mode.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tool: {
+          type: 'string',
+          description:
+            'Optional: return only this tool (short name like "search_emails", or the full call name). Omit to list all page tools.',
+        },
+      },
+    },
+  },
+}
+
+export const getPageToolsExecutor: ToolExecutor = async (args) => {
+  if (!isSidePanelMode()) {
+    return toolOkJson('get_page_tools', {
+      side_panel_mode: false,
+      tools: [],
+      message: 'Not in side-panel mode — there is no bound upstream page. Use search_tools instead.',
+    })
+  }
+  const hostname = getSidePanelHostname()
+  const tools = collectSidePanelPageTools()
+  if (tools.length === 0) {
+    return toolOkJson('get_page_tools', {
+      hostname,
+      count: 0,
+      tools: [],
+      message: `The current page (${hostname || 'unknown'}) exposes no WebMCP tools. Use search_tools for MCP/other-site tools, or the page tools (web_fetch etc.).`,
+    })
+  }
+
+  const rawFilter = (args as { tool?: unknown }).tool
+  const filter = typeof rawFilter === 'string' ? rawFilter.trim() : ''
+  const selected = filter
+    ? tools.filter((t) => t.name === filter || pageToolCallName(t) === filter || t.fullName === filter)
+    : tools
+
+  if (filter && selected.length === 0) {
+    return toolOkJson('get_page_tools', {
+      hostname,
+      count: tools.length,
+      tools: [],
+      message: `No page tool matches "${filter}". Available: ${tools.map((t) => t.name).join(', ')}.`,
+    })
+  }
+
+  return toolOkJson('get_page_tools', {
+    hostname,
+    count: selected.length,
+    tools: selected.map((t) => ({
+      call_name: pageToolCallName(t),
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema || { type: 'object', properties: {} },
+      annotations: t.annotations,
+    })),
+    hint: 'Call via call_tool with the exact call_name values above.',
+  })
+}
+
+/** Prompt doc for get_page_tools */
+export const getPageToolsPromptDoc: ToolPromptDoc = {
+  category: 'external-tools',
+  section: '### External Tools (MCP + WebMCP)',
+  lines: [
+    '- `get_page_tools(tool?)` — Side-panel fast path: list the current page\'s WebMCP tools with full schemas and exact call_tool names. Cheaper and more precise than search_tools for tasks on the page the user is browsing.',
+  ],
+}
+
+//=============================================================================
+// Side-panel system-prompt block: current page's WebMCP tool names + descriptions
+//=============================================================================
+
+const PAGE_TOOL_DESC_CAP = 160
+
+/**
+ * Build the <current_page_webmcp> block for the system prompt (side-panel
+ * mode only). Lists tool names + short descriptions + the exact call_tool
+ * names, so the LLM can act on the current page without a discovery round.
+ * Full parameter schemas stay behind get_page_tools (token economy).
+ */
+export function buildSidePanelWebMCPBlock(): string {
+  const tools = collectSidePanelPageTools()
+  if (tools.length === 0) return ''
+  const hostname = getSidePanelHostname() || 'the current page'
+  const lines: string[] = []
+  lines.push(`<current_page_webmcp>`)
+  lines.push(`The page the user is browsing (${hostname}) exposes these WebMCP tools. For tasks about this page, call them DIRECTLY via call_tool using the exact names below — no search_tools round needed. Use get_page_tools to fetch full parameter schemas on demand.`)
+  for (const t of tools) {
+    const desc = (t.description || '').replace(/\s+/g, ' ').trim().slice(0, PAGE_TOOL_DESC_CAP)
+    lines.push(`- \`${pageToolCallName(t)}\`${desc ? `: ${desc}` : ''}`)
+  }
+  lines.push(`</current_page_webmcp>`)
+  return lines.join('\n')
+}
 
 //=============================================================================
 // Prompt Doc + Summary

@@ -117,6 +117,12 @@ export interface Message {
     selectedText?: string | null
     /** Arbitrary business fields from the upstream provider (stringified when sent) */
     providerContext?: unknown
+    /** WebMCP tools available on the upstream hostname (frozen per-message).
+     *  Name + description + full name only — schemas are NOT embedded;
+     *  the LLM fetches them via search_tools (search + schema in one call).
+     *  Frozen at capture time so the conversation history shows what the
+     *  agent actually saw, and stale snapshots age out with the message. */
+    webmcpTools?: Array<{ name: string; description: string; fullName: string }>
   }
 }
 

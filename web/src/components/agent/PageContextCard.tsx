@@ -13,7 +13,7 @@
  * workspace-assistant-context.ts, which produces the LLM-facing text block.
  */
 import { useState } from 'react'
-import { Globe, ExternalLink, Link2, Type, TextQuote, ChevronDown, ChevronRight, Code2 } from 'lucide-react'
+import { Globe, ExternalLink, Link2, Type, TextQuote, ChevronDown, ChevronRight, Code2, Wrench } from 'lucide-react'
 import { useT } from '@/i18n'
 import type { Message } from '@/agent/message-types'
 
@@ -27,6 +27,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
   const t = useT()
   const [showFullText, setShowFullText] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
+  const [showTools, setShowTools] = useState(false)
 
   const hostname = pageContext.hostname
   const url = typeof pageContext.url === 'string' && pageContext.url ? pageContext.url : null
@@ -37,6 +38,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
       : null
 
   const hasProviderData = pageContext.providerContext != null
+  const webmcpTools = Array.isArray(pageContext.webmcpTools) ? pageContext.webmcpTools : []
 
   const truncatedText =
     selectedText && selectedText.length > SELECTED_TEXT_TRUNCATE
@@ -118,6 +120,38 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
           </div>
         )}
       </dl>
+
+      {/* WebMCP tools frozen into this snapshot (collapsed by default) */}
+      {webmcpTools.length > 0 && (
+        <div className="border-t border-neutral-200 dark:border-neutral-700">
+          <button
+            type="button"
+            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            onClick={() => setShowTools((v) => !v)}
+            aria-expanded={showTools}
+          >
+            {showTools ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            <Wrench className="h-3 w-3" />
+            <span>{t('conversation.pageContextWebmcpTools', { count: webmcpTools.length })}</span>
+          </button>
+          {showTools && (
+            <ul className="max-h-60 space-y-1 overflow-auto px-3 pb-2 text-[10px] leading-relaxed">
+              {webmcpTools.map((tool) => (
+                <li key={tool.fullName} className="break-words">
+                  <span className="font-mono text-neutral-700 dark:text-neutral-300">{tool.fullName}</span>
+                  {tool.description ? (
+                    <span className="text-neutral-500 dark:text-neutral-400"> — {tool.description}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Raw provider data (collapsed by default) */}
       {hasProviderData && (

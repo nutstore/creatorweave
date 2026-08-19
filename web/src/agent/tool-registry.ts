@@ -185,8 +185,12 @@ import {
   searchToolsExecutor,
   callToolDefinition,
   callToolExecutor,
+  getPageToolsDefinition,
+  getPageToolsExecutor,
   unifiedExternalToolsPromptDoc,
+  getPageToolsPromptDoc,
 } from './external-tool-bridge'
+import { isSidePanelMode } from './workspace-assistant-context'
 
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
@@ -262,6 +266,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   searchSkillsPromptDoc,
   installSkillPromptDoc,
   unifiedExternalToolsPromptDoc,
+  getPageToolsPromptDoc,
   imageGenPromptDoc,
   // Page action tools (only rendered when available — see getAvailableToolsDoc)
   pageReadPromptDoc,
@@ -329,6 +334,10 @@ export class ToolRegistry {
       if (doc.category === 'web' && !isWebBridgeAvailable()) continue
       // Skip page action tools if not available (extension + side panel)
       if (doc.category === 'page' && !isPageActionAvailable()) continue
+      // Skip get_page_tools doc outside side-panel mode — the tool is not
+      // registered there (see registerPageToolsFastPath) and its doc would
+      // advertise a capability that does not exist in this session.
+      if (doc === getPageToolsPromptDoc && !isSidePanelMode()) continue
       // External tools doc always shown — search_tools is always useful even with 0 external tools connected
       // Skip image gen tools if image gen model is not available
       if (doc.category === 'file-ops' && doc === imageGenPromptDoc && !isImageGenAvailable()) continue
@@ -567,6 +576,33 @@ export class ToolRegistry {
     }
   }
 
+  //=============================================================================
+  // Page Tools Fast Path (side-panel mode only)
+  //=============================================================================
+
+  /**
+   * Register get_page_tools — the side-panel fast path to the current page's
+   * WebMCP tool schemas. STRICTLY side-panel-gated: in regular workspace
+   * sessions there is no bound upstream page, so the tool is never registered
+   * (it would only ever return an error). Mirrors the register/unregister
+   * pattern of registerPageActionTools — idempotent, safe to call every
+   * getToolRegistry() access since side-panel mode can flip on mid-session.
+   */
+  registerPageToolsFastPath(): boolean {
+    const shouldHave = isSidePanelMode()
+    const has = this.has('get_page_tools')
+    if (shouldHave && !has) {
+      this.register(getPageToolsDefinition, getPageToolsExecutor)
+      console.log('[ToolRegistry] ✅ get_page_tools registered (side-panel mode)')
+      return true
+    }
+    if (!shouldHave && has) {
+      this.unregister('get_page_tools')
+      console.log('[ToolRegistry] get_page_tools unregistered (not in side-panel mode)')
+    }
+    return shouldHave
+  }
+
   /**
    * Unregister page action tools (e.g. when leaving side-panel mode
    * or when feature flags are toggled off).
@@ -775,6 +811,8 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerExecTool()
     // Conditionally register page action tools (Browser Extension + side panel)
     instance.registerPageActionTools()
+    // Conditionally register get_page_tools (side-panel mode only)
+    instance.registerPageToolsFastPath()
     // Set up listener for model cache updates (triggers image gen tool re-registration)
     ensureImageGenListener()
   } else {
@@ -786,6 +824,8 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerExecTool()
     // Also try page action tools (side-panel mode may have just become active)
     instance.registerPageActionTools()
+    // Re-check get_page_tools (side-panel mode may have flipped mid-session)
+    instance.registerPageToolsFastPath()
     // Also re-check image gen tool on every access
     instance.registerImageGenTool()
   }

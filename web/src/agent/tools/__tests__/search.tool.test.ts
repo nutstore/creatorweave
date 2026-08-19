@@ -3,9 +3,8 @@ import type { ToolContext } from '../tool-types'
 import { searchDefinition, searchExecutor } from '../search.tool'
 
 const searchInDirectoryMock = vi.fn()
-const getFilesDirMock = vi.fn()
-const getActiveConversationMock = vi.fn()
 const getWorkspaceManagerMock = vi.fn()
+const findProjectRootsMock = vi.fn()
 
 vi.mock('@/workers/search-worker-manager', () => ({
   getSearchWorkerManager: () => ({
@@ -13,12 +12,14 @@ vi.mock('@/workers/search-worker-manager', () => ({
   }),
 }))
 
-vi.mock('@/store/conversation-context.store', () => ({
-  getActiveConversation: () => getActiveConversationMock(),
-}))
-
 vi.mock('@/opfs', () => ({
   getWorkspaceManager: () => getWorkspaceManagerMock(),
+}))
+
+vi.mock('@/sqlite/repositories/project-root.repository', () => ({
+  getProjectRootRepository: () => ({
+    findByProject: findProjectRootsMock,
+  }),
 }))
 
 const directoryHandle = {
@@ -45,6 +46,7 @@ function unwrapError(result: string) {
 describe('search tool', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    findProjectRootsMock.mockResolvedValue([])
     searchInDirectoryMock.mockResolvedValue({
       results: [{ path: 'src/a.ts', line: 3, column: 8, match: 'TODO', preview: 'const x = TODO' }],
       totalMatches: 1,
@@ -61,14 +63,17 @@ describe('search tool', () => {
     expect(error.message).toContain('query is required')
   })
 
-  it('declares query and mode as required in schema', () => {
-    expect(searchDefinition.function.parameters.required).toEqual(['query', 'mode'])
+  it('declares only query as required in schema', () => {
+    expect(searchDefinition.function.parameters.required).toEqual(['query'])
   })
 
-  it('requires mode', async () => {
+  it('defaults an omitted mode to literal', async () => {
     const result = await searchExecutor({ query: 'TODO' }, context)
-    const error = unwrapError(result)
-    expect(error.message).toContain('mode is required')
+    unwrapOk(result)
+    expect(searchInDirectoryMock).toHaveBeenCalledWith(
+      directoryHandle,
+      expect.objectContaining({ query: 'TODO', regex: false })
+    )
   })
 
   it('searches with provided directory handle', async () => {
@@ -78,51 +83,50 @@ describe('search tool', () => {
     expect(data.totalMatches).toBe(1)
     expect(searchInDirectoryMock).toHaveBeenCalledWith(
       directoryHandle,
-      expect.objectContaining({ query: 'TODO', regex: false, maxResults: 20 })
+      expect.objectContaining({ query: 'TODO', regex: false, maxResults: 10000 })
     )
   })
 
-  it('falls back to active conversation files dir in opfs-only mode', async () => {
-    // Mock getNativeDirectoryHandle returning null (no native directory)
-    // and getFilesDir returning the directory handle (OPFS-only mode)
-    getFilesDirMock.mockResolvedValue(directoryHandle)
-    getActiveConversationMock.mockResolvedValue({
-      conversation: {
-        getNativeDirectoryHandle: vi.fn().mockResolvedValue(null),
-        getFilesDir: getFilesDirMock,
-        workspaceId: 'ws_1',
-      },
-      conversationId: 'conv_1',
+  it('searches a native-host root without a browser directory handle', async () => {
+    const scanDiskTree = vi.fn().mockResolvedValue([
+      { path: 'src/app.ts', type: 'file', size: 32, depth: 2 },
+    ])
+    const readFile = vi.fn().mockResolvedValue({
+      content: 'export const marker = "NATIVE_TODO"\n',
     })
-
-    // Mock workspace manager to return workspace with native dir = null
     getWorkspaceManagerMock.mockResolvedValue({
-      getWorkspace: vi.fn().mockResolvedValue({
-        getNativeDirectoryHandle: vi.fn().mockResolvedValue(null),
-        getFilesDir: getFilesDirMock,
-      }),
+      getWorkspace: vi.fn().mockResolvedValue({ scanDiskTree, readFile }),
     })
+    findProjectRootsMock.mockResolvedValue([
+      { name: 'native-root', backend: 'native-host' },
+    ])
 
-    const result = await searchExecutor({ query: 'TODO', mode: 'literal' }, { directoryHandle: null })
-    unwrapOk(result)
-
-    expect(getFilesDirMock).toHaveBeenCalled()
-    expect(searchInDirectoryMock).toHaveBeenCalledWith(
-      directoryHandle,
-      expect.objectContaining({ query: 'TODO', regex: false })
+    const result = await searchExecutor(
+      { query: 'NATIVE_TODO', mode: 'literal' },
+      { workspaceId: 'ws_1', projectId: 'project_1', directoryHandle: null }
     )
+    const data = unwrapOk(result)
+
+    expect(scanDiskTree).toHaveBeenCalledWith(
+      'native-root',
+      expect.any(Number),
+      'project_1',
+      expect.objectContaining({ includeSizes: true })
+    )
+    expect(readFile).toHaveBeenCalledWith('native-root/src/app.ts', null, { projectId: 'project_1' })
+    expect(data.totalMatches).toBe(1)
+    expect(data.files[0]).toMatchObject({ path: 'native-root/src/app.ts', bestLine: 1 })
+    expect(searchInDirectoryMock).not.toHaveBeenCalled()
   })
 
-  it('returns error when no directory and no active conversation', async () => {
-    getActiveConversationMock.mockResolvedValue(undefined)
-
+  it('returns error when no directory or native-host workspace is available', async () => {
     const result = await searchExecutor({ query: 'TODO', mode: 'literal' }, { directoryHandle: null })
     const error = unwrapError(result)
 
     expect(error.message).toContain('No active workspace')
   })
 
-  it('rejects regex-like query when mode=literal', async () => {
+  it('auto-upgrades regex-like query when mode=literal', async () => {
     const result = await searchExecutor(
       {
         query: 'from.*project-fingerprint|from.*intelligence-coordinator',
@@ -130,11 +134,11 @@ describe('search tool', () => {
       },
       context
     )
-    const error = unwrapError(result)
-
-    expect(error.message).toContain('query looks like regex')
-    expect(error.hint).toContain('set mode="regex"')
-    expect(searchInDirectoryMock).not.toHaveBeenCalled()
+    unwrapOk(result)
+    expect(searchInDirectoryMock).toHaveBeenCalledWith(
+      directoryHandle,
+      expect.objectContaining({ regex: true })
+    )
   })
 
   it('accepts regex-like query when mode=regex', async () => {
