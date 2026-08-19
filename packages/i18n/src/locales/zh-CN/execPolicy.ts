@@ -2,7 +2,7 @@ export const execPolicy = {
     tab: "执行策略",
     description: "配置哪些命令 AI 可以自动执行、哪些需要询问、哪些始终禁止。修改会保存到 ~/.creatorweave/execpolicy.json。",
     searchPlaceholder: "搜索命令...",
-    newCommandPlaceholder: "命令名（如 mkdir）",
+    newCommandPlaceholder: "命令名（可选子命令，如 git add）",
     add: "添加",
     remove: "移除",
     auto: "自动执行",

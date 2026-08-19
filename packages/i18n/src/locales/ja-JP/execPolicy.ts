@@ -2,7 +2,7 @@ export const execPolicy = {
     tab: "実行ポリシー",
     description: "AIが自動実行できるコマンド、承認が必要なコマンド、常にブロックされるコマンドを設定します。変更は ~/.creatorweave/execpolicy.json に保存されます。",
     searchPlaceholder: "コマンドを検索...",
-    newCommandPlaceholder: "コマンド名（例: mkdir）",
+    newCommandPlaceholder: "コマンド名（サブコマンド可、例: git add）",
     add: "追加",
     remove: "削除",
     auto: "自動実行",

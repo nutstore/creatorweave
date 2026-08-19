@@ -2,7 +2,7 @@ export const execPolicy = {
     tab: "Exec Policy",
     description: "Configure which commands the AI can run automatically, which require approval, and which are always blocked. Changes are saved to ~/.creatorweave/execpolicy.json.",
     searchPlaceholder: "Search commands...",
-    newCommandPlaceholder: "command name (e.g. mkdir)",
+    newCommandPlaceholder: "command with optional subcommand (e.g. git add)",
     add: "Add",
     remove: "Remove",
     auto: "Auto-execute",

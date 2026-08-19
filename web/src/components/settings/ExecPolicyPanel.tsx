@@ -49,7 +49,14 @@ function ExecPolicyPanel() {
 
   const handleAdd = () => {
     if (!newCmd.trim()) return
-    addRule(newCmd.trim(), newDecision)
+    // Parse full command string into [command, ...args]. The native host
+    // matches rules as prefix: argv[0] equals command, and argv[1..] starts
+    // with args. So "git add" becomes { command: "git", args: ["add"] },
+    // matching both `git add` and `git add path/to/file`.
+    const parts = newCmd.trim().split(/\s+/).filter(Boolean)
+    const command = parts[0]
+    const args = parts.slice(1)
+    addRule(command, newDecision, args.length > 0 ? args : undefined)
     setNewCmd('')
     setDirty(true)
   }
