@@ -1221,7 +1221,7 @@ function LLMGatewayCard({
         error: (e as Error).message || t('settings.gateway.authFailed'),
       })
     }
-  }, [triggerProviderRefresh])
+  }, [triggerProviderRefresh, t])
 
   const handleLogout = useCallback(async () => {
     const { deleteApiKey } = await import('@/security/api-key-store')
