@@ -21,6 +21,30 @@ import type { ExtendedThinkingLevel } from '@/agent/llm/pi-ai-custom-openai-fetc
 import { t as translateStatic } from '@creatorweave/i18n'
 import { useI18nStore } from '@/i18n/store'
 
+/**
+ * Chinese-brand providers whose display name should be locale-aware:
+ * zh keeps the original Chinese brand; other locales use the company's
+ * pinyin/English brand — NOT the separate international services (e.g.
+ * Zhipu's overseas arm "Z.ai" is a different service from open.bigmodel.cn).
+ */
+const PROVIDER_NAME_I18N_KEYS: Partial<Record<string, string>> = {
+  glm: 'settings.providerNames.glm',
+  'glm-coding': 'settings.providerNames.glmCoding',
+  'minimax-cn': 'settings.providerNames.minimaxChina',
+  qwen: 'settings.providerNames.qwen',
+  'volcengine-coding': 'settings.providerNames.volcengineCoding',
+  // gateway handled separately below
+  'llm-gateway': 'settings.gateway.name',
+}
+
+/** Resolve a provider display name; falls back to the static meta name. */
+function localizedProviderDisplayName(providerType: string, fallback: string): string {
+  const key = PROVIDER_NAME_I18N_KEYS[providerType]
+  if (!key) return fallback
+  const translated = translateStatic(useI18nStore.getState().locale, key)
+  return translated !== key ? translated : fallback
+}
+
 // Cache for hasApiKey to avoid repeated database queries
 // This is a soft cache that can be invalidated
 const apiKeyCache = new Map<string, boolean>()
@@ -743,7 +767,7 @@ export const useSettingsStore = create<SettingsState>()(
 
             results.push({
               providerType,
-              displayName: meta.displayName,
+              displayName: localizedProviderDisplayName(providerType, meta.displayName),
               models,
               providerKey: providerType,
             })
@@ -817,12 +841,9 @@ export const useSettingsStore = create<SettingsState>()(
                 : allModels.map((m) => ({ id: m.id, name: m.name }))
               results.push({
                 providerType: llmGatewayProviderKey,
-                // Locale-aware provider name (zh: 坚果云 AI / others: Nutstore AI).
-                // gwMeta.displayName is the static English registration name,
-                // so prefer the i18n string and fall back to it on miss.
-                displayName: translateStatic(useI18nStore.getState().locale, 'settings.gateway.name') !== 'settings.gateway.name'
-                  ? translateStatic(useI18nStore.getState().locale, 'settings.gateway.name')
-                  : (gwMeta?.displayName || 'Nutstore AI'),
+                // Locale-aware provider name (zh: 坚果云 AI / others: Nutstore AI);
+                // helper covers the llm-gateway -> settings.gateway.name mapping.
+                displayName: localizedProviderDisplayName(llmGatewayProviderKey, gwMeta?.displayName || 'Nutstore AI'),
                 models,
                 providerKey: llmGatewayProviderKey,
               })

@@ -487,6 +487,15 @@ export const settings = {
       login: "Nutstore AI 로그인",
       notLoggedInError: "Nutstore AI에 로그인되어 있지 않습니다. 먼저 로그인해 주세요.",
     },
+    // Provider display names (company pinyin/English brand; NOT separate
+    // international services like Z.ai)
+    providerNames: {
+      glm: "Zhipu GLM",
+      glmCoding: "Zhipu GLM (Coding)",
+      minimaxChina: "MiniMax (중국 버전)",
+      qwen: "Qwen (Tongyi)",
+      volcengineCoding: "Volcengine Ark Coding",
+    },
     gatewayRateLimits: {
       fiveHour: "최근 5시간",
       week: "이번 주",

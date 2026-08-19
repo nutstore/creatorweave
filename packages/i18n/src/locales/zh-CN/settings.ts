@@ -479,6 +479,15 @@ export const settings = {
       login: "登录坚果云 AI",
       notLoggedInError: "未登录坚果云 AI，请先完成登录",
     },
+    // Provider 显示名（中文品牌保留中文，国际用户看公司拼音/英文品牌；
+    // 注意不用海外分身服务名，如智谱国际是 Z.ai 但服务独立）
+    providerNames: {
+      glm: "智谱 GLM",
+      glmCoding: "智谱 GLM (Coding)",
+      minimaxChina: "MiniMax (中国版)",
+      qwen: "通义千问 (Qwen)",
+      volcengineCoding: "火山方舟 Coding",
+    },
     gatewayRateLimits: {
       fiveHour: "近 5 小时",
       week: "本周",

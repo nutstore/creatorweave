@@ -46,6 +46,7 @@ import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { canFetchModels } from '@/agent/providers/model-fetcher'
 import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
+import { useI18nStore } from '@/i18n/store'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
 import { LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels, isLLMGatewayConfigured, fetchGatewayRateLimits, type RateLimitsResponse } from '@/agent/providers/llm-gateway-provider'
 import { performDeviceCodeFlow, logoutGateway as logoutGatewayAuth, getValidAccessToken, fetchGatewayModels } from '@/agent/providers/llm-gateway-auth'
@@ -55,7 +56,38 @@ import type { AuthState, RateLimitWindow } from '@/agent/providers/llm-gateway-a
 // Constants
 // =============================================================================
 
-const CATEGORY_ORDER: ProviderCategory[] = ['custom', 'chinese', 'international']
+// Category order is locale-aware: Chinese users see Chinese providers
+// first (the default for this product), non-Chinese users see international
+// providers first. Custom providers stay on top in both orders (they are
+// user-created and thus most relevant).
+function categoryOrderForLocale(locale: string): ProviderCategory[] {
+  return /^zh/i.test(locale)
+    ? ['custom', 'chinese', 'international']
+    : ['custom', 'international', 'chinese']
+}
+
+/**
+ * Map provider types with a Chinese-brand display name to their i18n key.
+ * zh-CN keeps the original Chinese brand; other locales use the company's
+ * pinyin/English brand — NOT the separate international services (e.g.
+ * Zhipu's overseas arm "Z.ai" is a different service from open.bigmodel.cn,
+ * so showing "Z.ai" here would mislead users into registering there).
+ */
+const PROVIDER_NAME_I18N_KEYS: Partial<Record<LLMProviderType, string>> = {
+  glm: 'settings.providerNames.glm',
+  'glm-coding': 'settings.providerNames.glmCoding',
+  'minimax-cn': 'settings.providerNames.minimaxChina',
+  qwen: 'settings.providerNames.qwen',
+  'volcengine-coding': 'settings.providerNames.volcengineCoding',
+}
+
+/** Resolve a provider display name; falls back to the static meta name. */
+function localizedProviderName(t: (key: string) => string, type: LLMProviderType, fallback: string): string {
+  const key = PROVIDER_NAME_I18N_KEYS[type]
+  if (!key) return fallback
+  const translated = t(key)
+  return translated !== key ? translated : fallback
+}
 
 // =============================================================================
 // ProviderCard - 单个服务商卡片
@@ -1657,6 +1689,9 @@ export function ProviderManager() {
   const { customProviders } = useSettingsStore()
   const [expandedProvider, setExpandedProvider] = useState<LLMProviderType | null>(null)
   const [showNewProvider, setShowNewProvider] = useState(false)
+  // Locale drives the category ordering (zh: Chinese providers first,
+  // others: international first). Subscribed reactively.
+  const locale = useI18nStore((s) => s.locale)
 
   // `customProviders` is intentionally listed as a dep even though
 // getProvidersByCategory() doesn't reference it directly — it reads from
@@ -1707,8 +1742,11 @@ const groupedProviders = useMemo(
         />
       )}
 
-      {/* Provider Cards by Category */}
-      {CATEGORY_ORDER.map((category) => {
+      {/* Provider Cards by Category — order is locale-aware (Chinese
+          providers first for zh users, international first otherwise).
+          Subscribing to locale (not getState) so switching language
+          re-renders the list immediately. */}
+      {categoryOrderForLocale(locale).map((category) => {
         const providers = groupedProviders[category]
           .filter(({ type }) => type !== LLM_GATEWAY_PROVIDER_TYPE)
         if (providers.length === 0 && category !== 'custom') return null
@@ -1721,7 +1759,11 @@ const groupedProviders = useMemo(
               <ProviderCard
                 key={type}
                 providerType={type}
-                displayName={meta.displayName}
+                // Locale-aware display name for the Chinese-brand providers
+                // (zh: 原中文品牌 / others: company pinyin/English brand).
+                // Falls back to the static meta.displayName for providers
+                // without an i18n mapping (OpenAI, Anthropic, ...).
+                displayName={localizedProviderName(t, type, meta.displayName)}
                 website={meta.website}
                 isCustom={isCustomProviderType(type)}
                 customProvider={

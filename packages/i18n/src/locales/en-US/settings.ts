@@ -491,6 +491,16 @@ export const settings = {
       login: "Log in to Nutstore AI",
       notLoggedInError: "Not logged in to Nutstore AI. Please log in first.",
     },
+    // Provider display names (company pinyin/English brand for non-Chinese
+    // users; NOT the separate international services, e.g. Zhipu's overseas
+    // arm is Z.ai but that is a different service from open.bigmodel.cn)
+    providerNames: {
+      glm: "Zhipu GLM",
+      glmCoding: "Zhipu GLM (Coding)",
+      minimaxChina: "MiniMax (China)",
+      qwen: "Qwen (Tongyi)",
+      volcengineCoding: "Volcengine Ark Coding",
+    },
     gatewayRateLimits: {
       fiveHour: "Last 5 hours",
       week: "This week",
