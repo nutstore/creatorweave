@@ -24,4 +24,6 @@ export const projectRoots = {
     nativeRootAddFailed: "로컬 연결 추가에 실패했습니다: {error}",
     nativeRootMissingScope: "이 로컬 연결에 권한 정보가 없습니다",
     nativeRootRevokeFailed: "로컬 연결 제거에 실패했습니다: {error}",
+    nativeRootRemovedLocalOnly: "이 폴더를 프로젝트에서 제거했습니다(취소할 로컬 연결 권한이 없음)",
+    nativeRootRevokeFailedRemovedLocally: "이 폴더를 프로젝트에서 제거했지만 로컬 연결 권한 취소에 실패했습니다: {error}",
 } as const

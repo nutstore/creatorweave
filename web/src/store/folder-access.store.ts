@@ -1018,16 +1018,35 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       if (!root) return
 
       if (root.backend === 'native-host') {
+        // Best-effort revoke on the native host. NEVER abort the local removal:
+        // the SQLite row is the source of truth for the workspace view, and a
+        // scope that the host no longer knows (host reinstalled, scopes file
+        // lost, or extension/background bridge dead) would otherwise be
+        // unremovable forever — exactly the "unknown scope_id" deadlock.
         if (!root.scopeId) {
-          toast.error(i18nText('projectRoots.nativeRootMissingScope', 'This local connection is missing its authorization information'))
-          return
-        }
-        try {
-          await new NativeHostExecutor().revokeRoot(projectId, root.scopeId)
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'unknown error'
-          toast.error(i18nText('projectRoots.nativeRootRevokeFailed', `Failed to remove local connection: ${errorMessage}`, { error: errorMessage }))
-          return
+          console.warn(
+            '[FolderAccessStore] removeRoot: native-host root has no scopeId, removing locally only:',
+            root.name
+          )
+          toast.info(i18nText(
+            'projectRoots.nativeRootRemovedLocalOnly',
+            'Removed this folder from the project (no local-connection authorization to revoke)'
+          ))
+        } else {
+          try {
+            await new NativeHostExecutor().revokeRoot(projectId, root.scopeId)
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'unknown error'
+            console.warn(
+              '[FolderAccessStore] removeRoot: revokeRoot failed, continuing with local removal:',
+              errorMessage
+            )
+            toast.warning(i18nText(
+              'projectRoots.nativeRootRevokeFailedRemovedLocally',
+              'Removed this folder from the project, but revoking its local-connection authorization failed: {error}',
+              { error: errorMessage }
+            ))
+          }
         }
       }
 

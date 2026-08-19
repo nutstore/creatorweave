@@ -24,4 +24,6 @@ export const projectRoots = {
     nativeRootAddFailed: "ローカル接続の追加に失敗しました: {error}",
     nativeRootMissingScope: "このローカル接続には認可情報がありません",
     nativeRootRevokeFailed: "ローカル接続の削除に失敗しました: {error}",
+    nativeRootRemovedLocalOnly: "このフォルダーをプロジェクトから削除しました（取り消すべきローカル接続の認可はありません）",
+    nativeRootRevokeFailedRemovedLocally: "このフォルダーをプロジェクトから削除しましたが、ローカル接続の認可取り消しに失敗しました: {error}",
 } as const

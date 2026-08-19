@@ -24,4 +24,6 @@ export const projectRoots = {
     nativeRootAddFailed: "Failed to add local connection: {error}",
     nativeRootMissingScope: "This local connection is missing its authorization information",
     nativeRootRevokeFailed: "Failed to remove local connection: {error}",
+    nativeRootRemovedLocalOnly: "Removed this folder from the project (no local-connection authorization to revoke)",
+    nativeRootRevokeFailedRemovedLocally: "Removed this folder from the project, but revoking its local-connection authorization failed: {error}",
 } as const

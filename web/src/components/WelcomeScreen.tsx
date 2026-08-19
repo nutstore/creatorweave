@@ -177,9 +177,11 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
       <div className="w-full max-w-2xl">
         {/* Logo & Tagline */}
         <div className="mb-6 text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50/80 shadow-sm">
-            <Sparkles className="h-6 w-6 text-primary-600" />
-          </div>
+          <img
+            src="/favicon.svg"
+            alt=""
+            className="mb-4 inline-block h-12 w-12"
+          />
           <h1 className="mb-2 text-3xl font-semibold text-foreground">
             {t('welcome.title')}
           </h1>

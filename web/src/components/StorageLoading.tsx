@@ -170,21 +170,7 @@ export function StorageLoading({
         <BrandCard variant="info" className="text-center">
           <BrandCardHeader className="items-center justify-center pb-6">
             {/* Logo */}
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50">
-              <svg
-                className="h-6 w-6 text-primary-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-                />
-              </svg>
-            </div>
+            <img src="/favicon.svg" alt="" className="mb-4 h-12 w-12" />
 
             <BrandCardTitle className="text-xl">{t('app.productName')}</BrandCardTitle>
             <BrandCardDescription className="mt-1">{t('app.initializing')}</BrandCardDescription>

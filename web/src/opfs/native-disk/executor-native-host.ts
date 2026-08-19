@@ -126,7 +126,17 @@ export class NativeHostExecutor implements DiskExecutor {
 
   async revokeRoot(_projectId: string, rootId: string): Promise<void> {
     const resp = await this.call('remove_scope', { scope_id: rootId })
-    if (!resp.ok) throw new Error(`remove_scope failed: ${resp.error}`)
+    if (!resp.ok) {
+      // The Rust host returns ok:true + removed:false when the scope is
+      // already gone, but an explicit "unknown scope_id" / "missing scope_id"
+      // error can also surface. Removing a non-existent scope is idempotent
+      // success — the desired end state (scope gone) already holds.
+      const err = String(resp.error || '')
+      if (err.includes('unknown scope_id') || err.includes('missing scope_id')) {
+        return
+      }
+      throw new Error(`remove_scope failed: ${resp.error}`)
+    }
   }
 
   async hydrateRoot(_projectId: string, rootId: string): Promise<boolean> {

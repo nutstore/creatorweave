@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockRepo = vi.hoisted(() => ({
   load: vi.fn(),
+  loadAllForProject: vi.fn(),
   save: vi.fn(),
   delete: vi.fn(),
+  deleteByProjectAndRoot: vi.fn(),
 }))
 
 const mockNativeFS = vi.hoisted(() => ({
@@ -13,6 +15,17 @@ const mockNativeFS = vi.hoisted(() => ({
 
 const mockWorkspaceStore = vi.hoisted(() => ({
   onNativeDirectoryGranted: vi.fn(),
+}))
+
+const mockProjectRootRepo = vi.hoisted(() => ({
+  findByProject: vi.fn(),
+  createRoot: vi.fn(),
+  deleteRoot: vi.fn(),
+  setDefaultRoot: vi.fn(),
+}))
+
+const mockNativeHostExecutor = vi.hoisted(() => ({
+  revokeRoot: vi.fn(),
 }))
 
 vi.mock('@/services/folder-access.repository', () => ({
@@ -30,9 +43,17 @@ vi.mock('@/native-fs', () => ({
 }))
 
 vi.mock('@/sqlite', () => ({
-  getProjectRootRepository: () => ({
-    findByProject: vi.fn(async () => []),
-  }),
+  getProjectRootRepository: () => mockProjectRootRepo,
+}))
+
+vi.mock('@/opfs/native-disk/executor', () => ({
+  isNativeHostAvailable: vi.fn(() => true),
+}))
+
+vi.mock('@/opfs/native-disk/executor-native-host', () => ({
+  NativeHostExecutor: class {
+    revokeRoot = mockNativeHostExecutor.revokeRoot
+  },
 }))
 
 vi.mock('sonner', () => ({
@@ -40,6 +61,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
+    warning: vi.fn(),
   },
 }))
 
@@ -66,6 +88,8 @@ import { useFolderAccessStore } from '../folder-access.store'
 describe('folder-access.store runtime handle binding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRepo.loadAllForProject.mockResolvedValue([])
+    mockProjectRootRepo.findByProject.mockResolvedValue([])
     useFolderAccessStore.setState({
       activeProjectId: null,
       records: {},
@@ -129,5 +153,33 @@ describe('folder-access.store runtime handle binding', () => {
     expect(record.handle).toBe(handle)
     expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, 'repo', handle)
     expect(mockWorkspaceStore.onNativeDirectoryGranted).toHaveBeenCalledWith(handle)
+  })
+
+  it('removes a native-host root locally when host revocation fails', async () => {
+    const projectId = 'project-3'
+    const rootId = 'root-native-1'
+    const scopeId = 'scope_missing'
+    mockNativeHostExecutor.revokeRoot.mockRejectedValueOnce(new Error(`unknown scope_id: ${scopeId}`))
+
+    useFolderAccessStore.setState({
+      activeProjectId: projectId,
+      roots: [{
+        id: rootId,
+        name: 'orphaned-folder',
+        isDefault: false,
+        readOnly: false,
+        backend: 'native-host',
+        scopeId,
+        handle: null,
+        persistedHandle: null,
+        status: 'idle',
+      }],
+    })
+
+    await useFolderAccessStore.getState().removeRoot(rootId)
+
+    expect(mockNativeHostExecutor.revokeRoot).toHaveBeenCalledWith(projectId, scopeId)
+    expect(mockProjectRootRepo.deleteRoot).toHaveBeenCalledWith(rootId)
+    expect(mockRepo.deleteByProjectAndRoot).toHaveBeenCalledWith(projectId, 'orphaned-folder')
   })
 })

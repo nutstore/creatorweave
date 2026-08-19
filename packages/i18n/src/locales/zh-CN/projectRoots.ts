@@ -24,4 +24,6 @@ export const projectRoots = {
     nativeRootAddFailed: "添加本机连接失败：{error}",
     nativeRootMissingScope: "此本机连接缺少授权信息",
     nativeRootRevokeFailed: "移除本机连接失败：{error}",
+    nativeRootRemovedLocalOnly: "已从项目中移除该文件夹（无本机连接授权需要撤销）",
+    nativeRootRevokeFailedRemovedLocally: "已从项目中移除该文件夹，但撤销其本机连接授权失败：{error}",
 } as const
