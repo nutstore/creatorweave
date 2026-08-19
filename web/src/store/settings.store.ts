@@ -18,6 +18,8 @@ import {
 } from '@/agent/providers/types'
 import { getModelContextWindow } from '@/agent/providers/model-store'
 import type { ExtendedThinkingLevel } from '@/agent/llm/pi-ai-custom-openai-fetch'
+import { t as translateStatic } from '@creatorweave/i18n'
+import { useI18nStore } from '@/i18n/store'
 
 // Cache for hasApiKey to avoid repeated database queries
 // This is a soft cache that can be invalidated
@@ -815,7 +817,12 @@ export const useSettingsStore = create<SettingsState>()(
                 : allModels.map((m) => ({ id: m.id, name: m.name }))
               results.push({
                 providerType: llmGatewayProviderKey,
-                displayName: gwMeta?.displayName || 'Nutstore AI',
+                // Locale-aware provider name (zh: 坚果云 AI / others: Nutstore AI).
+                // gwMeta.displayName is the static English registration name,
+                // so prefer the i18n string and fall back to it on miss.
+                displayName: translateStatic(useI18nStore.getState().locale, 'settings.gateway.name') !== 'settings.gateway.name'
+                  ? translateStatic(useI18nStore.getState().locale, 'settings.gateway.name')
+                  : (gwMeta?.displayName || 'Nutstore AI'),
                 models,
                 providerKey: llmGatewayProviderKey,
               })

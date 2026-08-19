@@ -474,6 +474,11 @@ export const settings = {
     },
 
     // 坚果云 AI 使用额度
+    gateway: {
+      name: "坚果云 AI",
+      login: "登录坚果云 AI",
+      notLoggedInError: "未登录坚果云 AI，请先完成登录",
+    },
     gatewayRateLimits: {
       fiveHour: "近 5 小时",
       week: "本周",

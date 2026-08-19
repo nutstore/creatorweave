@@ -482,6 +482,11 @@ export const settings = {
     },
 
     // Nutstore AI usage quota
+    gateway: {
+      name: "Nutstore AI",
+      login: "Nutstore AI 로그인",
+      notLoggedInError: "Nutstore AI에 로그인되어 있지 않습니다. 먼저 로그인해 주세요.",
+    },
     gatewayRateLimits: {
       fiveHour: "최근 5시간",
       week: "이번 주",

@@ -1276,7 +1276,7 @@ function LLMGatewayCard({
               boxShadow: isLoggedIn ? '0 0 6px var(--brand,#0d9488)' : 'none',
             }}
           />
-          <span className="text-[13px] font-semibold text-secondary">坚果云 AI</span>
+          <span className="text-[13px] font-semibold text-secondary">{t('settings.gateway.name')}</span>
 
         </div>
         <div className="flex items-center gap-2">
@@ -1542,7 +1542,7 @@ function LLMGatewayCard({
                   style={{ background: 'var(--brand, #0d9488)' }}
                   onClick={handleLogin}
                 >
-                  登录 Nutstore AI
+                  {t('settings.gateway.login')}
                 </button>
               )}
 

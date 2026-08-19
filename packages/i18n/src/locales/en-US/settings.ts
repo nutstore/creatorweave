@@ -486,6 +486,11 @@ export const settings = {
     },
 
     // Nutstore AI usage quota
+    gateway: {
+      name: "Nutstore AI",
+      login: "Log in to Nutstore AI",
+      notLoggedInError: "Not logged in to Nutstore AI. Please log in first.",
+    },
     gatewayRateLimits: {
       fiveHour: "Last 5 hours",
       week: "This week",
