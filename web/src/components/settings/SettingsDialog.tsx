@@ -1444,8 +1444,10 @@ const SettingsDialogContent = forwardRef<
       </BrandDialogHeader>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {/* Sidebar tabs */}
-        <div className="border-subtle shrink-0 border-b p-2 md:w-44 md:border-b-0 md:border-r md:p-2">
+        {/* Sidebar tabs — w-52 (was w-44) so the longest tab label
+            ("Browser Extension" / "浏览器扩展" + icon) fits on one line;
+            nowrap guards against wrapping on narrower fallbacks. */}
+        <div className="border-subtle shrink-0 border-b p-2 md:w-52 md:border-b-0 md:border-r md:p-2">
           <nav role="tablist" aria-label="Settings tabs" aria-orientation="vertical" className="flex gap-1 overflow-x-auto md:block md:space-y-1">
             {tabs.map((tab) => (
               <button
@@ -1457,7 +1459,7 @@ const SettingsDialogContent = forwardRef<
                 aria-controls={`settings-tabpanel-${tab.id}`}
                 tabIndex={activeTab === tab.id ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === tab.id
                     ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
                     : 'text-secondary hover:bg-muted dark:text-tertiary dark:hover:bg-muted'
