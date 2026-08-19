@@ -589,4 +589,13 @@ export const settings = {
         loading: "Loading policy...",
         retry: "Retry",
     },
+
+    // Settings dialog sidebar tab groups
+    tabGroups: {
+        basics: "Basics",
+        workspace: "Workspace",
+        aiAndTools: "AI & Tools",
+        extensions: "Extensions",
+        experimental: "Experimental",
+    },
 } as const

@@ -576,4 +576,13 @@ export const settings = {
         loading: "加载策略中...",
         retry: "重试",
     },
+
+    // 设置对话框侧边栏分组标题
+    tabGroups: {
+        basics: "基础",
+        workspace: "工作区",
+        aiAndTools: "AI 与工具",
+        extensions: "扩展",
+        experimental: "实验",
+    },
 } as const

@@ -588,4 +588,13 @@ export const settings = {
         loading: "ポリシーを読み込み中...",
         retry: "再試行",
     },
+
+    // 設定ダイアログのサイドバーグループ見出し
+    tabGroups: {
+        basics: "基本",
+        workspace: "ワークスペース",
+        aiAndTools: "AI とツール",
+        extensions: "拡張機能",
+        experimental: "実験的",
+    },
 } as const

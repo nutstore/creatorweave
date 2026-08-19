@@ -584,4 +584,13 @@ export const settings = {
         loading: "정책 로딩 중...",
         retry: "재시도",
     },
+
+    // 설정 대화상자 사이드바 그룹 제목
+    tabGroups: {
+        basics: "기본",
+        workspace: "작업 영역",
+        aiAndTools: "AI 및 도구",
+        extensions: "확장 프로그램",
+        experimental: "실험적",
+    },
 } as const
