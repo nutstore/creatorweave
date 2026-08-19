@@ -1542,7 +1542,7 @@ function LLMGatewayCard({
                   style={{ background: 'var(--brand, #0d9488)' }}
                   onClick={handleLogin}
                 >
-                  登录坚果云 AI
+                  登录 Nutstore AI
                 </button>
               )}
 

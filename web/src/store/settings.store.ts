@@ -815,7 +815,7 @@ export const useSettingsStore = create<SettingsState>()(
                 : allModels.map((m) => ({ id: m.id, name: m.name }))
               results.push({
                 providerType: llmGatewayProviderKey,
-                displayName: gwMeta?.displayName || '坚果云 AI',
+                displayName: gwMeta?.displayName || 'Nutstore AI',
                 models,
                 providerKey: llmGatewayProviderKey,
               })

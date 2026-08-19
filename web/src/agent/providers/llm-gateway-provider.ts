@@ -53,7 +53,7 @@ export function getLLMGatewayClientId(): string {
 
 const GATEWAY_META: ProviderMeta = {
   category: 'chinese',
-  displayName: '坚果云 AI',
+  displayName: 'Nutstore AI',
   models: [], // populated dynamically via updateGatewayModels()
 }
 
@@ -151,7 +151,7 @@ export async function fetchGatewayRateLimits(): Promise<RateLimitsResponse> {
 
   let token = await getValidAccessToken(baseURL, clientId)
   if (!token) {
-    throw new Error('未登录坚果云 AI，请先完成登录')
+    throw new Error('未登录 Nutstore AI，请先完成登录')
   }
 
   try {
