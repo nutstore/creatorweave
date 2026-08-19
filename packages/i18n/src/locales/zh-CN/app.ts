@@ -60,7 +60,11 @@ export const app = {
     exportDatabaseSuccess: "数据库备份已下载：{filename}",
     exportDatabaseFailed: "导出失败：{error}",
     backupSuccess: "完整备份已下载：{filename}",
+    backupSuccessWithKey:
+      "完整备份已下载（含 API 密钥，可跨设备恢复）：{filename}。请妥善保管，不要分享给他人。",
     backupFailed: "备份失败：{error}",
+    restoreSuccess: "备份已恢复（{fileCount} 个文件），正在刷新页面…",
+    restoreFailed: "恢复失败：{error}。当前数据可能不完整，建议重试导入。",
     resetDatabase: "重置数据库",
     reloadPage: "重新加载页面",
     updateAvailable: "发现新版本，建议更新以获取最新功能",

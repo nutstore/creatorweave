@@ -70,7 +70,11 @@ export const app = {
     exportDatabaseSuccess: "데이터베이스 백업이 다운로드되었습니다: {filename}",
     exportDatabaseFailed: "내보내기 실패: {error}",
     backupSuccess: "전체 백업이 다운로드되었습니다: {filename}",
+    backupSuccessWithKey:
+      "전체 백업이 다운로드되었습니다(API 키 포함, 다른 기기에서 복원 가능): {filename}. 안전하게 보관하고 다른 사람과 공유하지 마세요.",
     backupFailed: "백업 실패: {error}",
+    restoreSuccess: "백업이 복원되었습니다({fileCount}개 파일). 새로고침 중…",
+    restoreFailed: "복원 실패: {error}. 현재 데이터가 불완전할 수 있습니다. 가져오기를 다시 시도하세요.",
     resetDatabase: "데이터베이스 재설정",
     reloadPage: "페이지 새로고침",
     updateAvailable: "새 버전을 사용할 수 있습니다. 최신 기능을 위해 업데이트하세요",

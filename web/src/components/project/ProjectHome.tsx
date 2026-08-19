@@ -44,6 +44,7 @@ import {
   Copy,
   Check,
   Download,
+  Upload,
   ChevronDown,
   AlertTriangle,
 } from 'lucide-react'
@@ -52,6 +53,7 @@ import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionBanner } from '@/components/extension'
 import { runDiagnostics, copyMarkdownToClipboard } from '@/storage/diagnostics'
+import { RESET_REQUIRES_TAB_CLOSURE } from '@/storage/init'
 import { toast } from 'sonner'
 
 // Design system styles
@@ -463,6 +465,10 @@ export function ProjectHome({
   const [clearDataConfirmText, setClearDataConfirmText] = useState('')
   const [isClearingCache, setIsClearingCache] = useState(false)
   const [isExportingDB, setIsExportingDB] = useState(false)
+  const [isImportingDB, setIsImportingDB] = useState(false)
+  const [importBackupFile, setImportBackupFile] = useState<File | null>(null)
+  const [showExportConfirm, setShowExportConfirm] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   // Diagnostic report state
   const [diagOpen, setDiagOpen] = useState(false)
@@ -501,14 +507,23 @@ export function ProjectHome({
     window.location.reload()
   }
 
-  // Export the entire OPFS (SQLite db + workspace files) as a downloadable zip
-  const handleExportBackup = async () => {
+  // Export the entire OPFS (SQLite db + workspace files) as a downloadable zip.
+  // Gated by a confirmation dialog because the archive carries the device
+  // encryption key + login tokens — it must be treated as sensitive.
+  const performExportBackup = async () => {
     setIsExportingDB(true)
     const toastId = toast.loading(t('projectHome.sidebar.backingUp'))
     try {
       const { downloadOPFSBackup } = await import('@/opfs')
-      const filename = await downloadOPFSBackup()
-      toast.success(t('app.backupSuccess', { filename }), { id: toastId })
+      const { filename, includesDeviceKey } = await downloadOPFSBackup()
+      // Surface whether API keys are actually restorable — a silent
+      // credential-less backup is exactly the class of bug users can't see.
+      toast.success(
+        includesDeviceKey
+          ? t('app.backupSuccessWithKey', { filename })
+          : t('app.backupSuccess', { filename }),
+        { id: toastId, duration: includesDeviceKey ? 5000 : 10000 }
+      )
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       console.error('[ProjectHome] Failed to export OPFS backup:', error)
@@ -516,11 +531,59 @@ export function ProjectHome({
         id: toastId,
         action: {
           label: t('projectHome.dialogs.retry'),
-          onClick: () => void handleExportBackup(),
+          onClick: () => void performExportBackup(),
         },
       })
     } finally {
       setIsExportingDB(false)
+    }
+  }
+
+  // Import a full OPFS backup zip — picked via hidden file input, then a
+  // confirmation dialog (destructive: replaces ALL current data), then the
+  // restore itself. The page must reload afterwards so everything
+  // re-initializes from the restored files.
+  const handleImportBackupSelected = () => {
+    const input = importInputRef.current
+    if (!input) return
+    input.value = '' // allow re-picking the same file
+    input.accept = '.zip'
+    input.click()
+  }
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    if (file) setImportBackupFile(file)
+    e.target.value = '' // allow re-picking the same file
+  }
+
+  const handleImportBackupConfirm = async () => {
+    const file = importBackupFile
+    if (!file) return
+    setIsImportingDB(true)
+    const toastId = toast.loading(t('projectHome.sidebar.restoringBackup'))
+    try {
+      const { importOPFSBackup } = await import('@/opfs')
+      const { fileCount } = await importOPFSBackup(file)
+      toast.success(t('app.restoreSuccess', { fileCount }), { id: toastId, duration: 8000 })
+      setImportBackupFile(null)
+      // Give the toast a moment to paint before the hard reload wipes it
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      window.location.reload()
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.error('[ProjectHome] Failed to import OPFS backup:', error)
+      // Multi-tab lock failures carry the same marker the clear-data flow
+      // uses — surface the actionable "close other tabs" message instead
+      // of the raw (cryptic) error text.
+      const message = errorMsg.includes(RESET_REQUIRES_TAB_CLOSURE)
+        ? t('app.clearFailedCloseOtherTabs')
+        : t('app.restoreFailed', { error: errorMsg })
+      toast.error(message, { id: toastId, duration: 10000 })
+      setIsImportingDB(false)
+      // OPFS may be in a partial state — a reload re-inits from whatever is
+      // on disk, which is the safest recoverable posture for the user.
+      // Keep the dialog open so the user can retry with another archive.
     }
   }
 
@@ -1150,15 +1213,26 @@ export function ProjectHome({
               <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
                 {t('projectHome.sidebar.backupDescription')}
               </p>
-              <BrandButton
-                variant="ghost"
-                className="w-full text-tertiary hover:text-primary hover:border-primary/50"
-                onClick={() => void handleExportBackup()}
-                disabled={isExportingDB}
-              >
-                <Download className="w-3.5 h-3.5 mr-1.5" />
-                {t('projectHome.sidebar.exportBackup')}
-              </BrandButton>
+              <div className="flex flex-col gap-2">
+                <BrandButton
+                  variant="ghost"
+                  className="w-full text-tertiary hover:text-primary hover:border-primary/50"
+                  onClick={() => setShowExportConfirm(true)}
+                  disabled={isExportingDB || isImportingDB}
+                >
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  {t('projectHome.sidebar.exportBackup')}
+                </BrandButton>
+                <BrandButton
+                  variant="ghost"
+                  className="w-full text-tertiary hover:text-primary hover:border-primary/50"
+                  onClick={handleImportBackupSelected}
+                  disabled={isExportingDB || isImportingDB}
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1.5" />
+                  {t('projectHome.sidebar.importBackup')}
+                </BrandButton>
+              </div>
             </div>
 
             {/* Diagnostics */}
@@ -1500,6 +1574,108 @@ export function ProjectHome({
               disabled={isClearingLocalData || clearDataConfirmText !== t('projectHome.dialogs.startFreshConfirmPlaceholder')}
             >
               {isClearingLocalData ? t('projectHome.dialogs.resetting') : t('projectHome.dialogs.confirmReset')}
+            </BrandButton>
+          </BrandDialogFooter>
+        </BrandDialogContent>
+      </BrandDialog>
+
+      {/* Export backup confirmation — the archive carries credentials */}
+      <BrandDialog
+        modal
+        open={showExportConfirm}
+        onOpenChange={(open) => {
+          if (!open && !isExportingDB) setShowExportConfirm(false)
+        }}
+      >
+        <BrandDialogContent className="max-w-md">
+          <BrandDialogHeader>
+            <BrandDialogTitle>{t('projectHome.dialogs.exportBackupTitle')}</BrandDialogTitle>
+          </BrandDialogHeader>
+          <BrandDialogBody>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-4">
+              <Shield className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="home-body text-sm text-secondary dark:text-secondary-foreground">
+                {t('projectHome.dialogs.exportBackupSensitive')}
+              </p>
+            </div>
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground">
+              {t('projectHome.dialogs.exportBackupHint')}
+            </p>
+          </BrandDialogBody>
+          <BrandDialogFooter>
+            <BrandButton
+              variant="ghost"
+              onClick={() => setShowExportConfirm(false)}
+              disabled={isExportingDB}
+            >
+              {t('common.cancel')}
+            </BrandButton>
+            <BrandButton
+              onClick={() => void performExportBackup()}
+              disabled={isExportingDB}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              {isExportingDB
+                ? t('projectHome.sidebar.backingUp')
+                : t('projectHome.dialogs.exportBackupConfirm')}
+            </BrandButton>
+          </BrandDialogFooter>
+        </BrandDialogContent>
+      </BrandDialog>
+
+      {/* Import backup: hidden file picker + confirmation dialog */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".zip"
+        className="hidden"
+        onChange={handleImportFileChange}
+      />
+
+      <BrandDialog
+        modal
+        open={importBackupFile !== null}
+        onOpenChange={(open) => {
+          if (!open && !isImportingDB) setImportBackupFile(null)
+        }}
+      >
+        <BrandDialogContent className="max-w-md">
+          <BrandDialogHeader>
+            <BrandDialogTitle>{t('projectHome.dialogs.importBackupTitle')}</BrandDialogTitle>
+          </BrandDialogHeader>
+          <BrandDialogBody>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-4">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="home-body text-sm text-secondary dark:text-secondary-foreground">
+                {t('projectHome.dialogs.importBackupWarning')}
+              </p>
+            </div>
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+              {t('projectHome.dialogs.importBackupFile', { name: importBackupFile?.name ?? '' })}
+            </p>
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+              {t('projectHome.dialogs.importBackupHint')}
+            </p>
+            <p className="home-mono text-xs text-tertiary dark:text-muted">
+              {t('projectHome.dialogs.importBackupSecurityNote')}
+            </p>
+          </BrandDialogBody>
+          <BrandDialogFooter>
+            <BrandButton
+              variant="ghost"
+              onClick={() => setImportBackupFile(null)}
+              disabled={isImportingDB}
+            >
+              {t('common.cancel')}
+            </BrandButton>
+            <BrandButton
+              variant="danger"
+              onClick={() => void handleImportBackupConfirm()}
+              disabled={isImportingDB}
+            >
+              {isImportingDB
+                ? t('projectHome.sidebar.restoringBackup')
+                : t('projectHome.dialogs.importBackupConfirm')}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>

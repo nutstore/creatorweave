@@ -146,6 +146,45 @@ async function loadRawKey(): Promise<ArrayBuffer | null> {
   })
 }
 
+//-----------------------------------------------------------------------------
+// Device-key portability (full backup / restore)
+//-----------------------------------------------------------------------------
+
+/**
+ * Read the raw device encryption key from IndexedDB, for inclusion in a full
+ * OPFS backup. Returns `null` when the key has never been created (no API
+ * keys saved yet) — callers treat that as "nothing to export".
+ *
+ * SECURITY: the returned bytes can decrypt every stored API key / secret.
+ * It exists so a backup zip can fully restore credentials on another
+ * device; treat backup files accordingly.
+ */
+export async function exportDeviceEncryptionKey(): Promise<ArrayBuffer | null> {
+  try {
+    return await loadRawKey()
+  } catch (error) {
+    console.warn('[ApiKeyRepo] Failed to read device encryption key for export:', error)
+    return null
+  }
+}
+
+/**
+ * Write a raw device encryption key (restored from a backup zip) into
+ * IndexedDB so it pairs with the `encryption_metadata` row + `api_keys`
+ * ciphertexts restored into SQLite from the same backup.
+ *
+ * Without this, `getEncryptionKey()` sees metadata in SQLite but no matching
+ * IndexedDB key, concludes the key is lost, and RESETS all api_keys (see
+ * `createAndPersistEncryptionKey({ resetApiKeys: true })`).
+ *
+ * Also invalidates the in-session encryption-key cache so the restored key
+ * takes effect immediately.
+ */
+export async function importDeviceEncryptionKey(rawKey: ArrayBuffer): Promise<void> {
+  await storeRawKey(rawKey)
+  cachedEncryptionKey = null
+}
+
 /**
  * Encrypt a string value
  */

@@ -37,8 +37,10 @@ export const projectHome = {
       backup: "数据备份",
       backupDescription:
         "导出完整的 OPFS 数据（SQLite 数据库 + 工作区文件），可用于备份或迁移到新设备。",
-      exportBackup: "导出完整备份",
+      exportBackup: "导出",
       backingUp: "正在备份…",
+      importBackup: "导入",
+      restoringBackup: "正在恢复…",
       diagnostics: "诊断",
       diagnosticsDescription:
         "收集运行环境和存储状态信息，遇到问题时可一键复制反馈给开发者。",
@@ -145,6 +147,19 @@ export const projectHome = {
       confirmReset: "确认重置",
       retry: "重试",
       resetting: "重置中...",
+      importBackupTitle: "导入备份",
+      importBackupWarning:
+        "导入会清空当前全部数据（项目、对话、文件），并用备份内容完全替换。建议先导出一份当前备份再继续。",
+      importBackupSecurityNote:
+        "备份文件包含加密密钥和应用设置（含登录凭据），可完整恢复 API 密钥等数据，请妥善保管，不要分享给他人。",
+      importBackupFile: "备份文件：{name}",
+      importBackupHint: "恢复项目、对话、文件、API 密钥和应用设置（含主题、语言、模型配置等）。完成后页面会自动刷新。",
+      importBackupConfirm: "覆盖并恢复",
+      exportBackupTitle: "导出备份",
+      exportBackupSensitive:
+        "备份文件包含加密密钥、API 密钥和应用设置（含登录凭据），等同于完整的账户访问权限，请妥善保管。",
+      exportBackupHint: "备份内容包括：SQLite 数据库、工作区文件、API 密钥、应用设置。",
+      exportBackupConfirm: "导出备份",
       diagnosticsTitle: "诊断报告",
       diagnosticsRunning: "正在收集诊断信息...",
       diagnosticsHint: "点击下方「复制报告」按钮，然后粘贴给开发者即可。",

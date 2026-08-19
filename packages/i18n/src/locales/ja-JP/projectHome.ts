@@ -39,8 +39,10 @@ export const projectHome = {
       backup: "データバックアップ",
       backupDescription:
         "OPFS 全体（SQLite データベース + ワークスペースファイル）をエクスポートします。バックアップや別デバイスへの移行に使用できます。",
-      exportBackup: "完全バックアップをエクスポート",
+      exportBackup: "エクスポート",
       backingUp: "バックアップ中…",
+      importBackup: "インポート",
+      restoringBackup: "復元中…",
       diagnostics: "診断",
       diagnosticsDescription:
         "実行環境とストレージ状態を収集します。問題発生時にワンクリックでコピーして開発者に共有できます。",
@@ -142,6 +144,19 @@ export const projectHome = {
       confirmReset: "リセットを確認",
       retry: "再試行",
       resetting: "リセット中...",
+      importBackupTitle: "バックアップをインポート",
+      importBackupWarning:
+        "インポートすると現在の全データ（プロジェクト・会話・ファイル）が削除され、バックアップの内容で完全に置き換えられます。続行する前に現在のバックアップをエクスポートすることを強くおすすめします。",
+      importBackupSecurityNote:
+        "バックアップファイルには暗号化キーとアプリ設定（ログイン資格情報を含む）が含まれており、API キーなどのデータを完全に復元できます。安全に保管し、他人と共有しないでください。",
+      importBackupFile: "バックアップファイル：{name}",
+      importBackupHint: "プロジェクト・会話・ファイル・API キー・アプリ設定（テーマ、言語、モデル設定など）を復元します。完了するとページが自動的に再読み込みされます。",
+      importBackupConfirm: "上書きして復元",
+      exportBackupTitle: "バックアップをエクスポート",
+      exportBackupSensitive:
+        "バックアップファイルには暗号化キー、API キー、アプリ設定（ログイン資格情報を含む）が含まれており、アカウントへの完全なアクセス権限と同等です。安全に保管してください。",
+      exportBackupHint: "含まれる内容：SQLite データベース、ワークスペースファイル、API キー、アプリ設定。",
+      exportBackupConfirm: "バックアップをエクスポート",
       diagnosticsTitle: "診断レポート",
       diagnosticsRunning: "診断情報を収集中...",
       diagnosticsHint: "下の「レポートをコピー」をクリックして開発者に送ってください。",

@@ -41,8 +41,10 @@ export const projectHome = {
       backup: "Data Backup",
       backupDescription:
         "Export the entire OPFS (SQLite database + workspace files) — for backups or migration to a new device.",
-      exportBackup: "Export Full Backup",
+      exportBackup: "Export",
       backingUp: "Backing up…",
+      importBackup: "Import",
+      restoringBackup: "Restoring…",
       diagnostics: "Diagnostics",
       diagnosticsDescription:
         "Collect runtime environment and storage state. Copy the report to share with the developer when something goes wrong.",
@@ -150,6 +152,19 @@ export const projectHome = {
       confirmReset: "Confirm Reset",
       retry: "Retry",
       resetting: "Resetting...",
+      importBackupTitle: "Import Backup",
+      importBackupWarning:
+        "Importing will wipe ALL current data (projects, conversations, files) and replace it with the backup. Exporting a fresh backup first is strongly recommended.",
+      importBackupSecurityNote:
+        "Backup files contain the encryption key and app settings (including login credentials) that can fully restore API keys and other data — store them safely and never share them.",
+      importBackupFile: "Backup file: {name}",
+      importBackupHint: "Restores projects, conversations, files, API keys, and app settings (theme, language, model config, …). The page will reload automatically once the restore completes.",
+      importBackupConfirm: "Overwrite & Restore",
+      exportBackupTitle: "Export Backup",
+      exportBackupSensitive:
+        "The backup file contains the encryption key, API keys, and app settings (including login credentials) — equivalent to full account access. Store it safely.",
+      exportBackupHint: "Includes: SQLite database, workspace files, API keys, and app settings.",
+      exportBackupConfirm: "Export Backup",
       diagnosticsTitle: "Diagnostic Report",
       diagnosticsRunning: "Collecting diagnostic information...",
       diagnosticsHint: "Click \"Copy Report\" below and paste it to the developer.",

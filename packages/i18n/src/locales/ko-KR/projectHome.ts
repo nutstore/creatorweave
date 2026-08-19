@@ -37,8 +37,10 @@ export const projectHome = {
       backup: "데이터 백업",
       backupDescription:
         "전체 OPFS 데이터(SQLite 데이터베이스 + 워크스페이스 파일)를 내보냅니다. 백업이나 새 기기로 이관용으로 사용할 수 있습니다.",
-      exportBackup: "전체 백업 내보내기",
+      exportBackup: "내보내기",
       backingUp: "백업 중…",
+      importBackup: "가져오기",
+      restoringBackup: "복원 중…",
       diagnostics: "진단",
       diagnosticsDescription:
         "실행 환경과 저장소 상태를 수집합니다. 문제 발생 시 한 번에 복사해서 개발자에게 공유할 수 있습니다.",
@@ -139,6 +141,19 @@ export const projectHome = {
       confirmReset: "초기화 확인",
       retry: "다시 시도",
       resetting: "초기화 중...",
+      importBackupTitle: "백업 가져오기",
+      importBackupWarning:
+        "가져오기를 실행하면 현재 모든 데이터(프로젝트·대화·파일)가 삭제되고 백업 내용으로 완전히 교체됩니다. 계속하기 전에 현재 데이터의 백업을 먼저 내보내는 것을 강력히 권장합니다.",
+      importBackupSecurityNote:
+        "백업 파일에는 암호화 키와 앱 설정(로그인 자격 증명 포함)이 포함되어 있어 API 키 등 데이터를 완전히 복원할 수 있습니다. 안전하게 보관하고 다른 사람과 공유하지 마세요.",
+      importBackupFile: "백업 파일: {name}",
+      importBackupHint: "프로젝트·대화·파일·API 키·앱 설정(테마, 언어, 모델 설정 등)을 복원합니다. 완료되면 페이지가 자동으로 새로고침됩니다.",
+      importBackupConfirm: "덮어쓰고 복원",
+      exportBackupTitle: "백업 내보내기",
+      exportBackupSensitive:
+        "백업 파일에는 암호화 키, API 키, 앱 설정(로그인 자격 증명 포함)이 포함되어 있어 전체 계정 접근 권한과 동일합니다. 안전하게 보관하세요.",
+      exportBackupHint: "포함 내용: SQLite 데이터베이스, 워크스페이스 파일, API 키, 앱 설정.",
+      exportBackupConfirm: "백업 내보내기",
       diagnosticsTitle: "진단 보고서",
       diagnosticsRunning: "진단 정보를 수집하는 중...",
       diagnosticsHint: "아래의「보고서 복사」를 클릭해서 개발자에게 전달해 주세요.",
