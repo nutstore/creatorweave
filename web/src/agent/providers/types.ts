@@ -423,7 +423,7 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
   },
   minimax: {
     category: 'international',
-    displayName: 'MiniMax (International)',
+    displayName: 'MiniMax',
     website: 'https://www.minimax.io',
     models: [
       {
