@@ -4,7 +4,7 @@ export const app = {
     preparing: "준비 중...",
     loadProgress: "로딩 진행률",
     firstLoadHint: "첫 로딩은 몇 초 정도 걸릴 수 있습니다",
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     initComplete: "초기화 완료",
     initFailed: "초기화 실패",
     sessionStorageOnly:

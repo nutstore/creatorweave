@@ -4,7 +4,7 @@ export const app = {
     preparing: "準備中...",
     loadProgress: "読み込み進捗",
     firstLoadHint: "初回読み込みには数秒かかる場合があります",
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     initComplete: "初期化完了",
     initFailed: "初期化に失敗しました",
     sessionStorageOnly:

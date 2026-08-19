@@ -7,7 +7,7 @@ export const extension = {
   bannerDismiss: "以后再说",
 
   // Install Guide Dialog
-  guideTitle: "安装 CreatorWeave 浏览器扩展",
+  guideTitle: "安装 怡氧知知 浏览器扩展",
   guideSubtitle: "让你的 AI 助手连接互联网",
   guideAlreadyInstalled: "已安装插件？",
   verifyInstallLink: "刷新页面",
@@ -51,7 +51,7 @@ export const extension = {
   installStepB: "打开右上角「开发者模式」开关",
   installStepC: "点击「加载已解压的扩展程序」",
   installStepCSelect: "选择刚才解压出来的 chrome-extension 文件夹",
-  installSuccessHint: "看到扩展列表中出现 \"CreatorWeave\" 即安装成功",
+  installSuccessHint: "看到扩展列表中出现 \"怡氧知知\" 即安装成功",
 
   // Verify step (kept for backwards compat)
   verifyTitle: "刷新页面",

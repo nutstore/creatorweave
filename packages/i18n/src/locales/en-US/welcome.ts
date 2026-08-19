@@ -1,5 +1,5 @@
 export const welcome = {
-    title: "CreatorWeave",
+    title: "EO2Weave",
     tagline: "AI-Native Workspace for Creators",
     placeholder: "Type a message to start...",
     send: "Send",
@@ -18,7 +18,7 @@ export const welcome = {
     step1Of3: "Step 1 of 3",
     step2Of3: "Step 2 of 3",
     step3Of3: "Step 3 of 3",
-    welcomeHeading: "Welcome to CreatorWeave",
+    welcomeHeading: "Welcome to eo2weave",
     welcomeSubtitle: "Your local AI workspace for files, code, and creation",
     continueButton: "Continue",
     skipButton: "Skip for now",

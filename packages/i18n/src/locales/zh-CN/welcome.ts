@@ -1,6 +1,6 @@
 // 欢迎页
 export const welcome = {
-    title: "CreatorWeave",
+    title: "怡氧知知",
     tagline: "面向创作者的 AI 原生工作台",
     placeholder: "输入消息开始对话...",
     send: "发送",
@@ -20,7 +20,7 @@ export const welcome = {
     step1Of3: "步骤 1 / 3",
     step2Of3: "步骤 2 / 3",
     step3Of3: "步骤 3 / 3",
-    welcomeHeading: "欢迎使用 CreatorWeave",
+    welcomeHeading: "欢迎使用 怡氧知知",
     welcomeSubtitle: "本地 AI 创作工坊，文件和代码都在浏览器中",
     continueButton: "继续",
     skipButton: "暂时跳过",

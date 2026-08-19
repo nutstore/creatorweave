@@ -766,7 +766,7 @@ function VersionInfoSection() {
   const displayBuildId = isSha ? buildId.slice(0, 7) : buildId.slice(0, 10)
 
   const handleCopy = useCallback(() => {
-    const fullInfo = `CreatorWeave v${version} (${buildId})`
+    const fullInfo = `EO2Weave v${version} (${buildId})`
     navigator.clipboard.writeText(fullInfo).then(
       () => toast.success(t('settings.versionInfoCopied')),
       () => toast.error('Copy failed'),

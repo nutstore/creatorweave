@@ -136,7 +136,7 @@ export async function runPageAction(action: PageAction): Promise<PageActionResul
       ok: false,
       errorCode: 'BRIDGE_UNAVAILABLE',
       error:
-        'Page action requires the CreatorWeave Browser Extension. Install/enable it and reopen the side panel.',
+        'Page action requires the eo2weave browser extension. Install/enable it and reopen the side panel.',
     }
   }
   if (!isSidePanelMode()) {
@@ -144,7 +144,7 @@ export async function runPageAction(action: PageAction): Promise<PageActionResul
       ok: false,
       errorCode: 'NOT_IN_SIDE_PANEL',
       error:
-        'Page action tools only work in side-panel mode (when CreatorWeave is docked to an upstream tab).',
+        'Page action tools only work in side-panel mode (when eo2weave is docked to an upstream tab).',
     }
   }
   const binding = getSidePanelBindingId()
@@ -194,7 +194,7 @@ export async function captureTab(
     return {
       ok: false,
       errorCode: 'BRIDGE_UNAVAILABLE',
-      error: 'Screenshot requires the CreatorWeave Browser Extension.',
+      error: 'Screenshot requires the eo2weave browser extension.',
     }
   }
   if (!isSidePanelMode()) {

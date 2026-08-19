@@ -1,6 +1,6 @@
 // 상단 바
 export const topbar = {
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     openFolder: "폴더 열기",
     switchFolder: "프로젝트 폴더 전환",
     noApiKey: "API Key가 설정되지 않음",

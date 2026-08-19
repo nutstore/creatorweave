@@ -204,7 +204,7 @@ export async function exportOPFSBackup(): Promise<{
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .slice(0, 19) // YYYY-MM-DD_HH-MM-SS
-  const filename = `creatorweave-backup_${ts}.zip`
+  const filename = `eo2weave-backup_${ts}.zip`
 
   const fileCount = Object.keys(files).length
   console.log(

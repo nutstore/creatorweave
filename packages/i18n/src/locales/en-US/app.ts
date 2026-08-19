@@ -4,7 +4,7 @@ export const app = {
     preparing: "Preparing...",
     loadProgress: "Load Progress",
     firstLoadHint: "First load may take a few seconds",
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     initComplete: "Initialization complete",
     initFailed: "Initialization failed",
     sessionStorageOnly:

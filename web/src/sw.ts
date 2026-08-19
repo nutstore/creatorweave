@@ -259,7 +259,7 @@ async function syncMessages(): Promise<void> {
 
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'CreatorWeave',
+    title: 'EO2Weave',
     body: 'You have a new notification',
     icon: '/favicon.svg',
     badge: '/icons/badge-72.png',

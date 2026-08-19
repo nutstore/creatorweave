@@ -4,7 +4,7 @@ export const app = {
     preparing: "正在准备...",
     loadProgress: "加载进度",
     firstLoadHint: "首次加载可能需要几秒钟时间",
-    productName: "CreatorWeave",
+    productName: "怡氧知知",
     initComplete: "初始化完成",
     initFailed: "初始化失败",
     sessionStorageOnly: "数据仅在当前会话保存，刷新后将丢失",

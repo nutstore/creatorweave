@@ -2640,7 +2640,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               await notifyAgentComplete({
                 conversationId,
                 projectId: notifProjectId,
-                title: currentConv.title ?? 'CreatorWeave Agent',
+                title: currentConv.title ?? 'EO2Weave Agent',
                 body: summary,
               })
             } catch (err) {

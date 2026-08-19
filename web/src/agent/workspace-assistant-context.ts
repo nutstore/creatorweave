@@ -153,7 +153,7 @@ export async function fetchSidePanelContext(): Promise<unknown | null> {
       {
         hasAgentWeb: !!agentWeb,
         hasMethod: !!agentWeb?.fetchBoundPageContext,
-        hint: 'Is the CreatorWeave browser extension installed and active on this origin?',
+        hint: 'Is the eo2weave browser extension installed and active on this origin?',
       },
     )
     return null
@@ -324,6 +324,77 @@ export interface PageContextSnapshot {
   title?: string | null
   selectedText?: string | null
   providerContext?: unknown
+  webmcpTools?: Array<{ name: string; description: string; fullName: string }>
+}
+
+/**
+ * Read the WebMCP tool list for an upstream hostname from the web app's
+ * discovery cache (useWebMCPStore — populated by the agent loop via
+ * discoverWebMCPCatalog, TTL 8s, authorized tools only).
+ *
+ * Purpose: give the LLM tool NAMES + descriptions in the page-context
+ * block so `search_tools` is no longer a blind guess (BM25 needs keywords;
+ * before this, the LLM did not even know what tools existed here).
+ * Schemas are deliberately NOT included — search_tools already returns
+ * search + schema in one call, and embedding schemas would bloat every
+ * message by KBs.
+ *
+ * Store read (not fresh discovery) by design: capturePageContext runs on
+ * the message-send path and must stay fast; the agent loop refreshes the
+ * catalog right before tool use anyway.
+ */
+async function readWebmcpToolsForHost(
+  hostname: string | null,
+  tabId: number | null,
+): Promise<
+  Array<{ name: string; description: string; fullName: string }>
+> {
+  if (!hostname) return []
+  const { useWebMCPStore } = await import('@/webmcp/store')
+  const collect = (): Array<{ name: string; description: string; fullName: string }> => {
+    const tools = useWebMCPStore.getState().getAllTools()
+    const host = hostname.trim().toLowerCase()
+    const seen = new Set<string>()
+    const out: Array<{ name: string; description: string; fullName: string }> = []
+    for (const tool of tools) {
+      if ((tool.hostname || '').trim().toLowerCase() !== host) continue
+      // Tab scoping (when known): same-hostname tabs in different apps
+      // (jmail.world / vs /messages) expose disjoint tool groups; only the
+      // group backed by the BOUND tab is relevant to this snapshot.
+      if (typeof tabId === 'number' && tool.representativeTabId !== tabId) continue
+      if (seen.has(tool.fullName)) continue
+      seen.add(tool.fullName)
+      out.push({
+        name: tool.name,
+        description: tool.description || '',
+        fullName: tool.fullName,
+      })
+    }
+    return out
+  }
+  try {
+    let tools = collect()
+    if (tools.length === 0) {
+      // Cold start: the message-send path runs BEFORE the agent loop's
+      // buildRuntimeEnhancedPrompt() discovery. Trigger one discovery
+      // (TTL-cached + inflight-deduped, so warm turns never re-pay this)
+      // so the FIRST message's snapshot doesn't falsely say "none".
+      try {
+        const { discoverWebMCPCatalog } = await import('@/webmcp/manager')
+        await Promise.race([
+          discoverWebMCPCatalog(),
+          new Promise((r) => setTimeout(r, 1500)),
+        ])
+        tools = collect()
+      } catch {
+        // bridge unavailable — keep the empty list
+      }
+    }
+    return tools
+  } catch {
+    // store unavailable (early boot / non-extension context) — degrade to empty
+    return []
+  }
 }
 
 /**
@@ -343,12 +414,26 @@ export async function capturePageContext(): Promise<PageContextSnapshot | null> 
       upstream && typeof upstream === 'object' && key in upstream
         ? ((upstream as Record<string, unknown>)[key] as T)
         : null
+    // Share the bound tab id with the get_page_tools / <current_page_webmcp>
+    // fast path so it lists only THIS tab's tool group (same-hostname tabs
+    // in different apps expose disjoint toolsets).
+    const boundTabId = pick<number>('tabId')
+    try {
+      const { setSidePanelBoundTabId } = await import('./external-tool-bridge')
+      setSidePanelBoundTabId(typeof boundTabId === 'number' ? boundTabId : null)
+    } catch {
+      // bridge module unavailable — fast path falls back to hostname-only
+    }
     return {
       hostname,
       url: pick<string>('url'),
       title: pick<string>('title'),
       selectedText: pick<string>('selectedText'),
       providerContext: pick('providerContext'),
+      // Scope tools to the BOUND TAB, not just the hostname: same-hostname
+      // tabs in different apps (jmail.world / vs /messages) expose disjoint
+      // toolsets and hostname-only filtering merges them into garbage.
+      webmcpTools: await readWebmcpToolsForHost(hostname, boundTabId),
     }
   } catch (err) {
     console.warn('[Workspace Assistant] capturePageContext failed:', err)
@@ -456,7 +541,7 @@ export function renderPageContextBlock(ctx: PageContextSnapshot | null): string 
 
   let block = '\n\n<current_page_context>\n'
   block += `You are running as a side panel in the browser sidebar, linked to the upstream page the user is browsing. The user invoked you from ${hostname}.\n`
-  block += '\n[Source — read live by CreatorWeave]\n'
+  block += '\n[Source — read live by eo2weave]\n'
   block += `- Website: ${ctx.hostname || 'unknown'}\n`
   block += `- URL: ${urlStr}\n`
   block += `- Title: ${titleStr}\n`
@@ -479,7 +564,32 @@ export function renderPageContextBlock(ctx: PageContextSnapshot | null): string 
     block += `\n[Page details — ${hostname} provided no additional business fields]\n`
   }
 
-  block += '\n**Important — always search before acting:** When the user wants to interact with this page or its content (e.g., read data, submit forms, navigate, extract info), you MUST call `search_tools` first to discover the available tools for this website. Do NOT guess tool names or call `call_tool` directly without searching — tool names are case-sensitive and vary by provider.\n'
+  // WebMCP tool awareness: names + descriptions only (no schemas —
+  // search_tools returns schema together with search results, so the
+  // context block stays lean while the LLM still knows WHAT exists).
+  const webmcpTools = Array.isArray(ctx.webmcpTools) ? ctx.webmcpTools : []
+  if (webmcpTools.length > 0) {
+    block += `\n[WebMCP tools — available on ${hostname} right now]\n`
+    for (const tool of webmcpTools) {
+      // First-sentence trim, but tolerant of abbreviations: "e.g." and
+      // "i.e." must NOT end the sentence (observed live: "…(from
+      // list_conversations, e.g. steve-bannon)" was cut at "e").
+      const desc = tool.description
+        ? tool.description
+            .replace(/\b(e\.g|i\.e)\./g, 'ᴇɢ')
+            .split(/[.\n]/)[0]
+            .replace(/ᴇɢ/g, 'e.g.')
+            .trim()
+            .slice(0, 160)
+        : ''
+      block += `- ${tool.fullName}${desc ? ' — ' + desc : ''}\n`
+    }
+    block += '\nThese names come straight from the site (native WebMCP or an eo2weave recipe). For the EXACT call_tool names with full schemas, call `get_page_tools` (one cheap local read — no search needed); they are also listed in the system prompt\'s <current_page_webmcp> block. Only use `search_tools` for MCP servers or other websites.\n'
+  } else {
+    block += `\n[WebMCP tools — ${hostname} exposes none at the moment]\n`
+  }
+
+  block += '\n**Important — always search before acting (other sites / MCP):** For interacting with OTHER websites or MCP servers, you MUST call `search_tools` first — do NOT guess tool names; they are case-sensitive and vary by provider. For THIS page, prefer the direct path: get_page_tools → call_tool.\n'
   block += '\nWhen the user says "this", "it", or "that one above", they usually mean an element in the context above. When the user navigates to a different page, URL/title/details refresh automatically — the user does not need to restate.\n'
   block += '\nTip: use the `web_fetch` tool on the URL above if you need the full page content.\n'
   block += '</current_page_context>'

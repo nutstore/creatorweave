@@ -1,5 +1,5 @@
 export const topbar = {
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     openFolder: "Open Folder",
     switchFolder: "Switch Project Folder",
     noApiKey: "No API Key",
