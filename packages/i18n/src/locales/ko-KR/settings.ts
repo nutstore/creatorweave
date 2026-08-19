@@ -508,7 +508,7 @@ export const settings = {
     providerNames: {
       glm: "Zhipu GLM",
       glmCoding: "Zhipu GLM (Coding)",
-      minimaxChina: "MiniMax (중국 버전)",
+      minimaxChina: "MiniMax",
       qwen: "Qwen (Tongyi)",
       volcengineCoding: "Volcengine Ark Coding",
     },

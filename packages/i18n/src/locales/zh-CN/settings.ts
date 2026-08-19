@@ -500,7 +500,7 @@ export const settings = {
     providerNames: {
       glm: "智谱 GLM",
       glmCoding: "智谱 GLM (Coding)",
-      minimaxChina: "MiniMax (中国版)",
+      minimaxChina: "MiniMax",
       qwen: "通义千问 (Qwen)",
       volcengineCoding: "火山方舟 Coding",
     },

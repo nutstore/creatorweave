@@ -1749,7 +1749,10 @@ const groupedProviders = useMemo(
       {categoryOrderForLocale(locale).map((category) => {
         const providers = groupedProviders[category]
           .filter(({ type }) => type !== LLM_GATEWAY_PROVIDER_TYPE)
-        if (providers.length === 0 && category !== 'custom') return null
+        // Hide empty groups entirely — including custom. Previously custom
+        // was exempted, which rendered a lone "Custom" header with no cards
+        // when the user hadn't added any custom provider yet.
+        if (providers.length === 0) return null
         return (
           <div key={category} className="space-y-1">
             <div className="px-1 text-[11px] font-semibold text-tertiary uppercase tracking-wider">

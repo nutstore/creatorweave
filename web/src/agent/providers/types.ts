@@ -440,7 +440,7 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
   },
   'minimax-cn': {
     category: 'chinese',
-    displayName: 'MiniMax (China)',
+    displayName: 'MiniMax',
     website: 'https://www.minimaxi.com',
     models: [
       {
