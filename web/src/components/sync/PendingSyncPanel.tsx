@@ -22,11 +22,8 @@ import {
 import { RefreshCw, ChevronRight, X, Check, AlertTriangle, FileInput } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
-import {
-  useSyncDialogStore,
-  type SyncExecutor,
-  type NotifyFn,
-} from '@/store/sync-dialog.store'
+import { useSyncDialogStore, type SyncExecutor, type NotifyFn } from '@/store/sync-dialog.store'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import type { SyncResult } from '@/opfs/types/opfs-types'
@@ -55,12 +52,18 @@ export function PendingSyncPanel() {
   // Use custom equality selector to prevent re-renders when pendingChanges
   // has the same logical content but a different object reference
   // (e.g. when refreshPendingChanges creates a new object during streaming)
+  // Use the folder-access store roots directly — the authoritative source
+  // of "is a local directory mounted right now". `hasDirectoryHandle` from
+  // conversation-context can be stale (set true by a previous FS Access grant
+  // or a native-host add that never notified the workspace store), while
+  // `roots.length` flips synchronously with addRoot/addNativeHostRoot/removeRoot.
+  const roots = useFolderAccessStore((state) => state.roots)
+  const hasLocalRoot = roots.length > 0
   const pendingChanges = useConversationContextStore(
     (state) => state.pendingChanges,
     arePendingChangesEqual,
   )
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
-  const hasDirectoryHandle = useConversationContextStore((state) => state.hasDirectoryHandle)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSyncing, setIsSyncing] = useState(false)
@@ -426,15 +429,15 @@ export function PendingSyncPanel() {
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="text-4xl mb-3 opacity-20 transition-opacity duration-500 hover:opacity-30">
-              {hasDirectoryHandle ? '✓' : '📂'}
+              {hasLocalRoot ? '✓' : '📂'}
             </div>
             <p className="text-sm font-medium text-secondary">
-              {hasDirectoryHandle
+              {hasLocalRoot
                 ? t('settings.pendingSyncPanel.noPendingChanges')
                 : t('settings.pendingSyncPanel.pureOpfsMode')}
             </p>
             <p className="text-xs text-tertiary mt-1">
-              {hasDirectoryHandle
+              {hasLocalRoot
                 ? t('settings.pendingSyncPanel.newChangesAppearHere')
                 : t('settings.pendingSyncPanel.pureOpfsModeHint')}
             </p>
