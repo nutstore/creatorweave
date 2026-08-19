@@ -639,6 +639,31 @@ export const jmailToolImplementations: Record<
     return navigateByAnchor(`nav a.nav-item[href="${href}"]`, `folder:${folder}`)
   },
 
+  async open_message_app() {
+    // Cross-APP navigation (/ → /messages): the dock's JMessage icon is
+    // a real anchor (it may sit inside the More-folder popover, but the
+    // anchor itself stays mounted & clickable). Client-side navigation
+    // keeps this tool's context alive; the recipe toolset swaps after
+    // the bridge's route-change poll (~1s), so return a soft pointer.
+    const dockLink = document.querySelector<HTMLAnchorElement>('.jmail-dock a[href="/messages"]')
+    if (!dockLink) {
+      return {
+        navigated: false,
+        error: 'JMessage dock entry not found — are you on a jmail.world page?',
+      }
+    }
+    dockLink.click()
+    await waitFor(
+      () => (location.pathname.startsWith('/messages') ? ({} as const) : null),
+      { timeoutMs: 8000 },
+    )
+    return {
+      navigated: true,
+      url: location.pathname,
+      note: 'Switched to the JMessage app. Its tools (search_messages, open_conversation, …) register within ~1-2s; the system-prompt tool list swaps on the next turn. Call list_conversations or search_messages to start reading texts.',
+    }
+  },
+
   async browse_topic(args) {
     const slug = String(args.topic || '').trim()
     if (!slug) throw new Error('topic is required (slug from list_topics, e.g. damage-control)')

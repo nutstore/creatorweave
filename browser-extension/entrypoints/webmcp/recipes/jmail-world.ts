@@ -7,9 +7,14 @@
 // clicks thread rows, reads the rendered thread view. Selectors
 // were verified against the live site (2026-08-18):
 //   - search input: input[name="q"]  (form in header)
-//   - thread rows:  a[href^="/thread/"]
 //   - thread URL:   /thread/{doc_id}
+//   - list rows:    plain divs (no href) — see jmail-tools.ts
 // All tools are read-only (readOnlyHint).
+//
+// Path scope: jmail.world hosts several distinct apps (JMessage
+// /messages, JPhotos /photos, JDrive /drive, JFlights, Jamazon,
+// …). This recipe covers ONLY the Gmail-style email archive
+// views listed in pathPrefixes.
 // ============================================================
 
 import type { WebMCPRecipe } from './types'
@@ -17,6 +22,21 @@ import type { WebMCPRecipe } from './types'
 export const jmailRecipe: WebMCPRecipe = {
   id: 'jmail-world',
   hostname: 'jmail.world',
+  // Scoped to the Gmail-style archive app only — the same hostname
+  // also serves JMessage (/messages) with its own recipe, and other
+  // apps (photos/drive/flights/…) that have no recipe at all.
+  pathPrefixes: [
+    '/',
+    '/search',
+    '/thread',
+    '/person',
+    '/topic',
+    '/starred',
+    '/unredactions',
+    '/sent',
+    '/attachments',
+    '/activity',
+  ],
   displayName: 'Jmail — Epstein Email Archive',
   description:
     'Search and read the 7,499 released Jeffrey Epstein emails directly in the Gmail-style archive UI.',
@@ -153,6 +173,13 @@ export const jmailRecipe: WebMCPRecipe = {
           limit: { type: 'number', description: 'Max rows to return (default 10, max 25)', minimum: 1, maximum: 25 },
         },
       },
+    },
+    {
+      name: 'open_message_app',
+      title: 'Switch to the JMessage app',
+      description:
+        'Switch from the email archive to the jmail.world JMessage app (/messages) — the iMessage-style text conversations, a different app with its own toolset (search_messages, open_conversation, …). After it runs, the system prompt\'s <current_page_webmcp> list swaps to the JMessage tools.',
+      inputSchema: { type: 'object', properties: {} },
     },
     {
       name: 'clear_date_filter',

@@ -22,8 +22,9 @@
 
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'
 import { CW_WEBMCP_AGENT_MARKER, parseRelayCommand } from './webmcp/relay-protocol'
-import { findRecipeForHostname } from './webmcp/recipes'
+import { findRecipeForLocation } from './webmcp/recipes'
 import { jmailToolImplementations } from './webmcp/recipes/jmail-tools'
+import { jmessageToolImplementations } from './webmcp/recipes/jmessage-tools'
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -36,6 +37,7 @@ export default defineContentScript({
     // hosts are simply never activated there.
     const implementations: Record<string, Record<string, (args: Record<string, unknown>) => Promise<unknown>>> = {
       'jmail-world': jmailToolImplementations,
+      'jmessage-world': jmessageToolImplementations,
     }
 
     let activeRecipeId: string | null = null
@@ -50,7 +52,9 @@ export default defineContentScript({
     }
 
     async function activate(recipeId: string): Promise<void> {
-      const recipe = findRecipeForHostname(location.hostname)
+      // Path-scoped lookup: the recipe must match BOTH the hostname
+      // and the current path (jmail.world runs several apps).
+      const recipe = findRecipeForLocation(location.hostname, location.pathname)
       if (!recipe || recipe.id !== recipeId) return
 
       const impl = implementations[recipe.id]
@@ -104,6 +108,14 @@ export default defineContentScript({
       if (!command) return
 
       if (command.kind === 'recipe-activate') {
+        // Idempotent: same-app SPA route changes re-run the bridge's
+        // syncRecipeState and re-send activate for the SAME recipe.
+        // Re-registering would abort + re-register every tool, and the
+        // page agent's poll could snapshot that empty window (popup
+        // flicker). Skip when this recipe is already active — the
+        // bridge's boot-time retry is likewise absorbed after the
+        // first successful activation.
+        if (activeRecipeId === command.recipeId) return
         void activate(command.recipeId)
       } else if (command.kind === 'recipe-deactivate') {
         unregisterCurrent()

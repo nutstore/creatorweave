@@ -82,7 +82,10 @@ export default defineContentScript({
 
       // ── Regular request: use sendMessage (existing path) ──
 
-      try {
+      /**
+       * Send a single request/response round trip to the background.
+       */
+      const sendMessageOnce = (onDone: (response: any) => void) => {
         chrome.runtime.sendMessage(
           { type, ...payload },
           (response) => {
@@ -90,16 +93,68 @@ export default defineContentScript({
             const normalizedResponse = runtimeError
               ? { ok: false, ...normalizeRelayError(runtimeError.message || runtimeError) }
               : (response || { ok: false, errorCode: 'NO_BACKGROUND_RESPONSE', error: 'No response from background' })
-
-            // Send response back to page (MAIN world)
-            window.postMessage({
-              __agentWebBridge: true,
-              __agentWebResponse: true,
-              id,
-              response: normalizedResponse,
-            }, '*');
+            onDone(normalizedResponse)
           },
         );
+      };
+
+      // A reply may be lost after a native-host request has already reached
+      // the host. Retrying a write, delete, exec, or folder-picker request
+      // would duplicate a side effect, so only retry operations that are
+      // explicitly read-only and idempotent.
+      const isSafeNativeHostRetry = type === 'native_host_call' && new Set([
+        'ping', 'list_scopes', 'stat_file', 'list_dir', 'read_file',
+        'read_file_at', 'check_policy', 'get_execpolicy', 'exec_logs',
+        'exec_status', 'exec_list',
+      ]).has(typeof payload.action === 'string' ? payload.action : '')
+
+      // A missing response with no runtime error usually means the MV3
+      // service worker was mid-cold-start or died between receiving the
+      // message and responding. A single retry is safe only for the
+      // read-only native-host operations listed above.
+      let didRetry = false;
+
+      try {
+        sendMessageOnce((response) => {
+          if (
+            response &&
+            response.ok === false &&
+            response.errorCode === 'NO_BACKGROUND_RESPONSE' &&
+            isSafeNativeHostRetry &&
+            !didRetry
+          ) {
+            didRetry = true;
+            setTimeout(() => {
+              try {
+                sendMessageOnce((retryResponse) => {
+                  window.postMessage({
+                    __agentWebBridge: true,
+                    __agentWebResponse: true,
+                    id,
+                    response: retryResponse,
+                  }, '*');
+                });
+              } catch (err) {
+                const normalized = normalizeRelayError(err)
+                window.postMessage({
+                  __agentWebBridge: true,
+                  __agentWebResponse: true,
+                  id,
+                  response: { ok: false, ...normalized },
+                }, '*');
+              }
+            }, 250);
+            return;
+          }
+
+          // Send response back to page (MAIN world)
+          window.postMessage({
+            __agentWebBridge: true,
+            __agentWebResponse: true,
+            id,
+            response,
+          }, '*');
+        });
       } catch (err) {
         const normalized = normalizeRelayError(err)
         window.postMessage({
