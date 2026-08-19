@@ -25,6 +25,8 @@
 //     will pick it up automatically. No code change in this script.
 // ============================================================
 
+import { isCwWebappOrigin } from '../lib/webapp-origins'
+
 const POS_KEY = 'cw_side_panel_btn_pos'
 
 export default defineContentScript({
@@ -46,8 +48,7 @@ export default defineContentScript({
     // the data attribute hasn't been set yet (e.g. page still loading).
     if (
       document.documentElement.dataset.creatorweave === 'true' ||
-      window.location.origin === 'http://localhost:5173' ||
-      window.location.origin === 'https://creatorweave.eo2suite.cn'
+      isCwWebappOrigin(window.location.origin)
     ) {
       // eslint-disable-next-line no-console
       console.log('[CreatorWeave Side Panel] skipped: this is a CreatorWeave page')

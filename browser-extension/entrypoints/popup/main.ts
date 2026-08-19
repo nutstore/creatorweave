@@ -2,6 +2,8 @@
 // Store builds (CW_CODEX_OAUTH=0) hide the whole Codex box in the popup.
 declare const __CW_CODEX_OAUTH__: boolean;
 
+import { getCwWebappBaseUrl } from '../../lib/webapp-origins';
+
 function t(key: string, substitutions?: string | string[]): string {
   return chrome.i18n.getMessage(key as any, substitutions) || key;
 }
@@ -63,16 +65,14 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     if (typeof tabId !== 'number') {
       // No valid tab yet (very rare — popup opened before query resolved):
       // open the web app in a plain tab as a graceful fallback.
-      var isDevFb = import.meta.env.MODE === 'development';
-      chrome.tabs.create({ url: (isDevFb ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn') + '/#/' });
+      chrome.tabs.create({ url: getCwWebappBaseUrl() + '/#/' });
       window.close();
       return;
     }
 
     // 1) Register the binding + panel-open marker (fire-and-forget).
     var bindingId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
-    var isDev = import.meta.env.MODE === 'development';
-    var cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn';
+    var cwBase = getCwWebappBaseUrl();
     var params = new URLSearchParams();
     params.set('source', 'side_panel');
     params.set('binding', bindingId);

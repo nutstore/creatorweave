@@ -20,6 +20,7 @@ import {
   isTrustedCreatorWeaveSenderUrl,
 } from '../lib/page-action-authorization'
 import { SidePanelBindingStore, type SidePanelBinding } from '../lib/side-panel-binding-store'
+import { getCwWebappBaseUrl } from '../lib/webapp-origins'
 
 // Config
 const CONFIG = {
@@ -1036,8 +1037,9 @@ export default defineBackground(() => {
       } catch {}
     }
 
-    const isDev = import.meta.env.MODE === 'development'
-    const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
+    // Site (.cn/.com) is chosen at runtime by browser language; dev builds
+    // target the local Vite server (handled inside getCwWebappBaseUrl).
+    const cwBase = getCwWebappBaseUrl()
     const cwUrl = `${cwBase}/#/?${params.toString()}`
     // eslint-disable-next-line no-console
     console.log('[CreatorWeave][bg] opening side panel', {
@@ -1251,7 +1253,15 @@ export default defineBackground(() => {
               },
             })
             const result = Array.isArray(results) ? results[0]?.result : null
-            sendResponse(result ?? null)
+            // Attach the bound tab's id so the web app can scope WebMCP tool
+            // groups to THIS tab (same-hostname tabs in different apps —
+            // e.g. jmail.world / vs /messages — expose disjoint toolsets;
+            // hostname-only filtering would merge them).
+            const payload =
+              result && typeof result === 'object'
+                ? { ...(result as Record<string, unknown>), tabId: targetTabId }
+                : result ?? null
+            sendResponse(payload)
           } catch (err: any) {
             console.warn('[Background] requestBoundPageContext failed:', err?.message || err)
             sendResponse(null)
@@ -1852,13 +1862,54 @@ export default defineBackground(() => {
           try {
             const { type: _type, __agentWebBridge: _bridge, id: _id, payload: _payload, ...topLevelPayload } = message as Record<string, any>
             const nativePayload = message.action !== undefined ? topLevelPayload : nestedPayload
-            const response = await chrome.runtime.sendNativeMessage(
-              'com.creatorweave.nativehost',
-              nativePayload
-            )
+            const actionName = typeof nativePayload?.action === 'string' ? nativePayload.action : ''
+            const configuredExecTimeoutSeconds =
+              typeof nativePayload?.timeout === 'number' && nativePayload.timeout > 0
+                ? nativePayload.timeout
+                : 120
+            // File operations should fail promptly when the host is broken,
+            // but exec_sync and pick_folder are deliberately long-running:
+            // the former has its own command timeout and the latter waits for
+            // an explicit user choice. A single 20-second timeout for every
+            // action incorrectly labels healthy work as a host failure.
+            const NATIVE_HOST_TIMEOUT_MS = actionName === 'exec_sync'
+              ? Math.max(20_000, configuredExecTimeoutSeconds * 1_000 + 5_000)
+              : actionName === 'pick_folder'
+                ? 5 * 60_000
+                : 20_000
+            const sendNativeMessageWithTimeout = () => new Promise<any>((resolve, reject) => {
+              let settled = false
+              const timer = setTimeout(() => {
+                if (settled) return
+                settled = true
+                const timeoutError = new Error(`Native host did not respond within ${NATIVE_HOST_TIMEOUT_MS / 1000}s`)
+                ;(timeoutError as Error & { code?: string }).code = 'NATIVE_HOST_TIMEOUT'
+                reject(timeoutError)
+              }, NATIVE_HOST_TIMEOUT_MS)
+              chrome.runtime.sendNativeMessage(
+                'com.creatorweave.nativehost',
+                nativePayload,
+                (response: any) => {
+                  if (settled) return
+                  settled = true
+                  clearTimeout(timer)
+                  const runtimeError = chrome.runtime.lastError
+                  if (runtimeError) {
+                    reject(new Error(String(runtimeError.message || runtimeError)))
+                    return
+                  }
+                  resolve(response ?? { ok: false, error: 'Empty response from native host' })
+                }
+              )
+            })
+            const response = await sendNativeMessageWithTimeout()
             sendResponse(response)
           } catch (err: any) {
-            sendResponse({ ok: false, error: String(err?.message || err), errorCode: 'NATIVE_HOST_ERROR' })
+            sendResponse({
+              ok: false,
+              error: String(err?.message || err),
+              errorCode: err?.code === 'NATIVE_HOST_TIMEOUT' ? 'NATIVE_HOST_TIMEOUT' : 'NATIVE_HOST_ERROR',
+            })
           }
           return
         }
