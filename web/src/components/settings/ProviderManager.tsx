@@ -1193,7 +1193,7 @@ function LLMGatewayCard({
     const clientId = getLLMGatewayClientId()
 
     if (!clientId) {
-      setAuthState({ status: 'error', error: 'Client ID 未配置，请设置 VITE_JIANGUOYUN_AI_CLIENT_ID 环境变量' })
+      setAuthState({ status: 'error', error: t('settings.gateway.clientIdMissing') })
       return
     }
 
@@ -1218,7 +1218,7 @@ function LLMGatewayCard({
     } catch (e) {
       setAuthState({
         status: 'error',
-        error: (e as Error).message || '认证失败',
+        error: (e as Error).message || t('settings.gateway.authFailed'),
       })
     }
   }, [triggerProviderRefresh])
@@ -1314,15 +1314,15 @@ function LLMGatewayCard({
         <div className="flex items-center gap-2">
           {isLoggedIn ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand,#0d9488)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--brand,#0d9488)]">
-              已登录
+              {t('settings.gateway.loggedIn')}
             </span>
           ) : isAuthRunning ? (
             <span className="inline-flex items-center gap-1 text-[10px] text-tertiary">
               <Loader2 className="h-3 w-3 animate-spin" />
-              登录中...
+              {t('settings.gateway.loggingIn')}
             </span>
           ) : (
-            <span className="text-[10px] text-tertiary/60">未登录</span>
+            <span className="text-[10px] text-tertiary/60">{t('settings.gateway.loggedOut')}</span>
           )}
         </div>
       </button>
@@ -1331,7 +1331,7 @@ function LLMGatewayCard({
       {isExpanded && (
         <div className="border-t border-border/60 px-3.5 py-3 space-y-3">
           <div>
-            <p className="text-[11px] font-medium text-secondary">服务地址</p>
+            <p className="text-[11px] font-medium text-secondary">{t('settings.gateway.serviceUrl')}</p>
             <p className="mt-0.5 font-mono text-[11px] text-tertiary">
               {import.meta.env.VITE_JIANGUOYUN_AI_BASE_URL || 'https://ai.jianguoyun.com'}
             </p>
@@ -1559,7 +1559,7 @@ function LLMGatewayCard({
                   className="flex-1 h-8 text-[11px]"
                   onClick={handleLogout}
                 >
-                  登出
+                  {t('settings.gateway.logout')}
                 </BrandButton>
               </div>
             </>
@@ -1582,7 +1582,7 @@ function LLMGatewayCard({
               {authState.status === 'requesting' && (
                 <div className="flex items-center justify-center gap-2 py-2 text-[12px] text-secondary">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  正在创建授权会话...
+                  {t('settings.gateway.creatingSession')}
                 </div>
               )}
 
@@ -1594,7 +1594,7 @@ function LLMGatewayCard({
                     className="rounded-lg border border-[var(--brand-border,rgba(13,148,136,0.25))] p-3 text-center"
                     style={{ background: 'var(--brand-bg, rgba(13,148,136,0.06))' }}
                   >
-                    <p className="text-[10px] text-tertiary mb-1.5">请在授权页面输入以下代码</p>
+                    <p className="text-[10px] text-tertiary mb-1.5">{t('settings.gateway.enterCodeHint')}</p>
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-xl font-mono font-bold tracking-[0.15em] text-primary">
                         {authState.userCode}
@@ -1603,7 +1603,7 @@ function LLMGatewayCard({
                         type="button"
                         onClick={handleCopyCode}
                         className="text-tertiary hover:text-primary transition-colors"
-                        title="复制"
+                        title={t('settings.gateway.copy')}
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                       </button>
@@ -1626,7 +1626,7 @@ function LLMGatewayCard({
                       style={{ background: 'var(--brand, #0d9488)' }}
                     >
                       <ExternalLink className="h-3 w-3" />
-                      打开授权页面
+                      {t('settings.gateway.openAuthPage')}
                     </a>
                   )}
 
@@ -1634,7 +1634,7 @@ function LLMGatewayCard({
                   {authState.status === 'polling' && (
                     <div className="flex items-center justify-center gap-1.5 text-[11px] text-tertiary">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      等待授权确认...
+                      {t('settings.gateway.waitingForAuth')}
                     </div>
                   )}
                 </div>
@@ -1644,7 +1644,7 @@ function LLMGatewayCard({
               {authState.status === 'success' && (
                 <div className="flex items-center justify-center gap-2 py-2 text-[12px] font-medium text-green-500">
                   <CheckCircle2 className="h-5 w-5" />
-                  登录成功！
+                  {t('settings.gateway.loginSuccess')}
                 </div>
               )}
 
@@ -1654,7 +1654,7 @@ function LLMGatewayCard({
                   <div className="flex items-start gap-2 py-1">
                     <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[12px] font-medium text-secondary">登录失败</p>
+                      <p className="text-[12px] font-medium text-secondary">{t('settings.gateway.loginFailed')}</p>
                       <p className="text-[11px] text-secondary">{authState.error}</p>
                     </div>
                   </div>
@@ -1664,13 +1664,13 @@ function LLMGatewayCard({
                     style={{ background: 'var(--brand, #0d9488)' }}
                     onClick={() => { setAuthState({ status: 'idle' }); handleLogin() }}
                   >
-                    重试
+                    {t('settings.gateway.retry')}
                   </button>
                 </div>
               )}
 
               <p className="text-[10px] text-tertiary">
-                通过 Device Code Flow 安全认证，无需手动管理 API Key。
+                {t('settings.gateway.authHint')}
               </p>
             </>
           )}
