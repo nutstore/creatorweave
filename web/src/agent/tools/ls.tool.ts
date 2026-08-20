@@ -364,6 +364,21 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     } catch { /* fall through to normal list */ }
   }
 
+  // Native Host roots expose no FileSystemDirectoryHandle and are therefore
+  // invisible to getRuntimeHandlesForProject. Mirror search.tool.ts: when the
+  // first path segment is a native-host root name, route to the disk scanner
+  // instead of silently falling through to the OPFS workspace mirror (which is
+  // a stale snapshot and misses disk-only files). The disk scan is then merged
+  // with the OPFS mirror subtree so pending changes (unsynced write/edit) stay
+  // visible — same "disk base + OPFS overlay" semantics as the handle path.
+  if (typeof args.path === 'string' && args.path.trim() && toolContext.workspaceId) {
+    const nativeRoots = await listNativeHostRootNames(toolContext)
+    if (nativeRoots.includes(args.path.split('/')[0])) {
+      const merged = await listNativeHostWithOpfsMerge(args.path, toolContext, args)
+      if (merged) return merged
+    }
+  }
+
   let scope: DiscoveryScope
   try {
     scope = await resolveDiscoveryScope(args.path, toolContext, 'list')
@@ -575,6 +590,30 @@ async function executeGlobMode(
   const toolContext = context as ToolContext
   const abortSignal = toolContext.abortSignal
 
+  // Native Host roots expose no FileSystemDirectoryHandle and are therefore
+  // invisible to getRuntimeHandlesForProject. Mirror search.tool.ts: when the
+  // first path segment is a native-host root name, route the glob to the disk
+  // scanner instead of silently falling through to the OPFS workspace mirror.
+  // OPFS-only matches (pending changes, unsynced writes) are merged on top;
+  // disk entries take precedence for duplicates.
+  if (typeof args.path === 'string' && args.path.trim() && toolContext.workspaceId) {
+    const nativeRoots = await listNativeHostRootNames(toolContext)
+    if (nativeRoots.includes(args.path.split('/')[0])) {
+      const collected = await collectNativeHostGlobMatches(toolContext, args, pattern, [args.path])
+      if (collected.available) {
+        const opfsMatches = await collectOpfsGlobMatches(toolContext, args, pattern, args.path)
+        const seen = new Set(collected.matches)
+        const matches = [...collected.matches]
+        for (const m of opfsMatches) {
+          if (seen.has(m)) continue
+          seen.add(m)
+          matches.push(m)
+        }
+        return formatNativeHostGlobResult(args, { matches, truncated: collected.truncated }, pattern, args.path)
+      }
+    }
+  }
+
   let scope: DiscoveryScope
   try {
     scope = await resolveDiscoveryScope(args.path, toolContext, 'glob')
@@ -584,6 +623,18 @@ async function executeGlobMode(
       return toolErrorJson('ls', SUBAGENT_PERMISSION_DENIED, message)
     }
     if (message === 'No directory selected.') {
+      // Native-host-only project (no FS Access/OPFS handle): glob the native
+      // roots via the disk scanner instead of failing, mirroring list mode's
+      // fallback and search's native-host support.
+      if (toolContext.workspaceId) {
+        const nativeRoots = await listNativeHostRootNames(toolContext)
+        if (nativeRoots.length > 0) {
+          const collected = await collectNativeHostGlobMatches(toolContext, args, pattern, nativeRoots)
+          if (collected.available) {
+            return formatNativeHostGlobResult(args, collected, pattern, '')
+          }
+        }
+      }
       return toolErrorJson('ls', 'no_directory', message)
     }
     return toolErrorJson('ls', 'glob_failed', message.startsWith('Glob search failed:') ? message : `Glob search failed: ${message}`)
@@ -814,6 +865,26 @@ async function executeGlobMode(
       }
     }
 
+    // Hybrid projects (mirrors search.tool.ts): native-host roots never appear
+    // in searchHandles (no FileSystemDirectoryHandle), so an unscoped glob must
+    // additionally scan them via the disk scanner and merge the matches.
+    if (!isTruncated && !timedOut && scope.kind === 'workspace' && !scope.subPath) {
+      const nativeRoots = await listNativeHostRootNames(toolContext)
+      if (nativeRoots.length > 0) {
+        const collected = await collectNativeHostGlobMatches(toolContext, args, pattern, nativeRoots)
+        for (const match of collected.matches) {
+          if (seenPaths.has(match)) continue
+          seenPaths.add(match)
+          matches.push(match)
+          if (maxResults !== undefined && matches.length >= maxResults) {
+            isTruncated = true
+            break
+          }
+        }
+        if (collected.truncated) isTruncated = true
+      }
+    }
+
     if (timedOut) {
       return toolErrorJson('ls', 'deadline_exceeded', `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`, { retryable: true, details: { matchedSoFar: matches.length } })
     }
@@ -891,4 +962,316 @@ async function tryNativeHostDiskScan(
   } catch {
     return null
   }
+}
+
+/**
+ * List native-host root names for the project from the DB root registry.
+ * Native-host roots expose no FileSystemDirectoryHandle, so they are invisible
+ * to getRuntimeHandlesForProject (mirrors listNativeHostRootNames in
+ * search.tool.ts). Returns [] when the registry is unavailable.
+ */
+async function listNativeHostRootNames(toolContext: ToolContext): Promise<string[]> {
+  if (!toolContext.projectId) return []
+  try {
+    const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+    const roots = await getProjectRootRepository().findByProject(toolContext.projectId)
+    return roots
+      .filter((root: { name: string; backend?: string }) => root.backend === 'native-host')
+      .map((root: { name: string }) => root.name)
+  } catch {
+    return []
+  }
+}
+
+/** WorkspaceRuntime shape needed for disk scans (duck-typed for tests). */
+type NativeHostWorkspace = {
+  scanDiskTree: (
+    path: string,
+    maxDepth: number,
+    projectId?: string | null,
+    options?: { includeSizes?: boolean; excludeDirs?: string[]; maxEntries?: number; deadlineMs?: number }
+  ) => Promise<Array<{ path: string; type: 'file' | 'directory'; size: number; depth: number }> | null>
+}
+
+/** Resolve the workspace runtime for native-host disk scans, or null. */
+async function getNativeHostWorkspace(toolContext: ToolContext): Promise<NativeHostWorkspace | null> {
+  if (!toolContext.workspaceId) return null
+  try {
+    const { getWorkspaceManager } = await import('@/opfs')
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(toolContext.workspaceId)
+    if (!workspace || typeof workspace.scanDiskTree !== 'function') return null
+    return workspace as unknown as NativeHostWorkspace
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Glob native-host roots via the disk scanner (WorkspaceRuntime.scanDiskTree).
+ * Match paths are prefixed with the scan root (`rootName/...`) so results are
+ * fully qualified, mirroring searchNativeHostRoots in search.tool.ts.
+ * Never throws — returns { available: false } when the disk scanner is unusable.
+ */
+async function collectNativeHostGlobMatches(
+  toolContext: ToolContext,
+  args: Record<string, unknown>,
+  pattern: string,
+  scanPaths: string[]
+): Promise<{ available: boolean; matches: string[]; truncated: boolean }> {
+  const workspace = await getNativeHostWorkspace(toolContext)
+  if (!workspace) return { available: false, matches: [], truncated: false }
+
+  const maxDepth = parseBoundedInt(args.max_depth ?? args.maxDepth, 20, 1, 64)
+  const maxResultsRaw = args.max_results ?? args.maxResults ?? args.max_entries ?? args.maxEntries
+  const maxResults =
+    typeof maxResultsRaw === 'number' && Number.isFinite(maxResultsRaw)
+      ? parseBoundedInt(maxResultsRaw, 1, 1, 100000)
+      : undefined
+  const excludeDirs = parseStringList(args.exclude_dirs ?? args.excludeDirs)
+  const deadlineMs = parseBoundedInt(args.deadline_ms ?? args.deadlineMs, 25000, 1000, 28000)
+  const micromatchOpts: micromatch.Options = { dot: true }
+
+  const matches: string[] = []
+  let truncated = false
+
+  for (const scanPath of scanPaths) {
+    let entries: Awaited<ReturnType<NativeHostWorkspace['scanDiskTree']>> = null
+    try {
+      entries = await workspace.scanDiskTree(scanPath, maxDepth, toolContext.projectId, {
+        excludeDirs,
+        maxEntries: 20_000,
+        deadlineMs,
+      })
+    } catch {
+      entries = null
+    }
+    if (entries === null) continue // not a native-host path — skip this root
+    if (entries.length >= 20_000) truncated = true
+
+    for (const entry of entries) {
+      if (entry.type !== 'file') continue
+      const fullPath = `${scanPath}/${entry.path}`
+      if (
+        micromatch.isMatch(fullPath, pattern, micromatchOpts) ||
+        micromatch.isMatch(entry.path, pattern, micromatchOpts)
+      ) {
+        matches.push(fullPath)
+        if (maxResults !== undefined && matches.length >= maxResults) {
+          truncated = true
+          break
+        }
+      }
+    }
+    if (truncated && maxResults !== undefined && matches.length >= maxResults) break
+  }
+
+  return { available: true, matches, truncated }
+}
+
+/** Format native-host glob results identically to handle-based glob output. */
+function formatNativeHostGlobResult(
+  args: Record<string, unknown>,
+  collected: { matches: string[]; truncated: boolean },
+  pattern: string,
+  scopePath: string
+): string {
+  const maxResultsRaw = args.max_results ?? args.maxResults ?? args.max_entries ?? args.maxEntries
+  const maxResults =
+    typeof maxResultsRaw === 'number' && Number.isFinite(maxResultsRaw)
+      ? parseBoundedInt(maxResultsRaw, 1, 1, 100000)
+      : undefined
+
+  if (collected.matches.length === 0) {
+    return toolOkJson('ls', [], {
+      _hint: `No files matching pattern "${pattern}"${scopePath ? ` in ${scopePath}` : ''}`,
+    })
+  }
+
+  return toolOkJson(
+    'ls',
+    collected.matches.map((m) => ({ name: m.split('/').pop() || m, path: m, kind: 'file' as const })),
+    {
+      ...(collected.truncated ? { truncated: true, maxResults } : {}),
+    }
+  )
+}
+
+/**
+ * List a native-host root path with "disk base + OPFS overlay" semantics,
+ * mirroring the handle-based list mode (scan native FS, then merge OPFS-only
+ * files). Disk entries take precedence; OPFS-only entries (pending changes,
+ * unsynced write/edit, Python-created files) are appended so ls sees the same
+ * files as Pyodide at /mnt/. Returns null when the path is not a native-host
+ * root or the disk scanner is unavailable — caller falls through.
+ */
+async function listNativeHostWithOpfsMerge(
+  rawPath: string,
+  toolContext: ToolContext,
+  args: Record<string, unknown>
+): Promise<string | null> {
+  const workspace = await getNativeHostWorkspace(toolContext)
+  if (!workspace) return null
+
+  const rawMaxDepth = args.max_depth ?? args.maxDepth
+  const maxDepth = typeof rawMaxDepth === 'number' ? Math.min(Math.max(1, rawMaxDepth), 10) : 2
+  const maxEntriesRaw = args.max_entries ?? args.maxEntries
+  const maxEntries = typeof maxEntriesRaw === 'number' && Number.isFinite(maxEntriesRaw)
+    ? Math.min(Math.max(1, maxEntriesRaw), 50000)
+    : undefined
+  const includeSizes = args.include_sizes === true || args.includeSizes === true
+  const includeIgnored = args.include_ignored === true || args.includeIgnored === true
+  const extraExcludes = parseStringList(args.exclude_dirs ?? args.excludeDirs)
+  const deadlineMs = parseBoundedInt(args.deadline_ms ?? args.deadlineMs, 25000, 1000, 28000)
+  const deadlineAt = Date.now() + deadlineMs
+
+  // 1. Disk scan (base) — real files on the native host.
+  let diskEntries: Awaited<ReturnType<NativeHostWorkspace['scanDiskTree']>> = null
+  try {
+    diskEntries = await workspace.scanDiskTree(rawPath, maxDepth, toolContext.projectId, {
+      includeSizes,
+      excludeDirs: extraExcludes,
+      maxEntries,
+      deadlineMs,
+    })
+  } catch {
+    diskEntries = null
+  }
+  if (diskEntries === null) return null // not a native-host path
+
+  const seenPaths = new Set<string>()
+  const entries: Array<{ path: string; type: 'file' | 'directory'; size: number; depth: number }> = []
+  for (const e of diskEntries) {
+    seenPaths.add(e.path)
+    entries.push(e)
+  }
+  let isTruncated = maxEntries !== undefined && diskEntries.length >= maxEntries
+
+  // 2. Merge OPFS-only entries (pending changes, unsynced writes) — skipped
+  //    when the disk scan already filled the entry budget.
+  if (!isTruncated && Date.now() <= deadlineAt) {
+    const opfsFilesHandle = await getOPFSFilesHandle(toolContext.workspaceId)
+    if (opfsFilesHandle) {
+      const trimmed = rawPath.replace(/\/+$/, '')
+      const opfsResolved = await resolveDirectoryHandle(opfsFilesHandle, trimmed, { allowMissing: true })
+      if (opfsResolved.exists) {
+        const queue: Array<{ handle: FileSystemDirectoryHandle; path: string; depth: number }> = [
+          { handle: opfsResolved.handle, path: '', depth: 0 },
+        ]
+        while (queue.length > 0) {
+          if (Date.now() > deadlineAt) break
+          const current = queue.shift()!
+          const handles = await readDirectoryEntriesSorted(current.handle)
+          for (const handle of handles) {
+            if (Date.now() > deadlineAt) break
+            const childDepth = current.depth + 1
+            if (childDepth > maxDepth) continue
+            const relPath = current.path ? `${current.path}/${handle.name}` : handle.name
+            // Disk takes precedence — OPFS copies of disk files are stale until synced
+            if (seenPaths.has(relPath)) continue
+            if (handle.kind === 'directory') {
+              if (shouldSkipDirectory(handle.name, includeIgnored, extraExcludes)) continue
+              seenPaths.add(relPath)
+              entries.push({ path: relPath, type: 'directory', size: 0, depth: childDepth })
+              queue.push({ handle: handle as FileSystemDirectoryHandle, path: relPath, depth: childDepth })
+            } else {
+              seenPaths.add(relPath)
+              let size = 0
+              if (includeSizes) {
+                try {
+                  const file = await (handle as FileSystemFileHandle).getFile()
+                  size = file.size
+                } catch { size = 0 }
+              }
+              entries.push({ path: relPath, type: 'file', size, depth: childDepth })
+            }
+            if (maxEntries !== undefined && entries.length >= maxEntries) {
+              isTruncated = true
+              break
+            }
+          }
+          if (isTruncated) break
+        }
+      }
+    }
+  }
+
+  // Format results identically to tryNativeHostDiskScan
+  const formatted = entries
+    .filter((e) => e.type === 'file' || e.depth <= maxDepth)
+    .slice(0, maxEntries)
+    .map((e) => ({
+      name: e.path.split('/').pop() || e.path,
+      path: e.path,
+      kind: e.type === 'file' ? 'file' : 'directory',
+      ...(e.size ? { size: e.size } : {}),
+    }))
+
+  return toolOkJson('ls', formatted, {
+    ...(isTruncated ? { truncated: true, maxEntries } : {}),
+  })
+}
+
+/**
+ * Glob the OPFS mirror subtree for a native-host root path (pending changes,
+ * unsynced writes) and return root-prefixed matches (`rootName/...`).
+ * Returns an empty array when the subtree does not exist. Never throws.
+ */
+async function collectOpfsGlobMatches(
+  toolContext: ToolContext,
+  args: Record<string, unknown>,
+  pattern: string,
+  scanPath: string
+): Promise<string[]> {
+  const matches: string[] = []
+  try {
+    const opfsFilesHandle = await getOPFSFilesHandle(toolContext.workspaceId)
+    if (!opfsFilesHandle) return matches
+    const trimmed = scanPath.replace(/\/+$/, '')
+    const resolved = await resolveDirectoryHandle(opfsFilesHandle, trimmed, { allowMissing: true })
+    if (!resolved.exists) return matches
+
+    const maxDepth = parseBoundedInt(args.max_depth ?? args.maxDepth, 20, 1, 64)
+    const maxResultsRaw = args.max_results ?? args.maxResults ?? args.max_entries ?? args.maxEntries
+    const maxResults =
+      typeof maxResultsRaw === 'number' && Number.isFinite(maxResultsRaw)
+        ? parseBoundedInt(maxResultsRaw, 1, 1, 100000)
+        : undefined
+    const includeIgnored = args.include_ignored === true || args.includeIgnored === true
+    const extraExcludes = parseStringList(args.exclude_dirs ?? args.excludeDirs)
+    const deadlineMs = parseBoundedInt(args.deadline_ms ?? args.deadlineMs, 25000, 1000, 28000)
+    const deadlineAt = Date.now() + deadlineMs
+    const micromatchOpts: micromatch.Options = { dot: true }
+
+    const stack: Array<{ handle: FileSystemDirectoryHandle; relPath: string; depth: number }> = [
+      { handle: resolved.handle, relPath: '', depth: 0 },
+    ]
+    while (stack.length > 0) {
+      if (Date.now() > deadlineAt) break
+      const current = stack.pop()!
+      const handles = await readDirectoryEntriesSorted(current.handle)
+      for (const handle of handles) {
+        if (Date.now() > deadlineAt) return matches
+        const nextDepth = current.depth + 1
+        if (nextDepth > maxDepth) continue
+        const relPath = current.relPath ? `${current.relPath}/${handle.name}` : handle.name
+        if (handle.kind === 'directory') {
+          if (shouldSkipDirectory(handle.name, includeIgnored, extraExcludes)) continue
+          stack.push({ handle: handle as FileSystemDirectoryHandle, relPath, depth: nextDepth })
+          continue
+        }
+        const fullPath = `${trimmed}/${relPath}`
+        if (
+          micromatch.isMatch(fullPath, pattern, micromatchOpts) ||
+          micromatch.isMatch(relPath, pattern, micromatchOpts)
+        ) {
+          matches.push(fullPath)
+          if (maxResults !== undefined && matches.length >= maxResults) return matches
+        }
+      }
+    }
+  } catch {
+    return matches
+  }
+  return matches
 }
