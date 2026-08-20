@@ -186,13 +186,24 @@ export function WorkspaceLayout({
     }
   }, [addRoot])
 
+  // Show the folder tip bubble unless a local folder is already mounted
+  // (roots.length > 0) — the tip would only be redundant in that case.
+  const maybeShowFolderTip = useCallback(() => {
+    if (useFolderAccessStore.getState().roots.length > 0) return
+    setShowFolderTip(true)
+  }, [])
+
   // Auto-show folder tip when hasApiKey becomes true (first time only)
   useEffect(() => {
     if (!hasApiKey) return
     const SEEN_KEY = 'creatorweave:folder-tip-seen'
     if (localStorage.getItem(SEEN_KEY)) return
+    // Already mounted a local folder → no need to nudge
+    if (useFolderAccessStore.getState().roots.length > 0) return
     // Small delay to let TopBar render the folder button
     const timer = setTimeout(() => {
+      // Re-check at show time: a root may have been added while waiting
+      if (useFolderAccessStore.getState().roots.length > 0) return
       setShowFolderTip(true)
     }, 800)
     return () => clearTimeout(timer)
@@ -881,7 +892,7 @@ export function WorkspaceLayout({
                     if (tab) setSettingsInitialTab(tab)
                     setShowWorkspaceSettings(true)
                   }}
-                  onGatewayLoginSuccess={() => setShowFolderTip(true)}
+                  onGatewayLoginSuccess={maybeShowFolderTip}
                 />
               </div>
             )}
@@ -1020,9 +1031,11 @@ export function WorkspaceLayout({
         </div>
       )}
 
-      {/* Folder tip bubble — shown once after model is connected */}
+      {/* Folder tip bubble — shown once after model is connected.
+          Suppressed whenever a local folder is already mounted (roots.length > 0):
+          covers the race where roots hydrate after the tip became visible. */}
       <FolderTipBubble
-        show={showFolderTip}
+        show={showFolderTip && roots.length === 0}
         anchorRef={folderButtonRef}
         onOpenFolder={handleOpenFolder}
         onDismiss={() => {
