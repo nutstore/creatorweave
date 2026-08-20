@@ -70,6 +70,11 @@ interface FileTreePanelBaseProps {
   selectedPath?: string | null
   showHeader?: boolean
   /**
+   * Increment to trigger a tree refresh from outside (used in multi-root mode
+   * where showHeader=false hides the built-in refresh button).
+   */
+  refreshSignal?: number
+  /**
    * When set, the tree will programmatically expand all ancestor directories
    * to make this file visible, select it, and scroll it into view.
    * The value is a relative path within this root (no rootName prefix).
@@ -512,6 +517,7 @@ export const FileTreePanel = memo(function FileTreePanel({
   selectedPath,
   mode = 'all',
   showHeader = true,
+  refreshSignal = 0,
   revealTarget,
   onRevealComplete,
 }: FileTreePanelProps) {
@@ -1103,6 +1109,16 @@ export const FileTreePanel = memo(function FileTreePanel({
     prevWorkspaceIdRef.current = activeWorkspaceId
     loadRootRef.current(true)
   }, [activeWorkspaceId])
+
+  // External refresh trigger (multi-root mode: the built-in header refresh
+  // button is hidden, so the parent signals refreshes via refreshSignal).
+  const prevRefreshSignalRef = useRef(refreshSignal)
+  useEffect(() => {
+    if (prevRefreshSignalRef.current === refreshSignal) return
+    prevRefreshSignalRef.current = refreshSignal
+    if (!loaded && !loading) return
+    void loadRootRef.current(true)
+  }, [refreshSignal, loaded, loading])
 
   // Show empty state only if no disk root, pending changes, or cached files exist.
   const hasPendingChanges = pendingChanges.length > 0

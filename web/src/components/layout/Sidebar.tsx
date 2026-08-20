@@ -19,7 +19,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   BrandButton,
@@ -356,6 +356,10 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   collapsed: boolean
   onToggleCollapse: (rootName: string) => void
 }) {
+  const t = useT()
+  // Per-root external refresh signal: the tree's built-in header (with its
+  // refresh button) is hidden in multi-root mode, so expose refresh here.
+  const [refreshSignal, setRefreshSignal] = useState(0)
   const handleFileSelect = useCallback(
     (path: string, handle: FileSystemFileHandle | null) => {
       // Virtual OPFS root: paths in cachedPaths are already workspace-relative
@@ -405,19 +409,30 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   return (
     <div className="flex-shrink-0">
       {rootsLength > 1 ? (
-        <button
-          type="button"
-          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-secondary hover:bg-hover"
-          onClick={() => onToggleCollapse(root.name)}
-        >
-          {collapsed && !shouldReveal ? (
-            <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />
-          ) : (
-            <ChevronDown className="h-3 w-3 shrink-0 text-tertiary" />
-          )}
-          <FolderTree className="h-3 w-3 shrink-0 text-warning" />
-          <span className="truncate">{root.name}</span>
-        </button>
+        <div className="flex w-full items-center gap-1">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-secondary hover:bg-hover"
+            onClick={() => onToggleCollapse(root.name)}
+          >
+            {collapsed && !shouldReveal ? (
+              <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />
+            ) : (
+              <ChevronDown className="h-3 w-3 shrink-0 text-tertiary" />
+            )}
+            <FolderTree className="h-3 w-3 shrink-0 text-warning" />
+            <span className="truncate">{root.name}</span>
+          </button>
+          <button
+            type="button"
+            className="mr-1 shrink-0 rounded-md p-1 text-tertiary transition-colors hover:bg-hover hover:text-secondary"
+            title={t('common.refresh')}
+            aria-label={t('common.refresh')}
+            onClick={() => setRefreshSignal((s) => s + 1)}
+          >
+            <RefreshCw className="h-3 w-3" />
+          </button>
+        </div>
       ) : null}
       {rootsLength <= 1 || !collapsed || shouldReveal ? (
         <FileTreePanel
@@ -435,6 +450,7 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
           revealTarget={rootRevealTarget}
           onRevealComplete={onRevealComplete}
           showHeader={rootsLength <= 1}
+          refreshSignal={refreshSignal}
         />
       ) : null}
     </div>
