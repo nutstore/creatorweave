@@ -22,6 +22,10 @@ vi.mock('@/sqlite/repositories/project-root.repository', () => ({
   }),
 }))
 
+vi.mock('@/native-fs', () => ({
+  getRuntimeHandlesForProject: () => new Map(),
+}))
+
 const directoryHandle = {
   getFileHandle: vi.fn(),
   getDirectoryHandle: vi.fn(),
@@ -117,6 +121,98 @@ describe('search tool', () => {
     expect(data.totalMatches).toBe(1)
     expect(data.files[0]).toMatchObject({ path: 'native-root/src/app.ts', bestLine: 1 })
     expect(searchInDirectoryMock).not.toHaveBeenCalled()
+  })
+
+  it('routes a root-prefixed path to the native-host disk scanner even when an OPFS handle exists', async () => {
+    // Regression: native-host roots have no FileSystemDirectoryHandle, so they
+    // are invisible to getRuntimeHandlesForProject. Before the fix, a path like
+    // "creatorweave/web/src" fell through to the OPFS workspace handle and the
+    // search silently scanned 0 files (or errored with path_not_found).
+    const scanDiskTree = vi.fn().mockResolvedValue([
+      { path: 'src/opfs/backup.ts', type: 'file', size: 64, depth: 3 },
+    ])
+    const readFile = vi.fn().mockResolvedValue({
+      content: 'const REQUIRED_DB_FILE = "bfosa-unified.sqlite"\n',
+    })
+    getWorkspaceManagerMock.mockResolvedValue({
+      getWorkspace: vi.fn().mockResolvedValue({ scanDiskTree, readFile }),
+    })
+    findProjectRootsMock.mockResolvedValue([
+      { name: 'creatorweave', backend: 'native-host' },
+    ])
+
+    const result = await searchExecutor(
+      { query: 'bfosa-unified.sqlite', mode: 'literal', path: 'creatorweave/web/src' },
+      { workspaceId: 'ws_1', projectId: 'project_1', directoryHandle }
+    )
+    const data = unwrapOk(result)
+
+    expect(scanDiskTree).toHaveBeenCalledWith(
+      'creatorweave/web/src',
+      expect.any(Number),
+      'project_1',
+      expect.objectContaining({ includeSizes: true })
+    )
+    expect(readFile).toHaveBeenCalledWith(
+      'creatorweave/web/src/src/opfs/backup.ts',
+      null,
+      { projectId: 'project_1' }
+    )
+    expect(data.totalMatches).toBe(1)
+    expect(data.files[0]).toMatchObject({
+      path: 'creatorweave/web/src/src/opfs/backup.ts',
+      bestLine: 1,
+    })
+    expect(searchInDirectoryMock).not.toHaveBeenCalled()
+  })
+
+  it('merges native-host root results into an unscoped search when both handle and native roots exist', async () => {
+    // Hybrid project: an OPFS/FS Access handle AND a native-host root. The
+    // unscoped search must cover both — handle path via the worker, native-host
+    // path via the disk scanner — and merge the results.
+    const scanDiskTree = vi.fn().mockResolvedValue([
+      { path: 'native-src/app.ts', type: 'file', size: 32, depth: 2 },
+    ])
+    const readFile = vi.fn().mockResolvedValue({
+      content: 'export const marker = "NATIVE_TODO"\n',
+    })
+    getWorkspaceManagerMock.mockResolvedValue({
+      getWorkspace: vi.fn().mockResolvedValue({ scanDiskTree, readFile }),
+    })
+    findProjectRootsMock.mockResolvedValue([
+      { name: 'native-root', backend: 'native-host' },
+    ])
+
+    const result = await searchExecutor(
+      { query: 'TODO', mode: 'literal' },
+      { workspaceId: 'ws_1', projectId: 'project_1', directoryHandle }
+    )
+    const data = unwrapOk(result)
+
+    // Worker scanned the handle root; disk scanner scanned the native-host root.
+    expect(searchInDirectoryMock).toHaveBeenCalledTimes(1)
+    expect(scanDiskTree).toHaveBeenCalledWith(
+      'native-root',
+      expect.any(Number),
+      'project_1',
+      expect.objectContaining({ includeSizes: true })
+    )
+
+    const paths = data.files.map((f: { path: string }) => f.path).sort()
+    expect(paths).toEqual(['native-root/native-src/app.ts', 'src/a.ts'])
+    // 1 match from the worker + 1 from the disk scan
+    expect(data.totalMatches).toBe(2)
+  })
+
+  it('does not scan native-host roots when the project has none', async () => {
+    // Pure FS Access / OPFS project — the disk scanner must stay out of the way.
+    const getWorkspace = vi.fn().mockResolvedValue({})
+    getWorkspaceManagerMock.mockResolvedValue({ getWorkspace })
+
+    await searchExecutor({ query: 'TODO', mode: 'literal' }, context)
+
+    expect(searchInDirectoryMock).toHaveBeenCalledTimes(1)
+    expect(getWorkspace).not.toHaveBeenCalled()
   })
 
   it('returns error when no directory or native-host workspace is available', async () => {

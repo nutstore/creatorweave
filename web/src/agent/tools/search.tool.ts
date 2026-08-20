@@ -198,6 +198,38 @@ function asSearchText(content: unknown): string | null {
 }
 
 /**
+ * List Native Host root names for the project (from the DB root registry).
+ * Returns null when the registry/workspace is unavailable — callers treat that
+ * as "no native-host roots" rather than an error.
+ */
+async function listNativeHostRootNames(
+  context: { projectId?: string | null }
+): Promise<string[] | null> {
+  if (!context.projectId) return null
+  try {
+    const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+    const roots = await getProjectRootRepository().findByProject(context.projectId)
+    return roots.filter(root => root.backend === 'native-host').map(root => root.name)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Merge a secondary SearchInDirectoryResult (e.g. native-host disk scan) into a
+ * primary one in place. Used for hybrid projects where OPFS/FS Access handles
+ * and Native Host roots must both be covered by a single search.
+ */
+function mergeSearchResults(into: SearchInDirectoryResult, from: SearchInDirectoryResult): void {
+  into.results.push(...from.results)
+  into.totalMatches += from.totalMatches
+  into.scannedFiles += from.scannedFiles
+  into.skippedFiles += from.skippedFiles
+  if (from.truncated) into.truncated = true
+  if (from.deadlineExceeded) into.deadlineExceeded = true
+}
+
+/**
  * Search roots backed by the Native Messaging host. These roots deliberately do
  * not expose FileSystemDirectoryHandle, so they cannot be passed to the search
  * worker; scan and read through WorkspaceRuntime instead.
@@ -624,6 +656,8 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
   let directoryHandle: FileSystemDirectoryHandle | null = null
   let vfsSubPath = '' // sub-path within the resolved VFS namespace
   let resolvedRootName: string | undefined // root name for overlay prefix stripping
+  // Non-empty when searchPath was routed to a Native Host root (no FileSystemDirectoryHandle).
+  let nativeHostRoutePath: string | null = null
 
   // VFS path support: resolve vfs:// URIs to directory handles via backends
   if (searchPath.startsWith('vfs://')) {
@@ -660,6 +694,22 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
             directoryHandle = rootHandle
             vfsSubPath = segments.slice(1).join('/')
             resolvedRootName = maybeRoot
+            rootRouted = true
+          }
+        }
+        // Native Host roots deliberately expose no FileSystemDirectoryHandle and
+        // are therefore invisible to getRuntimeHandlesForProject. Consult the DB
+        // root registry so paths like "rootName/web/src" route to the disk scanner
+        // instead of silently falling through to the OPFS workspace handle — that
+        // fall-through made search return scannedFiles: 0 (no error) for
+        // native-host-backed projects.
+        if (!rootRouted) {
+          const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+          const nativeRootNames = (await getProjectRootRepository().findByProject(projectId))
+            .filter(root => root.backend === 'native-host')
+            .map(root => root.name)
+          if (nativeRootNames.includes(searchPath.split('/')[0])) {
+            nativeHostRoutePath = searchPath
             rootRouted = true
           }
         }
@@ -732,9 +782,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     // Determine whether to search a single root or all roots
     let result: SearchInDirectoryResult
 
-    if (!directoryHandle) {
+    if (!directoryHandle || nativeHostRoutePath) {
       const nativeResult = await withToolTimeout(
-        searchNativeHostRoots(context, searchPath, {
+        searchNativeHostRoots(context, nativeHostRoutePath ?? searchPath, {
           query,
           regex: useRegex,
           caseSensitive: args.case_sensitive === true,
@@ -797,6 +847,36 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
         timeoutMs,
         'search',
       )
+
+      // Hybrid projects (OPFS/FS Access handles + Native Host roots): a non-null
+      // directoryHandle above normally hides native-host roots entirely, because
+      // searchNativeHostRoots is only reached when directoryHandle is null.
+      // After the handle-based search completes, scan the native-host roots too
+      // and merge, so an unscoped search covers the whole project.
+      const nativeRootNames = await listNativeHostRootNames(context)
+      if (nativeRootNames && nativeRootNames.length > 0) {
+        const nativeResult = await withToolTimeout(
+          searchNativeHostRoots(context, '', {
+            query,
+            regex: useRegex,
+            caseSensitive: args.case_sensitive === true,
+            wholeWord: args.whole_word === true,
+            glob: typeof args.glob === 'string' ? args.glob : undefined,
+            maxResults: internalMaxResults,
+            contextLines,
+            deadlineMs: typeof args.deadline_ms === 'number' ? args.deadline_ms : 60000,
+            maxFileSize: Math.max(1, typeof args.max_file_size === 'number' ? args.max_file_size : 1024 * 1024),
+            excludeDirs: Array.isArray(args.exclude_dirs)
+              ? args.exclude_dirs.filter((v): v is string => typeof v === 'string')
+              : [],
+          }),
+          timeoutMs,
+          'search',
+        )
+        if (nativeResult) {
+          mergeSearchResults(result, nativeResult)
+        }
+      }
     }
 
     // Aggregate raw hits into file-level results
