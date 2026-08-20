@@ -75,6 +75,11 @@ export default defineContentScript({
         'padding: 8px',
         'width: 32px',
         'height: 32px',
+        // box-sizing: border-box keeps width/height inclusive of padding + border,
+        // so the rendered size stays 32x32 even on pages without a global reset
+        // (e.g. YouTube — its scoped reset doesn't reach injected <div> elements,
+        // so without this the button becomes 50x50 = 32 + 8*2 + 1*2).
+        'box-sizing: border-box',
         'cursor: pointer',
         'box-shadow: 0 2px 10px rgba(0,0,0,0.2)',
         'display: inline-flex',
