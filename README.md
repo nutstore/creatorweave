@@ -202,25 +202,21 @@ pnpm -C web run test:e2e
 - [Changelog](./CHANGELOG.md) - Version history and changes
 
 ### Developer Documentation
-- [Developer Portal (CN)](./docs/developer/guides/index.md) - Structured developer docs in Chinese
-- [Quick Start Guide (EN)](./docs/development/quick-start.md) - Get started in 5 minutes
-- [Architecture Overview](./docs/architecture/overview.md) - System architecture and design
+- [Developer Portal (CN)](./docs/zh/developer/guides/index.md) - Structured developer docs in Chinese
+- [Quick Start Guide (EN)](./docs/en/developer/quick-start.md) - Get started in 5 minutes
+- [Architecture Overview](./docs/zh/developer/architecture/overview.md) - System architecture and design
 
 ### Technical Documentation
-- [Agent System](./docs/agent-system.md) - AI agent architecture and tools
 - [Python Integration](./web/src/python/README.md) - Pyodide integration guide
 - [SQLite Storage](./web/src/sqlite/README.md) - SQLite WASM storage architecture
-- [Remote Session](./docs/relay-server/remote-session-architecture.md) - Mobile remote control design
-- [Plugin System](./docs/plugin-system/plugin-system-architecture.md) - Dynamic plugin system
-- [MCP Integration](./docs/MCP_INTEGRATION_DESIGN.md) - Model Context Protocol
 
 ### API Documentation
-- [API Index](./docs/api/README.md) - Stores and services API notes
+- [API Index](./docs/zh/developer/reference/README.md) - Stores and services API notes
 
 ## Roadmap
 
 - [ ] **SubAgent Orchestration (Planned)**: Add native subagent dispatching, parallel execution scheduling, result aggregation, and guardrails for cross-agent context isolation and handoff quality.
-- [ ] **LLM Wiki (Pending)**: Build an evolving knowledge-base workflow for `ingest` / `query` / `lint`, with structured claims and source traceability. See [LLM Wiki Unified Spec](./docs/design/llm-wiki-mvp-unified-spec.md) and [SubAgent Prerequisite for LLM Wiki](./docs/design/subagent-prerequisite-for-llm-wiki.md).
+- [ ] **LLM Wiki (Pending)**: Build an evolving knowledge-base workflow for `ingest` / `query` / `lint`, with structured claims and source traceability. Specs live in the internal `weave-docs` repository (`design/llm-wiki-mvp-unified-spec.md`, `design/subagent-prerequisite-for-llm-wiki.md`).
 
 ## Browser Compatibility
 

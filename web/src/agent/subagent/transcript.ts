@@ -6,7 +6,7 @@
  *
  * File layout: `.subagents/{agentId}/transcript.jsonl`
  *
- * @see docs/design/subagent-prerequisite-for-llm-wiki.md §8.1
+ * @see weave-docs/design/subagent-prerequisite-for-llm-wiki.md §8.1
  */
 
 import { SubagentError, SubagentErrorCode } from '@/agent/tools/tool-types'

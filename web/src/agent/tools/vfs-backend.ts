@@ -10,7 +10,7 @@ export type BackendLabel = 'workspace' | 'agent' | 'assets' | 'skills'
  * New storage targets (assets, cloud drives, etc.) only need to implement
  * this interface — no tool changes required.
  *
- * @see docs/design/assets-system.md §7
+ * @see weave-docs/design/assets-system.md §7
  */
 
 /** A file or directory entry returned by listDir */

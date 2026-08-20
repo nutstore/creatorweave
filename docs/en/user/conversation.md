@@ -1,3 +1,8 @@
+---
+title: Conversations
+order: 3
+---
+
 # Conversations
 
 Conversations connect your prompts, tool calls, and outputs in one timeline.

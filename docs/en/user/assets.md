@@ -1,3 +1,8 @@
+---
+title: Assets
+order: 5
+---
+
 # Assets (File Exchange)
 
 Assets are the bridge for exchanging files between you and the AI. Upload files for analysis, and the AI can generate files (charts, reports) for you to download.

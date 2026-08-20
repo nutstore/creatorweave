@@ -113,9 +113,7 @@ function localeToDocsLanguage(locale: Locale): DocsLanguage {
 }
 
 function buildIndexCandidates(lang: DocsLanguage, category: 'user' | 'developer'): string[] {
-  return lang === 'zh'
-    ? [`/docs/zh/${category}/_index.json`, `/docs/${category}/_index.json`]
-    : [`/docs/en/${category}/_index.json`, `/docs/${category}/_index.json`]
+  return [`/docs/${lang}/${category}/_index.json`]
 }
 
 function buildContentCandidates(
@@ -123,9 +121,7 @@ function buildContentCandidates(
   category: 'user' | 'developer',
   file: string
 ): string[] {
-  return lang === 'zh'
-    ? [`/docs/zh/${category}/${file}`, `/docs/${category}/${file}`]
-    : [`/docs/en/${category}/${file}`, `/docs/${category}/${file}`]
+  return [`/docs/${lang}/${category}/${file}`]
 }
 
 function isHtmlFallback(content: string): boolean {

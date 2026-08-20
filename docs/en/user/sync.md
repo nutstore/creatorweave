@@ -1,3 +1,8 @@
+---
+title: Sync and Remote Control
+order: 4
+---
+
 # Sync and Remote Control
 
 CreatorWeave supports remote session workflows through the relay server.
@@ -15,5 +20,4 @@ CreatorWeave supports remote session workflows through the relay server.
 
 ## Related Technical Docs
 
-- [Remote Session Architecture](../../relay-server/remote-session-architecture.md)
-- [Session Sync API](../../relay-server/session-sync-api.md)
+Remote session architecture and the session sync API are documented in the internal `weave-docs` repository (`relay-server/`).

@@ -39,9 +39,21 @@ interface Category {
   defaultOrder?: number
 }
 
+interface Lang {
+  /** URL segment and docs/ subdirectory, e.g. 'zh' */
+  code: 'zh' | 'en'
+  /** Sidebar title used in the generated index */
+  titles: Record<'user' | 'developer', string>
+}
+
 const CATEGORIES: Category[] = [
   { slug: 'user', title: '用户文档', dir: 'user' },
   { slug: 'developer', title: '开发者文档', dir: 'developer' },
+]
+
+const LANGS: Lang[] = [
+  { code: 'zh', titles: { user: '用户文档', developer: '开发者文档' } },
+  { code: 'en', titles: { user: 'User Documentation', developer: 'Developer Documentation' } },
 ]
 
 function syncDocs() {
@@ -121,74 +133,76 @@ function generateTitle(fileName: string): string {
 }
 
 function generateIndexFiles() {
-  for (const cat of CATEGORIES) {
-    const catDir = join(PUBLIC_DOCS, cat.slug)
-    const srcDir = join(ROOT_DOCS, cat.dir)
-    mkdirSync(catDir, { recursive: true })
+  for (const lang of LANGS) {
+    for (const cat of CATEGORIES) {
+      const catDir = join(PUBLIC_DOCS, lang.code, cat.slug)
+      const srcDir = join(ROOT_DOCS, lang.code, cat.dir)
+      mkdirSync(catDir, { recursive: true })
 
-    const pages: PageEntry[] = []
-    const categoryDefaultOrder = cat.defaultOrder ?? 1000
+      const pages: PageEntry[] = []
+      const categoryDefaultOrder = cat.defaultOrder ?? 1000
 
-    // Check if source directory exists
-    if (!existsSync(srcDir)) {
-      console.warn(`[docs-sync] Source directory not found: ${srcDir}`)
-      const index = { title: cat.title, pages: [] }
-      writeFileSync(join(catDir, '_index.json'), JSON.stringify(index, null, 2))
-      continue
-    }
+      // Check if source directory exists
+      if (!existsSync(srcDir)) {
+        console.warn(`[docs-sync] Source directory not found: ${srcDir}`)
+        const index = { title: lang.titles[cat.slug as 'user' | 'developer'], pages: [] }
+        writeFileSync(join(catDir, '_index.json'), JSON.stringify(index, null, 2))
+        continue
+      }
 
-    // Scan source directory and generate index
-    const scanDir = (dir: string, basePath: string = ''): void => {
-      const entries = readdirSync(dir)
-      for (const entry of entries) {
-        const srcPath = join(dir, entry)
-        const stat = statSync(srcPath)
+      // Scan source directory and generate index
+      const scanDir = (dir: string, basePath: string = ''): void => {
+        const entries = readdirSync(dir)
+        for (const entry of entries) {
+          const srcPath = join(dir, entry)
+          const stat = statSync(srcPath)
 
-        if (stat.isDirectory()) {
-          scanDir(srcPath, basePath ? `${basePath}/${entry}` : entry)
-        } else if (stat.isFile() && entry.endsWith('.md')) {
-          const relativePath = basePath ? `${basePath}/${entry}` : entry
-          const baseName = entry.replace(/\.md$/, '')
+          if (stat.isDirectory()) {
+            scanDir(srcPath, basePath ? `${basePath}/${entry}` : entry)
+          } else if (stat.isFile() && entry.endsWith('.md')) {
+            const relativePath = basePath ? `${basePath}/${entry}` : entry
+            const baseName = entry.replace(/\.md$/, '')
 
-          // Skip index files
-          if (baseName.toLowerCase() === 'index') continue
+            // Skip index files
+            if (baseName.toLowerCase() === 'index') continue
 
-          // Read file and parse frontmatter
-          const content = readFileSync(srcPath, 'utf-8')
-          const { meta } = parseFrontmatter(content)
+            // Read file and parse frontmatter
+            const content = readFileSync(srcPath, 'utf-8')
+            const { meta } = parseFrontmatter(content)
 
-          // Get title from frontmatter or generate from filename
-          const title = meta.title || generateTitle(baseName)
+            // Get title from frontmatter or generate from filename
+            const title = meta.title || generateTitle(baseName)
 
-          // Get order from frontmatter or use default
-          const order = meta.order ?? (categoryDefaultOrder * 1000)
+            // Get order from frontmatter or use default
+            const order = meta.order ?? (categoryDefaultOrder * 1000)
 
-          pages.push({
-            slug: relativePath.replace(/\.md$/, '').replace(/\//g, '-'),
-            title,
-            file: relativePath,
-            category: basePath || undefined,
-            order,
-          })
+            pages.push({
+              slug: relativePath.replace(/\.md$/, '').replace(/\//g, '-'),
+              title,
+              file: relativePath,
+              category: basePath || undefined,
+              order,
+            })
+          }
         }
       }
+
+      scanDir(srcDir)
+
+      // Sort by order, then by title
+      pages.sort((a, b) => {
+        if (a.order !== b.order) return a.order - b.order
+        return a.title.localeCompare(b.title, 'zh-CN')
+      })
+
+      const index = {
+        title: lang.titles[cat.slug as 'user' | 'developer'],
+        pages,
+      }
+
+      writeFileSync(join(catDir, '_index.json'), JSON.stringify(index, null, 2))
+      console.log(`[docs-sync] Generated ${lang.code}/${cat.slug}/_index.json with ${pages.length} pages`)
     }
-
-    scanDir(srcDir)
-
-    // Sort by order, then by title
-    pages.sort((a, b) => {
-      if (a.order !== b.order) return a.order - b.order
-      return a.title.localeCompare(b.title, 'zh-CN')
-    })
-
-    const index = {
-      title: cat.title,
-      pages,
-    }
-
-    writeFileSync(join(catDir, '_index.json'), JSON.stringify(index, null, 2))
-    console.log(`[docs-sync] Generated ${cat.slug}/_index.json with ${pages.length} pages`)
   }
 }
 

@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { HashRouter } from 'react-router-dom'
 import { DocsPage } from '../DocsPage'
+
+function renderDocs(ui: React.ReactElement) {
+  return render(<HashRouter>{ui}</HashRouter>)
+}
 
 const { localeState, setLocaleMock } = vi.hoisted(() => ({
   localeState: { value: 'zh-CN' as 'zh-CN' | 'en-US' },
@@ -65,7 +70,7 @@ describe('DocsPage sidebar grouping', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url
 
-      if (url === '/docs/user/_index.json') {
+      if (url === '/docs/zh/user/_index.json') {
         return Promise.resolve(new Response(JSON.stringify(userIndex), { status: 200 }))
       }
 
@@ -73,7 +78,7 @@ describe('DocsPage sidebar grouping', () => {
         return Promise.resolve(new Response(JSON.stringify(userIndexEn), { status: 200 }))
       }
 
-      if (url === '/docs/developer/_index.json') {
+      if (url === '/docs/zh/developer/_index.json') {
         return Promise.resolve(new Response(JSON.stringify(developerIndex), { status: 200 }))
       }
 
@@ -83,18 +88,11 @@ describe('DocsPage sidebar grouping', () => {
 
       if (url === '/docs/zh/user/getting-started.md') {
         return Promise.resolve(
-          new Response('<!doctype html><html><body>fallback</body></html>', {
-            status: 200,
-            headers: { 'Content-Type': 'text/html' },
-          })
+          new Response('---\ntitle: 快速入门\norder: 1\n---\n\n# 快速入门正文', { status: 200 })
         )
       }
 
-      if (url === '/docs/user/getting-started.md') {
-        return Promise.resolve(new Response('---\ntitle: 快速入门\norder: 1\n---\n\n# 快速入门正文', { status: 200 }))
-      }
-
-      if (url === '/docs/developer/guides/quick-start.md') {
+      if (url === '/docs/zh/developer/guides/quick-start.md') {
         return Promise.resolve(new Response('# 开发者快速入门', { status: 200 }))
       }
 
@@ -110,7 +108,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('renders user docs without group headers', async () => {
-    render(<DocsPage category="user" />)
+    renderDocs(<DocsPage category="user" />)
 
     const entries = await screen.findAllByText('快速入门')
     expect(entries.length).toBeGreaterThan(0)
@@ -118,7 +116,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('renders developer docs without group headers', async () => {
-    render(<DocsPage category="developer" />)
+    renderDocs(<DocsPage category="developer" />)
 
     const entries = await screen.findAllByText('快速入门')
     expect(entries.length).toBeGreaterThan(0)
@@ -129,15 +127,15 @@ describe('DocsPage sidebar grouping', () => {
   it('loads locale-prefixed docs index for english locale', async () => {
     localeState.value = 'en-US'
 
-    render(<DocsPage category="user" />)
+    renderDocs(<DocsPage category="user" />)
 
     const entries = await screen.findAllByText('Getting Started')
     expect(entries.length).toBeGreaterThan(0)
     expect(globalThis.fetch).toHaveBeenCalledWith('/docs/en/user/_index.json')
   })
 
-  it('tries locale-prefixed index path first for chinese locale', async () => {
-    render(<DocsPage category="user" />)
+  it('uses zh-prefixed index path for chinese locale', async () => {
+    renderDocs(<DocsPage category="user" />)
 
     await screen.findAllByText('快速入门')
     const fetchMock = vi.mocked(globalThis.fetch)
@@ -147,24 +145,24 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('switches locale to english from docs home', () => {
-    render(<DocsPage />)
+    renderDocs(<DocsPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
 
     expect(setLocaleMock).toHaveBeenCalledWith('en-US')
   })
 
-  it('falls back when locale-prefixed markdown resolves to html shell', async () => {
-    render(<DocsPage category="user" page="getting-started" />)
+  it('strips frontmatter from loaded markdown', async () => {
+    renderDocs(<DocsPage category="user" page="getting-started" />)
 
     await screen.findByText('快速入门正文')
     expect(screen.queryByText('title: 快速入门')).not.toBeInTheDocument()
     expect(screen.queryByText('order: 1')).not.toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledWith('/docs/user/getting-started.md')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/docs/zh/user/getting-started.md')
   })
 
   it('keeps current page on locale switch when same slug exists', async () => {
-    render(<DocsPage category="user" page="getting-started" />)
+    renderDocs(<DocsPage category="user" page="getting-started" />)
 
     await screen.findByText('快速入门正文')
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
@@ -175,7 +173,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('falls back to category home on locale switch when slug is missing', async () => {
-    render(<DocsPage category="developer" page="guides-quick-start" />)
+    renderDocs(<DocsPage category="developer" page="guides-quick-start" />)
 
     await screen.findByText('开发者快速入门')
     fireEvent.click(screen.getByRole('button', { name: 'English' }))

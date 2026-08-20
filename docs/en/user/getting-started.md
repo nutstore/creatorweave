@@ -1,3 +1,8 @@
+---
+title: Getting Started
+order: 1
+---
+
 # Getting Started
 
 CreatorWeave is a local-first workspace for creators and engineering teams.

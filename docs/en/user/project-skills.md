@@ -1,36 +1,35 @@
 ---
 title: Project Skills
 order: 6
-lang: en
 ---
 
 # Project Skills
 
-Project Skills are reusable knowledge units (containing instructions, examples, templates, and resource files) that can be automatically recognized and loaded by AI. By creating a `.skills/` directory in your project, you can provide AI with project-specific guidance, enabling it to follow your team's conventions and best practices when handling specific tasks.
+Project Skills are reusable knowledge units (instructions, examples, templates, and resource files) that AI can automatically identify and load. By creating a `.skills/` directory in your project, you can give the AI project-specific guidance so that it follows your team's conventions and best practices when handling particular tasks.
 
 ## Why Project Skills?
 
 | Scenario | Description |
-|----------|-------------|
-| Team conventions | Enforce code style, naming conventions, and architectural patterns |
-| Domain expertise | Provide domain-specific terminology and background knowledge |
-| Workflow templates | Standardize repetitive tasks with predefined processes |
-| Resource files | Supply reference docs, executable scripts, and other auxiliary resources |
+|------|------|
+| Team conventions | Make the AI follow your code style, naming rules, architecture patterns |
+| Domain knowledge | Provide terminology and background for a specific business domain |
+| Workflow templates | Standardize flows for repetitive tasks |
+| Resource files | Give the AI reference docs, executable scripts, and other supporting resources |
 
 ## Quick Start
 
 ### 1. Create the directory structure
 
-Create a `.skills/` folder in your project root. Each Skill is a subfolder:
+Create a `.skills/` folder in your project root; each Skill is a subfolder:
 
 ```
 your-project/
-├── .skills/                        ← Project Skills root directory
+├── .skills/                        ← Project Skills root
 │   ├── code-review/
-│   │   └── SKILL.md               ← Skill definition file
+│   │   └── SKILL.md               ← Skill definition
 │   ├── api-design/
 │   │   ├── SKILL.md
-│   │   ├── references/            ← Reference documents
+│   │   ├── references/            ← Reference docs
 │   │   │   └── api-spec.md
 │   │   └── scripts/               ← Executable scripts
 │   │       └── generate-api.py
@@ -43,143 +42,143 @@ your-project/
 
 ### 2. Write SKILL.md
 
-The core of each Skill is a `SKILL.md` file using YAML Frontmatter + Markdown format:
+The core of each Skill is a `SKILL.md` file using YAML frontmatter + Markdown:
 
 ```markdown
 ---
 name: "Code Review"
 version: "1.0.0"
-description: "Team-standard code review process"
+description: "Team-standard code review workflow"
 author: "Your Team"
 category: code-review
 tags: [review, quality, team-standards]
 triggers:
-  keywords: [review, code review, PR review, inspect]
+  keywords: [review, code review, PR review]
   fileExtensions: [".ts", ".tsx", ".js"]
 ---
 
 # Instruction
 
-When performing code reviews, follow this process:
+When performing code reviews, follow this workflow:
 
-## 1. Code Style Check
+## 1. Code style checks
 
-- Run the project ESLint config for basic checks
-- Use camelCase for variables, PascalCase for components
-- Use kebab-case for file names
+- Run basic checks with the project ESLint config
+- Variables use camelCase; components use PascalCase
+- File names use kebab-case
 
-## 2. Architectural Consistency
+## 2. Architectural consistency
 
-- New components must be placed under the appropriate `src/components/` directory
-- Business logic must be extracted into custom Hooks
-- API calls must use the service layer in `src/services/`
+- New components go into the matching directory under `src/components/`
+- Business logic must be extracted into custom hooks
+- API calls go through the service layer in `src/services/`
 
-## 3. Security Review
+## 3. Security review
 
 - Check for XSS risks (dangerouslySetInnerHTML)
-- Ensure user inputs are validated and sanitized
+- Confirm user input is validated and escaped
 - API keys must never appear in frontend code
 
 # Examples
 
-## Review Feedback Format
+## Review feedback format
 
-Use the following markers:
-- 🔴 **Critical**: Must fix before merge
-- 🟡 **Suggestion**: Recommended improvement
-- 🟢 **Nitpick**: Minor issue (optional)
+Use these markers:
+- 🔴 **Critical**: must fix before merge
+- 🟡 **Suggestion**: recommended improvement
+- 🟢 **Nitpick**: minor issue (optional)
 ```
 
-### 3. Automatic loading
+### 3. Automatic activation
 
-When you open a project, CreatorWeave automatically scans all `SKILL.md` files under the `.skills/` directory and loads them. AI will automatically match and use these Skills in relevant tasks.
+When you open the project, CreatorWeave automatically scans all `SKILL.md` files under `.skills/` and loads them. The AI automatically matches and uses these Skills in relevant tasks.
 
 ## SKILL.md Format Reference
 
 ### Frontmatter fields
 
 | Field | Required | Description |
-|-------|----------|-------------|
-| `name` | ✅ | Skill name (English recommended for better AI matching) |
-| `version` | ❌ | Version number, defaults to `1.0.0` |
-| `description` | ❌ | Brief description — AI uses this to determine applicability |
+|------|------|------|
+| `name` | ✅ | Skill name (English recommended for AI matching) |
+| `version` | ❌ | Version, defaults to `1.0.0` |
+| `description` | ❌ | Short description the AI uses to judge applicability |
 | `author` | ❌ | Author name |
-| `category` | ❌ | Category, see the list below |
-| `tags` | ❌ | Tag array for auxiliary matching |
+| `category` | ❌ | Category, see list below |
+| `tags` | ❌ | Tag array to assist matching |
 | `triggers.keywords` | ❌ | Trigger keyword array (case-insensitive) |
-| `triggers.fileExtensions` | ❌ | Associated file extension array |
+| `triggers.fileExtensions` | ❌ | Related file extension array |
 
 ### Categories
 
 | Value | Description |
-|-------|-------------|
-| `code-review` | Code review |
-| `testing` | Testing |
-| `debugging` | Debugging and troubleshooting |
-| `refactoring` | Code refactoring |
-| `documentation` | Documentation |
-| `security` | Security audit |
-| `performance` | Performance optimization |
-| `architecture` | Architecture design |
-| `general` | General (default) |
+|----|------|
+| `code-review` | code review |
+| `testing` | testing |
+| `debugging` | debugging |
+| `refactoring` | refactoring |
+| `documentation` | documentation |
+| `security` | security audit |
+| `performance` | performance |
+| `architecture` | architecture |
+| `general` | general (default) |
 
 ### Markdown body
 
 The body supports three optional H1 sections:
 
-- **`# Instruction`** (required) — Core instructions that AI follows after loading the Skill
-- **`# Examples`** (optional) — Examples that help AI understand expected input/output formats
-- **`# Templates`** (optional) — Templates that AI can use directly or reference
+- **`# Instruction`** (required) — the core instructions the AI follows after loading the Skill
+- **`# Examples`** (optional) — examples that help the AI understand expected input/output formats
+- **`# Templates`** (optional) — templates the AI can use or reference directly
 
 If the body has no H1 headings, the entire content is treated as Instruction.
 
 ## Resource Files
 
-Each Skill directory can contain three types of resource subdirectories:
+Each Skill directory may contain three resource subdirectories:
 
-### Directory structure
+### Directory layout
 
 ```
 your-skill/
 ├── SKILL.md                ← Skill definition (required)
-├── references/             ← Reference documents
+├── references/             ← Reference docs
 │   ├── style-guide.md
 │   └── api-conventions.md
-├── scripts/                ← Executable scripts (Python, etc.)
+├── scripts/                ← Executable scripts (Python etc.)
 │   └── analyze.py
-└── assets/                 ← Other resource files
+└── assets/                 ← Other resources
     └── config-template.json
 ```
 
 ### Resource types
 
 | Directory | Type | Purpose |
-|-----------|------|---------|
-| `references/` | Reference | Markdown, text docs, etc. — AI can read these as background knowledge |
-| `scripts/` | Script | Python scripts, etc. — can run in AI's execution environment (Pyodide) |
-| `assets/` | Asset | JSON configs, images, and other auxiliary files |
+|------|------|------|
+| `references/` | Reference docs | Markdown, text documents etc. the AI reads as background |
+| `scripts/` | Scripts | Python scripts etc. runnable in the AI execution environment (Pyodide) |
+| `assets/` | Assets | JSON configs, images, and other auxiliary files |
 
 ### Resource limits
 
 | Limit | Value |
-|-------|-------|
-| Max single file size | 5 MB |
-| Max resources per Skill | 50 files |
-| Max total size per Skill | 20 MB |
+|------|-----|
+| Max single file | 5 MB |
+| Max resources per Skill | 50 |
+| Max total resource size per Skill | 20 MB |
 
 ## Skill Matching
 
-AI automatically matches Skills based on the following factors:
+The AI automatically matches Skills based on:
 
-1. **Keyword matching** — When your message contains words from `triggers.keywords`
-2. **File extension matching** — When the currently open file matches `triggers.fileExtensions`
-3. **Tag matching** — When the conversation topic relates to `tags`
+1. **Keyword matching**: when your message contains a `triggers.keywords` entry
+2. **File extension**: when the currently open file matches `triggers.fileExtensions`
+3. **Tag matching**: when the conversation topic relates to `tags`
 
-Matched Skills are recommended to AI, which then loads the full content via the `read_skill` tool as needed.
+Matched Skills are recommended to the AI, which then loads full content via the `read_skill` tool as needed.
 
 ## Complete Examples
 
-### Example 1: API Design Guide
+### Example 1: API design guide
 
 ```
 .skills/
@@ -195,39 +194,39 @@ Matched Skills are recommended to AI, which then loads the full content via the 
 ---
 name: "API Design Guide"
 version: "1.0.0"
-description: "RESTful API design conventions covering naming, versioning, and error handling"
+description: "RESTful API design guide: naming, versioning, and error handling standards"
 category: architecture
 tags: [api, rest, design, backend]
 triggers:
-  keywords: [api, endpoint, restful, "api design"]
+  keywords: [api, endpoint, restful, api design]
   fileExtensions: [".ts", ".py", ".go"]
 ---
 
 # Instruction
 
-When designing APIs, follow these conventions:
+Follow these standards when designing APIs:
 
-## URL Naming
+## URL naming
 
 - Use plural nouns: `/api/users`, `/api/orders`
-- Nest resources at most two levels deep: `/api/users/:id/orders`
+- Nest resources at most two levels: `/api/users/:id/orders`
 - Use kebab-case: `/api/user-profiles`
 
-## HTTP Methods
+## HTTP methods
 
 | Method | Purpose | Example |
-|--------|---------|---------|
-| GET | Retrieve resources | `GET /api/users` |
-| POST | Create resources | `POST /api/users` |
-| PUT | Full update | `PUT /api/users/123` |
-| PATCH | Partial update | `PATCH /api/users/123` |
-| DELETE | Delete resources | `DELETE /api/users/123` |
+|------|------|------|
+| GET | fetch resource | `GET /api/users` |
+| POST | create resource | `POST /api/users` |
+| PUT | full update | `PUT /api/users/123` |
+| PATCH | partial update | `PATCH /api/users/123` |
+| DELETE | delete resource | `DELETE /api/users/123` |
 
-## Error Response Format
+## Error response format
 
 All error responses use a unified format:
 
-\`\`\`json
+```json
 {
   "error": {
     "code": "VALIDATION_ERROR",
@@ -235,10 +234,10 @@ All error responses use a unified format:
     "details": []
   }
 }
-\`\`\`
+```
 ```
 
-### Example 2: Data Analysis
+### Example 2: Data analysis scripts
 
 ```
 .skills/
@@ -259,88 +258,88 @@ description: "Data analysis and visualization workflow using pandas and matplotl
 category: general
 tags: [data, analysis, visualization, pandas]
 triggers:
-  keywords: [data analysis, visualize, CSV, report, chart]
+  keywords: [data analysis, visualization, CSV, report]
 ---
 
 # Instruction
 
-When performing data analysis, follow this workflow:
+Follow this workflow for data analysis:
 
-1. First use the `analyze_data` tool to examine basic statistics of the data file
-2. Use Python scripts for data cleaning and transformation
-3. Generate visualization charts and save to `/mnt_assets/`
+1. First use the `analyze_data` tool to profile the data file
+2. Clean and transform data with Python scripts
+3. Generate visualization charts and save them to `/mnt_assets/`
 4. Output an analysis summary
 
 # Examples
 
-When a user says "help me analyze this sales data":
+When the user says "help me analyze this sales data":
 1. Read the CSV file
-2. Check data structure and missing values
-3. Generate trend charts and distribution plots
+2. Inspect structure and missing values
+3. Generate trend and distribution charts
 4. Output key findings
 ```
 
-## Managing Skills in CreatorWeave
+## Viewing in the Skills Manager
 
 You can view and manage all Skills in CreatorWeave:
 
-1. Click the Skills icon in the sidebar, or use the keyboard shortcut to open the Skills Manager
+1. Click the Skills icon in the sidebar, or use the shortcut to open the Skills Manager
 2. Skills are grouped by source:
-   - **Project Skills** — From the `.skills/` directory (read-only; edit in the file system)
-   - **My Skills** — Personal Skills created in the UI
-   - **Built-in Skills** — Pre-installed system Skills
+   - **Project Skills** — from the `.skills/` directory (read-only; edit on the filesystem)
+   - **My Skills** — personal Skills created in the UI
+   - **Built-in Skills** — Skills bundled with the system
 
-3. You can enable or disable any Skill
+3. Any Skill can be enabled/disabled
 
 ## Best Practices
 
-### ✅ Do
+### ✅ Recommended
 
-- **Clear descriptions** — Keep `description` concise and specific to help AI accurately determine applicability
-- **Specific keywords** — Set trigger keywords directly related to the Skill content
-- **Actionable instructions** — Instruction should contain clear steps and rules, not vague suggestions
-- **Provide examples** — Examples significantly improve AI's accuracy in following conventions
-- **Keep updated** — Update Skill content as the project evolves
+- **Clear descriptions**: `description` should be concise and precise to help the AI judge applicability
+- **Specific keywords**: set trigger keywords directly related to the Skill content
+- **Actionable instructions**: Instruction should contain concrete steps and rules, not vague advice
+- **Provide examples**: Examples greatly improve how accurately the AI follows conventions
+- **Keep updated**: update Skill content as the project evolves
 
-### ❌ Don't
+### ❌ Avoid
 
-- **Overly long content** — Keep Instruction at a reasonable length; too much text wastes tokens
-- **Overly broad keywords** — Avoid generic triggers like "code" or "file"
-- **Overlapping definitions** — Avoid content duplication across different Skills
-- **Large binary files** — Avoid placing large binary files in resource directories
+- **Overly long content**: keep Instruction at a reasonable length; too long wastes tokens
+- **Overly generic keywords**: avoid trigger words like "code" or "file"
+- **Duplicate definitions**: avoid overlapping content between Skills
+- **Binary files**: avoid large binaries in resource directories
 
 ## FAQ
 
 ### Q: What's the difference between Project Skills and user-created Skills?
 
 | Feature | Project Skills | User Skills |
-|---------|---------------|-------------|
-| Storage | Project `.skills/` directory | App database (SQLite) |
-| Version control | ✅ Follows project Git | ❌ Local only |
-| Team sharing | ✅ Shared with team | ❌ Personal only |
-| Editing | Edit in file system | UI editor |
-| Resource files | ✅ Supported | ✅ Supported |
+|------|-----------|------------|
+| Storage | project `.skills/` directory | app database (SQLite) |
+| Version control | ✅ follows project Git | ❌ local only |
+| Team sharing | ✅ shared with the team | ❌ private |
+| Editing | filesystem | UI editor |
+| Resource files | ✅ supported | ✅ supported |
 
-### Q: Why isn't my Skill being loaded?
+### Q: Why isn't my Skill loaded?
 
-Check the following:
+Check that:
 
-1. The filename must be `SKILL.md` (uppercase)
-2. The file must be in a subfolder under `.skills/`
-3. Frontmatter format is correct (starts and ends with `---`)
-4. The `name` field is not empty
-5. The Skill is enabled (check in Skills Manager)
+1. The file is named `SKILL.md` (uppercase)
+2. It is inside a subfolder of the `.skills/` directory
+3. The frontmatter is well-formed (starts and ends with `---`)
+4. `name` is non-empty
+5. The Skill is enabled (check the Skills Manager)
 
 ### Q: How many Skills can I have?
 
-There is no hard limit. However, keeping it reasonable (10–20) is recommended — too many will increase AI's matching overhead.
+There is no hard limit, but keeping a reasonable count (10-20) is recommended — too many increase the AI's matching burden.
 
-### Q: What file formats are supported for resources?
+### Q: Which resource file formats are supported?
 
-Resources support common text formats (`.md`, `.py`, `.js`, `.ts`, `.json`, `.yaml`, `.txt`, `.sh`, etc.). Binary files are synced to the workspace but not processed as text content.
+Common text formats are supported (`.md`, `.py`, `.js`, `.ts`, `.json`, `.yaml`, `.txt`, `.sh`, etc.). Binary files are synced to the workspace but not processed as text content.
 
-## Related Documentation
+## Related Docs
 
-- [Getting Started](getting-started.md) — Basic usage guide
-- [Workspace](workspace.md) — Project and workspace management
-- [Conversation](conversation.md) — AI conversation capabilities
+- [Getting Started](getting-started.md) - basic usage guide
+- [Workspace](workspace.md) - project and workspace management
+- [Conversations](conversation.md) - AI conversation capabilities

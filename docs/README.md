@@ -1,29 +1,27 @@
 # Project Documentation Index
 
-This directory is the documentation source of truth for the repository.
+This directory is the documentation source of truth for the repository, organized by language:
 
-## Start Here
+- `docs/zh/` — Chinese docs (user + developer)
+- `docs/en/` — English docs (user + developer)
 
-- User docs: `docs/user/`
-- User docs (English, docs center): `docs/en/user/`
-- Developer docs (Chinese): `docs/developer/`
-- Developer docs (English, docs center): `docs/en/developer/`
-- Developer guides (English): `docs/development/`
-- Architecture: `docs/architecture/`
-- Design and workflow: `docs/design/`, `docs/workflow/`
-- Technical topics: `docs/plugin-system/`, `docs/relay-server/`, `docs/sqlite/`, `docs/skills/`
+Each language has two categories served by the docs center:
+
+- `user/` — product usage guides
+- `developer/` — developer guides (guides / architecture / reference)
+
+Internal-only docs (design specs, relay-server internals, plugin system, requirements, product ideas) live in the separate `weave-docs` repository next to this repo.
+
+Note: completed feature PRDs / plans / migration designs are removed from the repo once shipped; consult git history (`git log -- docs/`) if needed.
 
 ## Recommended Reading Paths
 
 - New users:
-  - `docs/user/getting-started.md`
-  - `docs/en/user/getting-started.md`
-  - `docs/user/workspace.md`
-  - `docs/user/conversation.md`
+  - `docs/zh/user/getting-started.md` / `docs/en/user/getting-started.md`
 - New contributors:
-  - `docs/developer/guides/quick-start.md` (中文)
-  - `docs/development/quick-start.md` (English)
-  - `docs/developer/architecture/index.md`
+  - `docs/zh/developer/guides/quick-start.md` (中文)
+  - `docs/en/developer/quick-start.md` (English)
+  - `docs/zh/developer/architecture/index.md`
 
 ## Maintenance Rules
 
@@ -31,11 +29,4 @@ This directory is the documentation source of truth for the repository.
 - `web/public/docs/` is a synced copy used by the web app docs viewer.
 - `web/public/docs/` is generated content and should not be edited manually.
 - Prefer editing files in `docs/` first, then sync to `web/public/docs/` when needed.
-- Keep the same relative path when adding mirrored docs.
-- Use descriptive file names and place docs under the closest topic directory.
-
-## Notes
-
-- `docs/developer/` and `docs/development/` are both active:
-  - `docs/developer/`: structured Chinese developer docs with section indexes.
-  - `docs/development/`: English developer guides kept for compatibility and external readers.
+- Every docs-center page needs YAML frontmatter (`title`, `order`) for sidebar ordering.

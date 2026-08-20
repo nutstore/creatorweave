@@ -1,3 +1,8 @@
+---
+title: Workspace
+order: 2
+---
+
 # Workspace
 
 The workspace is the main surface where you organize files, conversations, and tools.
