@@ -72,6 +72,7 @@ export function ExportConversationDialog({
     includeToolCalls: true,
     includeReasoning: true,
     includeUsage: false,
+    includeImages: true,
     addTimestamp: true,
   })
 
@@ -115,6 +116,7 @@ export function ExportConversationDialog({
         includeToolCalls: options.includeToolCalls,
         includeReasoning: options.includeReasoning,
         includeUsage: options.includeUsage,
+        includeImages: options.includeImages,
         addTimestamp: options.addTimestamp,
         onProgress: (p, s) => {
           setProgress(p)
@@ -240,6 +242,17 @@ export function ExportConversationDialog({
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
+                  checked={options.includeImages}
+                  onChange={(e) =>
+                    setOptions((prev) => ({ ...prev, includeImages: e.target.checked }))
+                  }
+                  className="rounded"
+                />
+                <span>{t('conversation.export.includeImages') || 'Include images & attachments'}</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
                   checked={options.addTimestamp}
                   onChange={(e) =>
                     setOptions((prev) => ({ ...prev, addTimestamp: e.target.checked }))
@@ -282,6 +295,8 @@ export function ExportConversationDialog({
               <span>
                 {t('conversation.export.saved') || 'Saved'}: {lastResult.filename}
                 ({formatSize(lastResult.size)})
+                {lastResult.bundledFileCount ?
+                  ` · ${lastResult.bundledFileCount} ${t('conversation.export.files') || 'files'}` : ''}
               </span>
             </div>
           )}

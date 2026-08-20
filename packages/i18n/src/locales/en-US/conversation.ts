@@ -194,6 +194,7 @@ export const conversation = {
       options: "Options",
       includeToolCalls: "Include tool calls",
       includeReasoning: "Include reasoning",
+      includeImages: "Include images & attachments",
       addTimestamp: "Add timestamp to filename",
       messages: "messages",
       user: "user",
@@ -202,6 +203,7 @@ export const conversation = {
       complete: "Export complete!",
       failed: "Export failed",
       saved: "Saved",
+      files: "files",
       button: "Export",
     },
 } as const

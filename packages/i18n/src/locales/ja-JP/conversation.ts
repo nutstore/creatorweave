@@ -179,6 +179,7 @@ export const conversation = {
       options: "オプション",
       includeToolCalls: "ツール呼び出しを含む",
       includeReasoning: "推論過程を含む",
+      includeImages: "画像と添付ファイルを含む",
       addTimestamp: "ファイル名にタイムスタンプを追加",
       messages: "件のメッセージ",
       user: "件のユーザー",
@@ -187,6 +188,7 @@ export const conversation = {
       complete: "エクスポート完了！",
       failed: "エクスポートに失敗しました",
       saved: "保存済み",
+      files: "個のファイル",
       button: "エクスポート",
     },
 } as const

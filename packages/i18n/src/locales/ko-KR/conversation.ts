@@ -178,6 +178,7 @@ export const conversation = {
       options: "옵션",
       includeToolCalls: "도구 호출 포함",
       includeReasoning: "추론 과정 포함",
+      includeImages: "이미지 및 첨부 파일 포함",
       addTimestamp: "파일명에 타임스탬프 추가",
       messages: "개 메시지",
       user: "개 사용자",
@@ -186,6 +187,7 @@ export const conversation = {
       complete: "내보내기 완료!",
       failed: "내보내기 실패",
       saved: "저장됨",
+      files: "개 파일",
       button: "내보내기",
     },
 } as const

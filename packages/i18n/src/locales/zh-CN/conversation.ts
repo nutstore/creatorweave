@@ -193,6 +193,7 @@ export const conversation = {
       options: "导出选项",
       includeToolCalls: "包含工具调用详情",
       includeReasoning: "包含推理过程",
+      includeImages: "包含图片与附件",
       addTimestamp: "文件名添加时间戳",
       messages: "条消息",
       user: "条用户",
@@ -201,6 +202,7 @@ export const conversation = {
       complete: "导出完成！",
       failed: "导出失败",
       saved: "已保存",
+      files: "个文件",
       button: "导出",
     },
 } as const
