@@ -45,14 +45,13 @@ describe('FileTreePanel', () => {
     expect(await screen.findByText('App.tsx')).toBeInTheDocument()
   })
 
-  it('shows OPFS sandbox hint when no directory, pending, or cached files exist', () => {
+  it('shows the no-directory hint when no directory, pending, or cached files exist', async () => {
     render(<FileTreePanel directoryHandle={null} onFileSelect={vi.fn()} />)
 
-    expect(screen.getByText(/You can continue without selecting a local directory/)).toBeInTheDocument()
-    expect(screen.getByText(/In pure OPFS sandbox mode, file changes will be displayed here/)).toBeInTheDocument()
+    expect(await screen.findByText(/You can continue without selecting a local directory/)).toBeInTheDocument()
   })
 
-  it('shows empty state when activeWorkspaceId is null regardless of stale cachedPaths', () => {
+  it('loads the tree when activeWorkspaceId is null but stale cached paths remain', async () => {
     // Simulate switching to a new project with no workspace
     mockWorkspaceState.activeWorkspaceId = null
     // Stale cachedPaths from previous workspace should not show
@@ -61,6 +60,35 @@ describe('FileTreePanel', () => {
 
     render(<FileTreePanel directoryHandle={null} onFileSelect={vi.fn()} />)
 
-    expect(screen.getByText(/You can continue without selecting a local directory/)).toBeInTheDocument()
+    expect(await screen.findByText('stale-file.txt')).toBeInTheDocument()
+  })
+
+  it('lists and expands a Native Host root through its disk executor', async () => {
+    const listDir = vi.fn(async (_rootId: string, path: string) => {
+      if (path === '') {
+        return [
+          { name: 'src', kind: 'directory' as const },
+          { name: 'README.md', kind: 'file' as const, stat: { size: 12, mtime: 1, contentType: 'text' as const, isFile: true } },
+        ]
+      }
+      return [{ name: 'main.ts', kind: 'file' as const, stat: { size: 8, mtime: 1, contentType: 'text' as const, isFile: true } }]
+    })
+
+    render(
+      <FileTreePanel
+        directoryHandle={null}
+        diskRootId="scope_test"
+        diskExecutor={{ listDir }}
+        onFileSelect={vi.fn()}
+      />
+    )
+
+    expect(await screen.findByText('README.md')).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByText('src'))
+
+    expect(await screen.findByText('main.ts')).toBeInTheDocument()
+    expect(listDir).toHaveBeenCalledWith('scope_test', '')
+    expect(listDir).toHaveBeenCalledWith('scope_test', 'src')
   })
 })

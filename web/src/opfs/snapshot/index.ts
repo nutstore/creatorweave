@@ -2,11 +2,11 @@
  * OPFS Git - Browser-based Git implementation using FSOverlayRepository.
  *
  * Provides Git-like operations based on the existing change tracking and snapshot system:
- * - git_status: Shows pending changes (unstaged) and staged snapshots
- * - git_diff: Shows diff between working directory and snapshots
- * - git_log: Shows commit/snapshot history
- * - git_show: Shows details of a specific snapshot
- * - git_restore: Restores files from a snapshot or discards pending changes
+ * - snapshot_status: Shows pending changes (unstaged) and staged snapshots
+ * - snapshot_diff: Shows diff between working directory and snapshots
+ * - snapshot_log: Shows commit/snapshot history
+ * - snapshot_show: Shows details of a specific snapshot
+ * - snapshot_restore: Restores files from a snapshot or discards pending changes
  */
 
 import { getSQLiteDB } from '@/sqlite'
@@ -27,7 +27,7 @@ export interface FileChangeEntry {
   error?: string
 }
 
-export interface GitStatusResult {
+export interface SnapshotStatusResult {
   workspaceId: string
   branch: string
   /** Changes awaiting review (review_status = pending, not yet synced) */
@@ -39,7 +39,7 @@ export interface GitStatusResult {
   counts: { pending: number; approved: number; conflicts: number; total: number }
 }
 
-export interface GitDiffResult {
+export interface SnapshotDiffResult {
   workspaceId: string
   from: string | null
   to: string | null
@@ -47,7 +47,7 @@ export interface GitDiffResult {
   summary: { filesChanged: number; insertions: number; deletions: number }
 }
 
-export interface GitDiffRenderOptions {
+export interface SnapshotDiffRenderOptions {
   nameOnly?: boolean
   nameStatus?: boolean
   stat?: boolean
@@ -55,7 +55,7 @@ export interface GitDiffRenderOptions {
   patch?: boolean
 }
 
-export interface GitLogResult {
+export interface SnapshotLogResult {
   projectId: string
   head: string | null
   commits: SnapshotCommit[]
@@ -98,7 +98,7 @@ export interface DiffLine {
   content: string
 }
 
-export interface GitShowResult {
+export interface SnapshotShowResult {
   id: string
   summary: string | null
   source: string
@@ -108,7 +108,7 @@ export interface GitShowResult {
   opCount: number
   workspaceName?: string
   files: SnapshotFileInfo[]
-  diff?: GitDiffResult
+  diff?: SnapshotDiffResult
 }
 
 export interface SnapshotFileInfo {
@@ -118,7 +118,7 @@ export interface SnapshotFileInfo {
   afterSize?: number
 }
 
-export interface GitRestoreResult {
+export interface SnapshotRestoreResult {
   restored: number
   discarded: number
   unstaged?: number
@@ -128,10 +128,10 @@ export interface GitRestoreResult {
 }
 
 //=============================================================================
-// git_status - Working tree status
+// snapshot_status - Working tree status
 //=============================================================================
 
-export async function gitStatus(workspaceId: string): Promise<GitStatusResult> {
+export async function snapshotStatus(workspaceId: string): Promise<SnapshotStatusResult> {
   const db = getSQLiteDB()
 
   // Query ALL active ops for this workspace, regardless of review_status.
@@ -196,7 +196,7 @@ export async function gitStatus(workspaceId: string): Promise<GitStatusResult> {
   }
 }
 
-export function formatGitStatus(status: GitStatusResult): string {
+export function formatSnapshotStatus(status: SnapshotStatusResult): string {
   const lines: string[] = []
 
   lines.push(`On branch ${status.branch}`)
@@ -238,10 +238,10 @@ export function formatGitStatus(status: GitStatusResult): string {
 }
 
 //=============================================================================
-// git_diff - Show changes
+// snapshot_diff - Show changes
 //=============================================================================
 
-export async function gitDiff(
+export async function snapshotDiff(
   workspaceId: string,
   options?: {
     mode?: 'working' | 'cached' | 'snapshot'
@@ -250,7 +250,7 @@ export async function gitDiff(
     directoryHandle?: FileSystemDirectoryHandle | null
     contextLines?: number
   }
-): Promise<GitDiffResult> {
+): Promise<SnapshotDiffResult> {
   const repo = getFSOverlayRepository()
   const db = getSQLiteDB()
   const mode = options?.mode || 'working'
@@ -382,7 +382,7 @@ export async function gitDiff(
   }
 }
 
-export function formatGitDiff(diff: GitDiffResult, options?: GitDiffRenderOptions): string {
+export function formatSnapshotDiff(diff: SnapshotDiffResult, options?: SnapshotDiffRenderOptions): string {
   if (diff.files.length === 0) {
     return 'No changes to show'
   }
@@ -392,7 +392,7 @@ export function formatGitDiff(diff: GitDiffResult, options?: GitDiffRenderOption
   }
 
   if (options?.nameStatus) {
-    return diff.files.map((file) => `${toGitStatusCode(file.kind)}\t${file.path}`).join('\n')
+    return diff.files.map((file) => `${toStatusCode(file.kind)}\t${file.path}`).join('\n')
   }
 
   const rendered: string[] = []
@@ -412,7 +412,7 @@ export function formatGitDiff(diff: GitDiffResult, options?: GitDiffRenderOption
   return rendered.filter(Boolean).join('\n\n')
 }
 
-function toGitStatusCode(kind: DiffFile['kind']): 'A' | 'D' | 'M' {
+function toStatusCode(kind: DiffFile['kind']): 'A' | 'D' | 'M' {
   if (kind === 'add') return 'A'
   if (kind === 'delete') return 'D'
   return 'M'
@@ -454,7 +454,7 @@ function renderDiffstat(files: DiffFile[]): string {
     .join('\n')
 }
 
-function renderPatchDiff(diff: GitDiffResult): string {
+function renderPatchDiff(diff: SnapshotDiffResult): string {
   const lines: string[] = []
 
   if (diff.from || diff.to) {
@@ -492,17 +492,17 @@ function renderPatchDiff(diff: GitDiffResult): string {
 }
 
 //=============================================================================
-// git_log - Show commit history
+// snapshot_log - Show commit history
 //=============================================================================
 
-export async function gitLog(
+export async function snapshotLog(
   projectId: string,
   options?: {
     limit?: number
     path?: string
     status?: 'committed' | 'approved' | 'rolled_back'
   }
-): Promise<GitLogResult> {
+): Promise<SnapshotLogResult> {
   const repo = getFSOverlayRepository()
   const limit = options?.limit || 10
   const hasFilter = Boolean(options?.status || options?.path)
@@ -544,7 +544,7 @@ function getSnapshotDisplayTitle(summary: string | null, opCount: number): strin
   return summary || `Saved ${opCount} file${opCount === 1 ? '' : 's'}`
 }
 
-export function formatGitLog(log: GitLogResult): string {
+export function formatSnapshotLog(log: SnapshotLogResult): string {
   const lines: string[] = []
 
   for (const commit of log.commits) {
@@ -571,7 +571,7 @@ export function formatGitLog(log: GitLogResult): string {
   return lines.join('\n')
 }
 
-export function formatGitLogOneline(log: GitLogResult): string {
+export function formatSnapshotLogOneline(log: SnapshotLogResult): string {
   const lines: string[] = []
 
   for (const commit of log.commits) {
@@ -593,17 +593,17 @@ export function formatGitLogOneline(log: GitLogResult): string {
 }
 
 //=============================================================================
-// git_show - Show commit details
+// snapshot_show - Show commit details
 //=============================================================================
 
-export async function gitShow(
+export async function snapshotShow(
   projectId: string,
   snapshotId?: string,
   options?: {
     includeDiff?: boolean
     path?: string
   }
-): Promise<GitShowResult | null> {
+): Promise<SnapshotShowResult | null> {
   const repo = getFSOverlayRepository()
   let snapshot: SnapshotRecord | null = null
   let targetId: string
@@ -620,9 +620,9 @@ export async function gitShow(
   }
 
   const files = await repo.listSnapshotFiles(snapshot.id)
-  let diff: GitDiffResult | undefined
+  let diff: SnapshotDiffResult | undefined
   if (options?.includeDiff) {
-    diff = await gitDiff(snapshot.workspaceId, {
+    diff = await snapshotDiff(snapshot.workspaceId, {
       mode: 'snapshot',
       snapshotId: targetId,
       path: options.path,
@@ -648,7 +648,7 @@ export async function gitShow(
   }
 }
 
-export function formatGitShow(data: GitShowResult): string {
+export function formatSnapshotShow(data: SnapshotShowResult): string {
   const date = new Date(data.createdAt).toLocaleString()
 
   const lines: string[] = []
@@ -673,17 +673,17 @@ export function formatGitShow(data: GitShowResult): string {
   if (data.diff) {
     lines.push('')
     lines.push('Diff:')
-    lines.push(formatGitDiff(data.diff))
+    lines.push(formatSnapshotDiff(data.diff))
   }
 
   return lines.join('\n')
 }
 
 //=============================================================================
-// git_restore - Restore files
+// snapshot_restore - Restore files
 //=============================================================================
 
-export async function gitRestore(
+export async function snapshotRestore(
   workspaceId: string,
   options?: {
     paths?: string[]
@@ -692,7 +692,7 @@ export async function gitRestore(
     snapshotId?: string
     directoryHandle?: FileSystemDirectoryHandle | null
   }
-): Promise<GitRestoreResult> {
+): Promise<SnapshotRestoreResult> {
   const repo = getFSOverlayRepository()
   const db = getSQLiteDB()
   const paths = options?.paths || []
@@ -823,7 +823,7 @@ export async function gitRestore(
   }
 }
 
-export function formatGitRestore(result: GitRestoreResult): string {
+export function formatSnapshotRestore(result: SnapshotRestoreResult): string {
   return result.message
 }
 

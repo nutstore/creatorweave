@@ -7,6 +7,7 @@
  */
 
 import { generateId, getSQLiteDB } from '../sqlite-database'
+import type { DiskBackend } from '@/opfs/native-disk/executor'
 
 export interface ProjectRoot {
   id: string
@@ -14,6 +15,8 @@ export interface ProjectRoot {
   name: string
   isDefault: boolean
   readOnly: boolean
+  backend: DiskBackend
+  scopeId: string | null
   sortOrder: number
   createdAt: number
 }
@@ -24,6 +27,8 @@ interface ProjectRootRow {
   name: string
   is_default: number
   read_only: number
+  backend: DiskBackend
+  scope_id: string | null
   sort_order: number
   created_at: number
 }
@@ -86,6 +91,8 @@ export class ProjectRootRepository {
     name: string
     isDefault?: boolean
     readOnly?: boolean
+    backend?: DiskBackend
+    scopeId?: string | null
     sortOrder?: number
   }): Promise<ProjectRoot> {
     const db = getSQLiteDB()
@@ -101,19 +108,23 @@ export class ProjectRootRepository {
       name: input.name,
       isDefault,
       readOnly: input.readOnly ?? false,
+      backend: input.backend ?? 'fsaccess',
+      scopeId: input.scopeId ?? null,
       sortOrder,
       createdAt: Date.now(),
     }
 
     await db.execute(
-      `INSERT INTO project_roots (id, project_id, name, is_default, read_only, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO project_roots (id, project_id, name, is_default, read_only, backend, scope_id, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         root.id,
         root.projectId,
         root.name,
         root.isDefault ? 1 : 0,
         root.readOnly ? 1 : 0,
+        root.backend,
+        root.scopeId,
         root.sortOrder,
         root.createdAt,
       ]
@@ -129,9 +140,9 @@ export class ProjectRootRepository {
     const db = getSQLiteDB()
     await db.execute(
       `UPDATE project_roots
-       SET name = ?, is_default = ?, read_only = ?, sort_order = ?
+       SET name = ?, is_default = ?, read_only = ?, backend = ?, scope_id = ?, sort_order = ?
        WHERE id = ?`,
-      [root.name, root.isDefault ? 1 : 0, root.readOnly ? 1 : 0, root.sortOrder, root.id]
+      [root.name, root.isDefault ? 1 : 0, root.readOnly ? 1 : 0, root.backend, root.scopeId, root.sortOrder, root.id]
     )
   }
 
@@ -187,6 +198,8 @@ export class ProjectRootRepository {
       name: row.name,
       isDefault: row.is_default === 1,
       readOnly: row.read_only === 1,
+      backend: row.backend ?? 'fsaccess',
+      scopeId: row.scope_id ?? null,
       sortOrder: row.sort_order,
       createdAt: row.created_at,
     }

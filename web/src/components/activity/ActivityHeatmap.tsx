@@ -501,14 +501,13 @@ export function ActivityHeatmap() {
     <>
       <div className="home-reveal home-delay-3 rounded-xl border border-border/60 bg-card/60 p-5">
         {/* Header with range selector and stats */}
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="mb-4">
+          {/* Top row: title (left) + range selector (right) */}
+          <div className="flex items-center justify-between gap-3">
             <span className="home-mono text-[11px] uppercase tracking-wider text-secondary dark:text-secondary-foreground">
               {t('projectHome.activity.title')}
             </span>
-          </div>
 
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0 flex-wrap justify-end">
             {/* Range selector */}
             <div
               className="flex rounded-lg border border-border p-0.5 bg-muted/30 dark:bg-muted/30"
@@ -535,51 +534,45 @@ export function ActivityHeatmap() {
                 )
               })}
             </div>
-
-            {/* P0: Summary stats — comprehensible metrics */}
-            {(totalDocs > 0 || totalChats > 0) && (
-              <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                {totalDocs > 0 && (
-                  <div className="flex items-center gap-1">
-                    <FileText className="w-3 h-3 text-primary/70" />
-                    <span className="home-mono text-base font-semibold tabular-nums text-secondary dark:text-foreground">
-                      {totalDocs}
-                    </span>
-                    <span className="home-mono text-[11px] text-muted-foreground">
-                      {t('projectHome.activity.docsLabel')}
-                    </span>
-                  </div>
-                )}
-                {totalChats > 0 && (
-                  <>
-                    <div className="w-px h-3 bg-border" />
-                    <div className="flex items-center gap-1">
-                      <MessageSquare className="w-3 h-3 text-primary/70" />
-                      <span className="home-mono text-base font-semibold tabular-nums text-secondary dark:text-foreground">
-                        {totalChats}
-                      </span>
-                      <span className="home-mono text-[11px] text-muted-foreground">
-                        {t('projectHome.activity.chatsLabel')}
-                      </span>
-                    </div>
-                  </>
-                )}
-                {activeDays > 0 && (
-                  <>
-                    <div className="w-px h-3 bg-border" />
-                    <div className="flex items-center gap-1">
-                      <span className="home-mono text-base font-semibold tabular-nums text-secondary dark:text-foreground">
-                        {activeDays}
-                      </span>
-                      <span className="home-mono text-[11px] text-muted-foreground">
-                        {t('projectHome.activity.activeDaysLabel')}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
+
+          {/* P0: Summary stats — horizontal row below header, wraps on narrow screens */}
+          {(totalDocs > 0 || totalChats > 0) && (
+            <div className="hidden sm:flex items-center gap-x-3 gap-y-1.5 mt-2 flex-wrap text-xs">
+              {totalDocs > 0 && (
+                <div className="flex items-center gap-1">
+                  <FileText className="w-3 h-3 text-primary/70 shrink-0" />
+                  <span className="home-mono text-sm font-semibold tabular-nums text-secondary dark:text-foreground">
+                    {totalDocs}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t('projectHome.activity.docsLabel')}
+                  </span>
+                </div>
+              )}
+              {totalChats > 0 && (
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3 text-primary/70 shrink-0" />
+                  <span className="home-mono text-sm font-semibold tabular-nums text-secondary dark:text-foreground">
+                    {totalChats}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t('projectHome.activity.chatsLabel')}
+                  </span>
+                </div>
+              )}
+              {activeDays > 0 && (
+                <div className="flex items-center gap-1">
+                  <span className="home-mono text-sm font-semibold tabular-nums text-secondary dark:text-foreground">
+                    {activeDays}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t('projectHome.activity.activeDaysLabel')}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Heatmap grid (desktop only) */}

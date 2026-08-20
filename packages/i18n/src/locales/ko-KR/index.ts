@@ -30,6 +30,8 @@ import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { keyboardShortcuts } from './keyboardShortcuts'
 import { assets } from './assets'
+import { processes } from './processes'
+import { execPolicy } from './execPolicy'
 import { tools } from './tools'
 
 export const koKR = {
@@ -86,5 +88,7 @@ export const koKR = {
   questionCard,
   runChanges,
   assets,
+  processes,
+  execPolicy,
   tools,
 } as const

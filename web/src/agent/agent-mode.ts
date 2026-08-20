@@ -45,11 +45,11 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   }],
   ['ocr', { name: 'ocr', category: 'read' }],
   
-  // Git read tools
-  ['git_status', { name: 'git_status', category: 'read' }],
-  ['git_diff', { name: 'git_diff', category: 'read' }],
-  ['git_log', { name: 'git_log', category: 'read' }],
-  ['git_show', { name: 'git_show', category: 'read' }],
+  // Snapshot read tools (OPFS change review — NOT real git)
+  ['snapshot_status', { name: 'snapshot_status', category: 'read' }],
+  ['snapshot_diff', { name: 'snapshot_diff', category: 'read' }],
+  ['snapshot_log', { name: 'snapshot_log', category: 'read' }],
+  ['snapshot_show', { name: 'snapshot_show', category: 'read' }],
   
   // Skill tools (read-only)
   ['read_skill', { name: 'read_skill', category: 'read' }],
@@ -87,8 +87,8 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['edit', { name: 'edit', category: 'write' }],
   ['delete', { name: 'delete', category: 'write' }],
   
-  // Git write tools
-  ['git_restore', { name: 'git_restore', category: 'write' }],
+  // Snapshot write tools (OPFS undo/restore — NOT real git)
+  ['snapshot_restore', { name: 'snapshot_restore', category: 'write' }],
 
   // Sync tools (writes to OPFS)
   ['sync', { name: 'sync', category: 'write' }],

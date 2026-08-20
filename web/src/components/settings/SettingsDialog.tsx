@@ -47,6 +47,7 @@ import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
 import { SecretManager } from './SecretManager'
+import ExecPolicyPanel from './ExecPolicyPanel'
 import { OfflineQueue } from '@/components/mobile/OfflineQueue'
 import { MCPSettings } from '@/components/mcp/MCPSettings'
 import { WebMCPSettings } from '@/components/webmcp/WebMCPSettings'
@@ -89,6 +90,7 @@ type SettingsTab =
   | 'mcp'
   | 'webmcp'
   | 'extension'
+  | 'exec-policy'
   | 'sync'
   | 'offline'
   | 'experimental'
@@ -764,7 +766,7 @@ function VersionInfoSection() {
   const displayBuildId = isSha ? buildId.slice(0, 7) : buildId.slice(0, 10)
 
   const handleCopy = useCallback(() => {
-    const fullInfo = `CreatorWeave v${version} (${buildId})`
+    const fullInfo = `EO2Weave v${version} (${buildId})`
     navigator.clipboard.writeText(fullInfo).then(
       () => toast.success(t('settings.versionInfoCopied')),
       () => toast.error('Copy failed'),
@@ -1403,18 +1405,49 @@ const SettingsDialogContent = forwardRef<
     { value: 'system', label: t('settings.themeSystem'), icon: <Monitor className="h-4 w-4" /> },
   ]
 
-  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'general', label: t('settings.general'), icon: <Globe className="h-4 w-4" /> },
-    { id: 'workspace-layout', label: t('workspaceSettings.tabs.layout'), icon: <LayoutDashboard className="h-4 w-4" /> },
-    { id: 'workspace-editor', label: t('workspaceSettings.tabs.display'), icon: <Settings className="h-4 w-4" /> },
-    { id: 'workspace-shortcuts', label: t('workspaceSettings.tabs.shortcuts'), icon: <Keyboard className="h-4 w-4" /> },
-    { id: 'workspace-data', label: t('workspaceSettings.tabs.data'), icon: <Database className="h-4 w-4" /> },
-    { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
-    { id: 'secrets', label: t('settings.secrets.tab'), icon: <Lock className="h-4 w-4" /> },
-    { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
-    { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
-    { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
-    { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
+  const tabGroups: { id: string; label: string; tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] }[] = [
+    {
+      id: 'basics',
+      label: t('settings.tabGroups.basics'),
+      tabs: [
+        { id: 'general', label: t('settings.general'), icon: <Globe className="h-4 w-4" /> },
+      ],
+    },
+    {
+      id: 'workspace',
+      label: t('settings.tabGroups.workspace'),
+      tabs: [
+        { id: 'workspace-layout', label: t('workspaceSettings.tabs.layout'), icon: <LayoutDashboard className="h-4 w-4" /> },
+        { id: 'workspace-editor', label: t('workspaceSettings.tabs.display'), icon: <Settings className="h-4 w-4" /> },
+        { id: 'workspace-shortcuts', label: t('workspaceSettings.tabs.shortcuts'), icon: <Keyboard className="h-4 w-4" /> },
+        { id: 'workspace-data', label: t('workspaceSettings.tabs.data'), icon: <Database className="h-4 w-4" /> },
+      ],
+    },
+    {
+      id: 'aiAndTools',
+      label: t('settings.tabGroups.aiAndTools'),
+      tabs: [
+        { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
+        { id: 'secrets', label: t('settings.secrets.tab'), icon: <Lock className="h-4 w-4" /> },
+        { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
+        { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
+        { id: 'exec-policy', label: t('execPolicy.tab'), icon: <Terminal className="h-4 w-4" /> },
+      ],
+    },
+    {
+      id: 'extensions',
+      label: t('settings.tabGroups.extensions'),
+      tabs: [
+        { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
+      ],
+    },
+    {
+      id: 'experimental',
+      label: t('settings.tabGroups.experimental'),
+      tabs: [
+        { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
+      ],
+    },
   ]
 
   return (
@@ -1441,28 +1474,39 @@ const SettingsDialogContent = forwardRef<
       </BrandDialogHeader>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {/* Sidebar tabs */}
-        <div className="border-subtle shrink-0 border-b p-2 md:w-44 md:border-b-0 md:border-r md:p-2">
-          <nav role="tablist" aria-label="Settings tabs" aria-orientation="vertical" className="flex gap-1 overflow-x-auto md:block md:space-y-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                id={`settings-tab-${tab.id}`}
-                aria-selected={activeTab === tab.id}
-                aria-controls={`settings-tabpanel-${tab.id}`}
-                tabIndex={activeTab === tab.id ? 0 : -1}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  activeTab === tab.id
-                    ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
-                    : 'text-secondary hover:bg-muted dark:text-tertiary dark:hover:bg-muted'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
+        {/* Sidebar tabs — w-52 (was w-44) so the longest tab label
+            ("Browser Extension" / "浏览器扩展" + icon) fits on one line;
+            nowrap guards against wrapping on narrower fallbacks. */}
+        <div className="border-subtle shrink-0 border-b p-2 md:w-52 md:border-b-0 md:border-r md:p-2">
+          <nav role="tablist" aria-label="Settings tabs" aria-orientation="vertical" className="flex gap-3 overflow-x-auto md:block md:space-y-3">
+            {tabGroups.map((group) => (
+              <div key={group.id} className="flex shrink-0 flex-col gap-1 md:gap-1">
+                <h3 className="hidden px-3 text-[10px] font-semibold uppercase tracking-wider text-tertiary md:block">
+                  {group.label}
+                </h3>
+                <div className="flex gap-1 md:block md:space-y-1">
+                  {group.tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      id={`settings-tab-${tab.id}`}
+                      aria-selected={activeTab === tab.id}
+                      aria-controls={`settings-tabpanel-${tab.id}`}
+                      tabIndex={activeTab === tab.id ? 0 : -1}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                        activeTab === tab.id
+                          ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
+                          : 'text-secondary hover:bg-muted dark:text-tertiary dark:hover:bg-muted'
+                      }`}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </div>
@@ -1605,6 +1649,11 @@ const SettingsDialogContent = forwardRef<
           {/* Extension Tab */}
           {activeTab === 'extension' && (
             <ExtensionSettingsPanel />
+          )}
+
+          {/* Exec Policy Tab */}
+          {activeTab === 'exec-policy' && (
+            <ExecPolicyPanel />
           )}
 
           {/* Sync Tab */}

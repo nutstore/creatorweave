@@ -18,6 +18,8 @@ import type { LLMProviderConfig, LLMProviderType, ModelInfo, ProviderMeta } from
 import { registerDynamicProvider, unregisterDynamicProvider } from './types'
 import { fetchGatewayModels, fetchRateLimits, forceRefreshAccessToken, getValidAccessToken, type RateLimitsResponse } from './llm-gateway-auth'
 import { getModelContextWindow } from './model-store'
+import { t as translateStatic } from '@creatorweave/i18n'
+import { useI18nStore } from '@/i18n/store'
 
 // ── Provider Identity ──
 
@@ -53,7 +55,7 @@ export function getLLMGatewayClientId(): string {
 
 const GATEWAY_META: ProviderMeta = {
   category: 'chinese',
-  displayName: '坚果云 AI',
+  displayName: 'Nutstore AI',
   models: [], // populated dynamically via updateGatewayModels()
 }
 
@@ -151,7 +153,10 @@ export async function fetchGatewayRateLimits(): Promise<RateLimitsResponse> {
 
   let token = await getValidAccessToken(baseURL, clientId)
   if (!token) {
-    throw new Error('未登录坚果云 AI，请先完成登录')
+    // Locale-aware error (zh: 坚果云 AI / others: Nutstore AI)
+    const locale = useI18nStore.getState().locale
+    const msg = translateStatic(locale, 'settings.gateway.notLoggedInError')
+    throw new Error(msg !== 'settings.gateway.notLoggedInError' ? msg : 'Not logged in to Nutstore AI. Please log in first.')
   }
 
   try {

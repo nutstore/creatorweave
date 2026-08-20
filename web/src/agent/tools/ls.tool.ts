@@ -350,15 +350,14 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
   // Multi-root: when no path and multiple roots exist, list root names
   if (!args.path) {
     try {
-      const { getRuntimeHandlesForProject } = await import('@/native-fs')
       const projectId = toolContext.projectId
       if (projectId) {
-        const allHandles = getRuntimeHandlesForProject(projectId)
-        if (allHandles.size > 0) {
-          // Read root metadata from DB (not from global folderAccessStore.roots
-          // which follows the user's active browser tab, not the agent's project).
-          const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
-          const dbRoots = await getProjectRootRepository().findByProject(projectId)
+        // Read root metadata from DB — covers BOTH FS Access and native-host roots.
+        // Previously this only checked FS Access handles (getRuntimeHandlesForProject),
+        // which missed native-host-only projects.
+        const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+        const dbRoots = await getProjectRootRepository().findByProject(projectId)
+        if (dbRoots.length > 0) {
           return toolOkJson('ls', dbRoots.map((r: { name: string; readOnly: boolean }) => ({ name: r.name, kind: 'directory', readOnly: r.readOnly })))
         }
       }
@@ -372,6 +371,13 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     const message = error instanceof Error ? error.message : String(error)
     if (isSubagentPermissionDenied(error)) {
       return toolErrorJson('ls', SUBAGENT_PERMISSION_DENIED, message)
+    }
+    // Before giving up, check if this is a native-host root that has no
+    // FileSystemDirectoryHandle — the error "No directory selected" is
+    // expected in that case. Try scanning via executor instead.
+    if ((message === 'No directory selected.' || message.startsWith('List failed')) && typeof args.path === 'string' && toolContext.workspaceId) {
+      const diskResult = await tryNativeHostDiskScan(args.path, toolContext, args)
+      if (diskResult) return diskResult
     }
     if (message === 'No directory selected.') {
       return toolErrorJson('ls', 'no_directory', message)
@@ -422,6 +428,14 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
           opfsHasDir = opfsResolved.exists
         }
         if (!opfsHasDir) {
+          // Before declaring not-found, check if this is a native-host root
+          // that has no FileSystemDirectoryHandle — try disk scan via executor.
+          const diskResult = await tryNativeHostDiskScan(
+            scope.rootName ? `${scope.rootName}/${scope.subPath}` : scope.subPath,
+            toolContext, args
+          )
+          if (diskResult) return diskResult
+
           const rootName = 'rootName' in scope ? scope.rootName : undefined
           const displayPath = rootName ? `${rootName}/${scope.subPath}` : scope.subPath
           return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
@@ -432,6 +446,13 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
         // OPFS has the directory — proceed with an empty native handle so only
         // the OPFS merge scan runs below.
       } else {
+        // Before declaring not-found, check native-host disk scan
+        const diskResult2 = await tryNativeHostDiskScan(
+          ('rootName' in scope && scope.rootName) ? `${scope.rootName}/${scope.subPath}` : scope.subPath,
+          toolContext, args
+        )
+        if (diskResult2) return diskResult2
+
         const rootName = 'rootName' in scope ? scope.rootName : undefined
         const displayPath = rootName ? `${rootName}/${scope.subPath}` : scope.subPath
         return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
@@ -817,4 +838,57 @@ export const lsPromptDoc: ToolPromptDoc = {
     '- `ls(pattern)` - Find files by pattern (e.g., "**/*.csv", "src/**/*.tsx")',
     '- `ls(path)` - Show directory structure',
   ],
+}
+
+/**
+ * Fallback for native-host roots that have no FileSystemDirectoryHandle.
+ * Tries WorkspaceRuntime.scanDiskTree() which uses the DiskExecutor API.
+ * Returns null if the path is not a native-host root (caller continues normally).
+ */
+async function tryNativeHostDiskScan(
+  rawPath: string,
+  toolContext: ToolContext,
+  args: Record<string, unknown>
+): Promise<string | null> {
+  try {
+    if (!toolContext.workspaceId) return null
+    const { getWorkspaceManager } = await import('@/opfs')
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(toolContext.workspaceId)
+    if (!workspace) return null
+
+    const rawMaxDepth = args.max_depth ?? args.maxDepth
+    const maxDepth = typeof rawMaxDepth === 'number' ? Math.min(Math.max(1, rawMaxDepth), 10) : 2
+    const maxEntriesRaw = args.max_entries ?? args.maxEntries
+    const maxEntries = typeof maxEntriesRaw === 'number' && Number.isFinite(maxEntriesRaw)
+      ? Math.min(Math.max(1, maxEntriesRaw), 50000)
+      : undefined
+    const includeSizes = args.include_sizes === true || args.includeSizes === true
+    const extraExcludes = parseStringList(args.exclude_dirs ?? args.excludeDirs)
+    const deadlineMs = typeof args.deadline_ms === 'number' ? args.deadline_ms : 25000
+
+    const entries = await workspace.scanDiskTree(
+      rawPath,
+      maxDepth,
+      toolContext.projectId,
+      { includeSizes, excludeDirs: extraExcludes, maxEntries, deadlineMs }
+    )
+
+    if (entries === null) return null // not a native-host root
+
+    // Format results identically to handle-based scan
+    const formatted = entries
+      .filter((e) => e.type === 'file' || e.depth <= maxDepth)
+      .map((e) => ({
+        name: e.path.split('/').pop() || e.path,
+        path: e.path,
+        kind: e.type === 'file' ? 'file' : 'directory',
+        ...(e.size ? { size: e.size } : {}),
+      }))
+
+    const result = toolOkJson('ls', formatted)
+    return result
+  } catch {
+    return null
+  }
 }

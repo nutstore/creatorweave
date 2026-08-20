@@ -1,6 +1,6 @@
 // 환영 페이지
 export const welcome = {
-    title: "CreatorWeave",
+    title: "EO2Weave",
     tagline:
       "지식베이스와 멀티 에이전트 오케스트레이션을 위한 AI 네이티브 Creator Workspace",
     placeholder: "메시지를 입력하여 대화를 시작하세요...",
@@ -20,7 +20,7 @@ export const welcome = {
     step1Of3: "단계 1 / 3",
     step2Of3: "단계 2 / 3",
     step3Of3: "단계 3 / 3",
-    welcomeHeading: "CreatorWeave 에 오신 것을 환영합니다",
+    welcomeHeading: "EO2Weave 에 오신 것을 환영합니다",
     welcomeSubtitle: "로컬 AI 워크스페이스, 파일과 코드는 브라우저 안에",
     continueButton: "계속",
     skipButton: "나중에 하기",

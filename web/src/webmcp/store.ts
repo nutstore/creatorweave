@@ -21,6 +21,8 @@ interface WebMCPState {
 
   setHostEnabled: (hostname: string, enabled: boolean) => void
   setGroupEnabled: (groupKey: string, enabled: boolean) => void
+  /** Replace both authorization maps from extension-side discovery annotations (mirror sync) */
+  setAuthorizationMirror: (enabledByHost: Record<string, boolean>, enabledByGroup: Record<string, boolean>) => void
   isHostEnabled: (hostname: string) => boolean
   isGroupEnabled: (groupKey: string) => boolean
   setDiscoveredTools: (tools: WebMCPDiscoveredTool[], scannedAt: number) => void
@@ -73,6 +75,16 @@ export const useWebMCPStore = create<WebMCPState>()(
         set((state) => ({
           enabledByGroup: { ...state.enabledByGroup, [normalized]: enabled },
         }))
+      },
+
+      setAuthorizationMirror: (enabledByHost, enabledByGroup) => {
+        // Extension-side storage is the single source of truth; the web copy
+        // exists only so getEnabledGroups()/UI switches render without
+        // another round-trip. Never persisted to localStorage.
+        set({
+          enabledByHost: { ...enabledByHost },
+          enabledByGroup: { ...enabledByGroup },
+        })
       },
 
       isHostEnabled: (hostname) => {
@@ -167,8 +179,9 @@ export const useWebMCPStore = create<WebMCPState>()(
     {
       name: 'creatorweave-webmcp-store',
       partialize: (state) => ({
-        enabledByHost: state.enabledByHost,
-        enabledByGroup: state.enabledByGroup,
+        // Authorization maps are deliberately NOT persisted — they mirror the
+        // extension-side authoritative store (chrome.storage.local) and are
+        // re-synced from discovery annotations on every scan.
         preferredTabByGroup: state.preferredTabByGroup,
         preferredTabByTool: state.preferredTabByTool,
       }),

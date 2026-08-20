@@ -7,7 +7,7 @@ export const extension = {
   bannerDismiss: "Maybe Later",
 
   // Install Guide Dialog
-  guideTitle: "Install CreatorWeave Browser Extension",
+  guideTitle: "Install eo2weave Browser Extension",
   guideSubtitle: "Connect your AI assistant to the internet",
   guideAlreadyInstalled: "Already installed?",
   verifyInstallLink: "Refresh Page",
@@ -51,7 +51,7 @@ export const extension = {
   installStepB: "Enable \"Developer mode\" toggle (top right)",
   installStepC: "Click \"Load unpacked\"",
   installStepCSelect: "Select the extracted chrome-extension folder",
-  installSuccessHint: "You should see \"CreatorWeave\" appear in the extensions list",
+  installSuccessHint: "You should see \"EO2Weave\" appear in the extensions list",
 
   // Verify step (kept for backwards compat)
   verifyTitle: "Refresh the Page",

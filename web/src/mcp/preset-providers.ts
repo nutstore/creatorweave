@@ -52,7 +52,7 @@ export const PRESET_PROVIDERS: MCPPresetProvider[] = [
 1. Create a Figma access token or follow the official Figma MCP auth flow
 2. Use the remote MCP endpoint:
    https://mcp.figma.com/mcp
-3. Paste your token into the Auth Token field in CreatorWeave
+3. Paste your token into the Auth Token field in eo2weave
 4. Recommended transport: Streamable HTTP
     `.trim(),
     requiredEnvVars: [
@@ -350,7 +350,7 @@ export const PRESET_PROVIDERS: MCPPresetProvider[] = [
       id: 'mail',
       name: 'Mail MCP',
       description:
-        'CreatorWeave Mail MCP server — draft and send emails through a shared SMTP relay',
+        'EO2Weave Mail MCP server — draft and send emails through a shared SMTP relay',
       url: 'https://mail-mcp.jianguoyun.net.cn/mcp',
       transport: 'streamable_http',
       enabled: false,
@@ -379,7 +379,7 @@ export const PRESET_PROVIDERS: MCPPresetProvider[] = [
    - For QQ Mail: host=smtp.qq.com, port=465 (SSL) or 587 (STARTTLS),
      use the SMTP 授权码 from QQ 邮箱设置 → 账户, NOT your web login password
 
-4. Paste the same Personal Mail Token into CreatorWeave:
+4. Paste the same Personal Mail Token into eo2weave:
    - MCP Settings → Quick add Mail MCP (or manually add a server)
    - Set the URL to your mail-mcp server URL
    - Set the transport to streamable_http

@@ -48,6 +48,7 @@ import { SnapshotList } from '@/components/sync/SnapshotList'
 import { useT } from '@/i18n'
 import { ExportConversationDialog } from '@/components/conversation/ExportConversationDialog'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
+import { NativeHostExecutor } from '@/opfs/native-disk/executor-native-host'
 
 type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 
@@ -338,7 +339,13 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   collapsed,
   onToggleCollapse,
 }: {
-  root: { id: string; name: string; handle: FileSystemDirectoryHandle | null }
+  root: {
+    id: string
+    name: string
+    handle: FileSystemDirectoryHandle | null
+    backend?: 'fsaccess' | 'native-host'
+    scopeId?: string | null
+  }
   selectedFilePath?: string | null
   revealTargetPath?: string | null
   rootsLength: number
@@ -415,6 +422,8 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
       {rootsLength <= 1 || !collapsed || shouldReveal ? (
         <FileTreePanel
           directoryHandle={root.handle}
+          diskRootId={root.backend === 'native-host' ? root.scopeId : null}
+          diskExecutor={root.backend === 'native-host' ? nativeHostTreeExecutor : null}
           rootName={root.name}
           // Virtual OPFS-only root: don't filter cachedPaths by name prefix
           // (files were written without any rootName prefix in pure-OPFS mode).
@@ -431,6 +440,9 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
     </div>
   )
 })
+
+/** Shared read-only executor used by Native Host-backed file trees. */
+const nativeHostTreeExecutor = new NativeHostExecutor()
 
 /**
  * ResourceTabPanel — isolated from conversation state to avoid re-rendering

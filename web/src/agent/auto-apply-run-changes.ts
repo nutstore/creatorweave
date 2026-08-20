@@ -9,9 +9,10 @@ import type { PendingChange, SyncResult } from '@/opfs/types/opfs-types'
 
 export interface AutoApplyWorkspace {
   getNativeDirectoryHandle(): Promise<FileSystemDirectoryHandle | null>
+  hasAnyNativeDirectoryHandle(): Promise<boolean>
   getPendingChanges(): PendingChange[]
   detectSyncConflicts(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle: FileSystemDirectoryHandle | null,
     onlyPaths?: string[],
   ): Promise<SyncResult['conflicts']>
   createApprovedSnapshotForPaths(
@@ -21,7 +22,7 @@ export interface AutoApplyWorkspace {
     runId?: string | null,
   ): Promise<{ snapshotId: string; opCount: number } | null>
   syncToDisk(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle: FileSystemDirectoryHandle | null,
     onlyPaths?: string[],
     forceOverwrite?: boolean,
   ): Promise<SyncResult>
@@ -49,10 +50,13 @@ export async function autoApplyCompletedRunChanges(
     return { status: 'skipped', reason: 'no_paths' }
   }
 
-  const nativeDirectory = await workspace.getNativeDirectoryHandle()
-  if (!nativeDirectory) {
+  // Check if ANY disk root is mounted (FS Access OR native host).
+  // getNativeDirectoryHandle() returns null for native-host roots.
+  const hasDiskRoot = await workspace.hasAnyNativeDirectoryHandle()
+  if (!hasDiskRoot) {
     return { status: 'skipped', reason: 'no_native_directory' }
   }
+  const nativeDirectory = await workspace.getNativeDirectoryHandle()
 
   // Changes can cancel themselves out (for example, create then delete), so
   // only consider paths that are still pending at finalization time. Deletions

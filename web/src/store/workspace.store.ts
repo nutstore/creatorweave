@@ -98,20 +98,34 @@ export const PENDING_RESET_PATCH: Partial<WorkspaceState> = {
 /**
  * Derive `hasDirectoryHandle` from the live in-memory runtime handle table.
  *
- * `PENDING_RESET_PATCH` hard-codes `hasDirectoryHandle: false`. Any store
- * reset that spreads `...PENDING_RESET_PATCH` will clobber the field to false
- * unless it is explicitly re-derived afterwards. This helper centralizes the
- * re-derivation so every reset site (initialize early-return, initialize
- * catch, switchWorkspace reset) stays consistent with the already-mounted
- * native directory.
+ * Checks BOTH:
+ *   1. FS Access runtime handles (getRuntimeHandlesForProject)
+ *   2. Native host roots (folder-access.store roots with backend='native-host')
  *
- * Returns false on error so callers can safely use it as a fallback.
+ * Without the native host check, roots authorized via pick_folder (which
+ * don't have a FileSystemDirectoryHandle) would make this return false,
+ * causing the PendingSyncPanel to incorrectly show "未挂载本地目录".
  */
 async function deriveLiveHasDirectoryHandle(activeProjectId: string | null): Promise<boolean> {
   if (!activeProjectId) return false
   try {
+    // Check 1: FS Access handles
     const { getRuntimeHandlesForProject } = await import('@/native-fs')
-    return getRuntimeHandlesForProject(activeProjectId).size > 0
+    if (getRuntimeHandlesForProject(activeProjectId).size > 0) {
+      return true
+    }
+
+    // Check 2: Native host roots in folder-access store
+    const { useFolderAccessStore } = await import('./folder-access.store')
+    const roots = useFolderAccessStore.getState().roots
+    const hasNativeRoot = roots.some(
+      (r) => r.backend === 'native-host' && r.status === 'ready'
+    )
+    if (hasNativeRoot) {
+      return true
+    }
+
+    return false
   } catch {
     return false
   }
@@ -729,6 +743,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               if (anyHandle) {
                 await get().onNativeDirectoryGranted(anyHandle)
               } else {
+                // No FS Access handle — but may still have native-host roots.
+                // deriveLiveHasDirectoryHandle checks folder-access.store for
+                // backend='native-host' roots. Without this, switching to a
+                // workspace backed by a native-host root would leave
+                // hasDirectoryHandle=false, showing "未挂载本地目录" in the
+                // PendingSyncPanel even though a scope is authorized.
+                const liveHasDir = await deriveLiveHasDirectoryHandle(activeProjectId)
+                if (liveHasDir) {
+                  set({ hasDirectoryHandle: true })
+                  // Register checkpoint tools (they work with native-host roots too)
+                  try { getToolRegistry().registerCheckpointTools() } catch {}
+                }
                 await get().refreshPendingChanges(true)
               }
               // Fire-and-forget: refresh the OPFS store so FileTreePanel's
@@ -1408,13 +1434,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const workspace = await manager.getWorkspace(activeWorkspaceId)
             if (!workspace) return
 
-            // Multi-root aware: get default handle (or first available)
-            const nativeDir = await workspace.getNativeDirectoryHandle()
-            if (!nativeDir) {
+            // Check if ANY disk root is mounted (FS Access handle OR native host scope).
+            // getNativeDirectoryHandle() returns null for native-host roots (no handle),
+            // but syncToDisk internally routes via getAllNativeDirectoryHandles + resolvePath.
+            const hasDiskRoot = await workspace.hasAnyNativeDirectoryHandle()
+            if (!hasDiskRoot) {
               toast.error('没有可用的本地目录')
               set({ isLoading: false })
               return
             }
+            const nativeDir = await workspace.getNativeDirectoryHandle()
 
             const repo = getFSOverlayRepository()
             let syncedCount = 0
@@ -1475,10 +1504,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const workspace = await manager.getWorkspace(activeWorkspaceId)
             if (!workspace) return
 
-            // Only fire on the first mount (size === 1); subsequent mounts of
-            // additional roots don't re-trigger the one-time sync prompt.
+            // Only fire on the first mount; subsequent mounts of additional
+            // roots don't re-trigger the one-time sync prompt.
+            // Count BOTH FS Access handles AND native-host roots.
             const handles = await workspace.getAllNativeDirectoryHandles()
-            if (handles.size !== 1) {
+            const hasDiskRoot = await workspace.hasAnyNativeDirectoryHandle()
+            const totalRoots = handles.size + (hasDiskRoot && handles.size === 0 ? 1 : 0)
+            if (totalRoots !== 1) {
               set({ opfsOnlyFileCount: 0, opfsOnlyFilesPaths: [] })
               return
             }
@@ -1502,12 +1534,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const workspace = await manager.getWorkspace(activeWorkspaceId)
             if (!workspace) return
 
-            const nativeDir = await workspace.getNativeDirectoryHandle()
-            if (!nativeDir) {
+            const hasDiskRoot = await workspace.hasAnyNativeDirectoryHandle()
+            if (!hasDiskRoot) {
               toast.error('没有可用的本地目录')
               set({ isLoading: false })
               return
             }
+            const nativeDir = await workspace.getNativeDirectoryHandle()
 
             const result = await workspace.syncOpfsFilesToNative(nativeDir, opfsOnlyFilesPaths)
             set({ opfsOnlyFileCount: 0, opfsOnlyFilesPaths: [], isLoading: false })

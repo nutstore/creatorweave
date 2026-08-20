@@ -1,0 +1,21 @@
+export const execPolicy = {
+    tab: "실행 정책",
+    description: "AI가 자동 실행할 수 있는 명령, 승인이 필요한 명령, 항상 차단되는 명령을 설정합니다. 변경 사항은 ~/.creatorweave/execpolicy.json에 저장됩니다.",
+    searchPlaceholder: "명령 검색...",
+    newCommandPlaceholder: "명령 이름 (서브 명령어 포함 가능, 예: git add)",
+    add: "추가",
+    remove: "제거",
+    auto: "자동 실행",
+    prompt: "확인 필요",
+    forbidden: "금지",
+    defaultLabel: "목록에 없는 명령의 기본 정책:",
+    defaultHint: "일치하는 규칙이 없을 때 적용",
+    loading: "로딩 중...",
+    saving: "저장 중...",
+    save: "저장",
+    cancel: "취소",
+    retry: "재시도",
+    saveHint: "저장되지 않은 변경 사항이 있습니다",
+    // ExecAuthModal guidance
+    authGuide: "명령의 승인 방식을 변경하려면 설정 → 실행 정책으로 이동",
+} as const

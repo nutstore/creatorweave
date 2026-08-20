@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getRuntimeDirectoryHandleMock = vi.hoisted(() => vi.fn())
 const findWorkspaceByIdMock = vi.hoisted(() => vi.fn())
+const runtimeHandlesMock = vi.hoisted(() => new Map<string, FileSystemDirectoryHandle>())
 
 vi.mock('@/native-fs', () => ({
   getRuntimeDirectoryHandle: getRuntimeDirectoryHandleMock,
-  getRuntimeHandlesForProject: () => new Map(),
+  getRuntimeHandlesForProject: () => runtimeHandlesMock,
+  buildHandleKey: (projectId: string, rootName: string) => `${projectId}:${rootName}`,
 }))
 
 vi.mock('@/sqlite/repositories/project-root.repository', () => ({
@@ -27,6 +29,7 @@ import { WorkspaceRuntime } from '../workspace-runtime'
 describe('WorkspaceRuntime native handle scope', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    runtimeHandlesMock.clear()
   })
 
   it('resolves native handle via workspace-bound projectId (not global activeProject)', async () => {
@@ -42,7 +45,7 @@ describe('WorkspaceRuntime native handle scope', () => {
     const result = await runtime.getNativeDirectoryHandle()
 
     expect(result).toBe(projectHandle)
-    expect(getRuntimeDirectoryHandleMock).toHaveBeenCalledWith('project-1')
+    expect(getRuntimeDirectoryHandleMock).toHaveBeenCalledWith('project-1', 'root-a')
     expect(getRuntimeDirectoryHandleMock).not.toHaveBeenCalledWith('ws-1')
   })
 
@@ -62,5 +65,18 @@ describe('WorkspaceRuntime native handle scope', () => {
     const result = await runtime.getNativeDirectoryHandle()
 
     expect(result).toBeNull()
+  })
+
+  it('resolves a root ID only when the supplied handle is the registered handle instance', async () => {
+    const runtime = new WorkspaceRuntime('ws-1', {} as FileSystemDirectoryHandle, '/tmp')
+    const registeredHandle = { name: 'root-a' } as FileSystemDirectoryHandle
+    const sameNameDifferentHandle = { name: 'root-a' } as FileSystemDirectoryHandle
+    findWorkspaceByIdMock.mockResolvedValue({ id: 'ws-1', projectId: 'project-1' })
+    runtimeHandlesMock.set('root-a', registeredHandle)
+
+    await expect((runtime as any).resolveRootIdForHandle(registeredHandle)).resolves.toBe('project-1:root-a')
+    await expect((runtime as any).resolveRootIdForHandle(sameNameDifferentHandle)).rejects.toThrow(
+      'Handle not found in runtime map'
+    )
   })
 })

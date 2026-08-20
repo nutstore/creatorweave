@@ -46,6 +46,7 @@ import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { canFetchModels } from '@/agent/providers/model-fetcher'
 import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
+import { useI18nStore } from '@/i18n/store'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
 import { LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels, isLLMGatewayConfigured, fetchGatewayRateLimits, type RateLimitsResponse } from '@/agent/providers/llm-gateway-provider'
 import { performDeviceCodeFlow, logoutGateway as logoutGatewayAuth, getValidAccessToken, fetchGatewayModels } from '@/agent/providers/llm-gateway-auth'
@@ -55,7 +56,38 @@ import type { AuthState, RateLimitWindow } from '@/agent/providers/llm-gateway-a
 // Constants
 // =============================================================================
 
-const CATEGORY_ORDER: ProviderCategory[] = ['custom', 'chinese', 'international']
+// Category order is locale-aware: Chinese users see Chinese providers
+// first (the default for this product), non-Chinese users see international
+// providers first. Custom providers stay on top in both orders (they are
+// user-created and thus most relevant).
+function categoryOrderForLocale(locale: string): ProviderCategory[] {
+  return /^zh/i.test(locale)
+    ? ['custom', 'chinese', 'international']
+    : ['custom', 'international', 'chinese']
+}
+
+/**
+ * Map provider types with a Chinese-brand display name to their i18n key.
+ * zh-CN keeps the original Chinese brand; other locales use the company's
+ * pinyin/English brand — NOT the separate international services (e.g.
+ * Zhipu's overseas arm "Z.ai" is a different service from open.bigmodel.cn,
+ * so showing "Z.ai" here would mislead users into registering there).
+ */
+const PROVIDER_NAME_I18N_KEYS: Partial<Record<LLMProviderType, string>> = {
+  glm: 'settings.providerNames.glm',
+  'glm-coding': 'settings.providerNames.glmCoding',
+  'minimax-cn': 'settings.providerNames.minimaxChina',
+  qwen: 'settings.providerNames.qwen',
+  'volcengine-coding': 'settings.providerNames.volcengineCoding',
+}
+
+/** Resolve a provider display name; falls back to the static meta name. */
+function localizedProviderName(t: (key: string) => string, type: LLMProviderType, fallback: string): string {
+  const key = PROVIDER_NAME_I18N_KEYS[type]
+  if (!key) return fallback
+  const translated = t(key)
+  return translated !== key ? translated : fallback
+}
 
 // =============================================================================
 // ProviderCard - 单个服务商卡片
@@ -1161,7 +1193,7 @@ function LLMGatewayCard({
     const clientId = getLLMGatewayClientId()
 
     if (!clientId) {
-      setAuthState({ status: 'error', error: 'Client ID 未配置，请设置 VITE_JIANGUOYUN_AI_CLIENT_ID 环境变量' })
+      setAuthState({ status: 'error', error: t('settings.gateway.clientIdMissing') })
       return
     }
 
@@ -1186,10 +1218,10 @@ function LLMGatewayCard({
     } catch (e) {
       setAuthState({
         status: 'error',
-        error: (e as Error).message || '认证失败',
+        error: (e as Error).message || t('settings.gateway.authFailed'),
       })
     }
-  }, [triggerProviderRefresh])
+  }, [triggerProviderRefresh, t])
 
   const handleLogout = useCallback(async () => {
     const { deleteApiKey } = await import('@/security/api-key-store')
@@ -1276,21 +1308,21 @@ function LLMGatewayCard({
               boxShadow: isLoggedIn ? '0 0 6px var(--brand,#0d9488)' : 'none',
             }}
           />
-          <span className="text-[13px] font-semibold text-secondary">坚果云 AI</span>
+          <span className="text-[13px] font-semibold text-secondary">{t('settings.gateway.name')}</span>
 
         </div>
         <div className="flex items-center gap-2">
           {isLoggedIn ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand,#0d9488)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--brand,#0d9488)]">
-              已登录
+              {t('settings.gateway.loggedIn')}
             </span>
           ) : isAuthRunning ? (
             <span className="inline-flex items-center gap-1 text-[10px] text-tertiary">
               <Loader2 className="h-3 w-3 animate-spin" />
-              登录中...
+              {t('settings.gateway.loggingIn')}
             </span>
           ) : (
-            <span className="text-[10px] text-tertiary/60">未登录</span>
+            <span className="text-[10px] text-tertiary/60">{t('settings.gateway.loggedOut')}</span>
           )}
         </div>
       </button>
@@ -1299,7 +1331,7 @@ function LLMGatewayCard({
       {isExpanded && (
         <div className="border-t border-border/60 px-3.5 py-3 space-y-3">
           <div>
-            <p className="text-[11px] font-medium text-secondary">服务地址</p>
+            <p className="text-[11px] font-medium text-secondary">{t('settings.gateway.serviceUrl')}</p>
             <p className="mt-0.5 font-mono text-[11px] text-tertiary">
               {import.meta.env.VITE_JIANGUOYUN_AI_BASE_URL || 'https://ai.jianguoyun.com'}
             </p>
@@ -1527,7 +1559,7 @@ function LLMGatewayCard({
                   className="flex-1 h-8 text-[11px]"
                   onClick={handleLogout}
                 >
-                  登出
+                  {t('settings.gateway.logout')}
                 </BrandButton>
               </div>
             </>
@@ -1542,7 +1574,7 @@ function LLMGatewayCard({
                   style={{ background: 'var(--brand, #0d9488)' }}
                   onClick={handleLogin}
                 >
-                  登录坚果云 AI
+                  {t('settings.gateway.login')}
                 </button>
               )}
 
@@ -1550,7 +1582,7 @@ function LLMGatewayCard({
               {authState.status === 'requesting' && (
                 <div className="flex items-center justify-center gap-2 py-2 text-[12px] text-secondary">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  正在创建授权会话...
+                  {t('settings.gateway.creatingSession')}
                 </div>
               )}
 
@@ -1562,7 +1594,7 @@ function LLMGatewayCard({
                     className="rounded-lg border border-[var(--brand-border,rgba(13,148,136,0.25))] p-3 text-center"
                     style={{ background: 'var(--brand-bg, rgba(13,148,136,0.06))' }}
                   >
-                    <p className="text-[10px] text-tertiary mb-1.5">请在授权页面输入以下代码</p>
+                    <p className="text-[10px] text-tertiary mb-1.5">{t('settings.gateway.enterCodeHint')}</p>
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-xl font-mono font-bold tracking-[0.15em] text-primary">
                         {authState.userCode}
@@ -1571,7 +1603,7 @@ function LLMGatewayCard({
                         type="button"
                         onClick={handleCopyCode}
                         className="text-tertiary hover:text-primary transition-colors"
-                        title="复制"
+                        title={t('settings.gateway.copy')}
                       >
                         {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                       </button>
@@ -1594,7 +1626,7 @@ function LLMGatewayCard({
                       style={{ background: 'var(--brand, #0d9488)' }}
                     >
                       <ExternalLink className="h-3 w-3" />
-                      打开授权页面
+                      {t('settings.gateway.openAuthPage')}
                     </a>
                   )}
 
@@ -1602,7 +1634,7 @@ function LLMGatewayCard({
                   {authState.status === 'polling' && (
                     <div className="flex items-center justify-center gap-1.5 text-[11px] text-tertiary">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      等待授权确认...
+                      {t('settings.gateway.waitingForAuth')}
                     </div>
                   )}
                 </div>
@@ -1612,7 +1644,7 @@ function LLMGatewayCard({
               {authState.status === 'success' && (
                 <div className="flex items-center justify-center gap-2 py-2 text-[12px] font-medium text-green-500">
                   <CheckCircle2 className="h-5 w-5" />
-                  登录成功！
+                  {t('settings.gateway.loginSuccess')}
                 </div>
               )}
 
@@ -1622,7 +1654,7 @@ function LLMGatewayCard({
                   <div className="flex items-start gap-2 py-1">
                     <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[12px] font-medium text-secondary">登录失败</p>
+                      <p className="text-[12px] font-medium text-secondary">{t('settings.gateway.loginFailed')}</p>
                       <p className="text-[11px] text-secondary">{authState.error}</p>
                     </div>
                   </div>
@@ -1632,13 +1664,13 @@ function LLMGatewayCard({
                     style={{ background: 'var(--brand, #0d9488)' }}
                     onClick={() => { setAuthState({ status: 'idle' }); handleLogin() }}
                   >
-                    重试
+                    {t('settings.gateway.retry')}
                   </button>
                 </div>
               )}
 
               <p className="text-[10px] text-tertiary">
-                通过 Device Code Flow 安全认证，无需手动管理 API Key。
+                {t('settings.gateway.authHint')}
               </p>
             </>
           )}
@@ -1657,6 +1689,9 @@ export function ProviderManager() {
   const { customProviders } = useSettingsStore()
   const [expandedProvider, setExpandedProvider] = useState<LLMProviderType | null>(null)
   const [showNewProvider, setShowNewProvider] = useState(false)
+  // Locale drives the category ordering (zh: Chinese providers first,
+  // others: international first). Subscribed reactively.
+  const locale = useI18nStore((s) => s.locale)
 
   // `customProviders` is intentionally listed as a dep even though
 // getProvidersByCategory() doesn't reference it directly — it reads from
@@ -1707,11 +1742,17 @@ const groupedProviders = useMemo(
         />
       )}
 
-      {/* Provider Cards by Category */}
-      {CATEGORY_ORDER.map((category) => {
+      {/* Provider Cards by Category — order is locale-aware (Chinese
+          providers first for zh users, international first otherwise).
+          Subscribing to locale (not getState) so switching language
+          re-renders the list immediately. */}
+      {categoryOrderForLocale(locale).map((category) => {
         const providers = groupedProviders[category]
           .filter(({ type }) => type !== LLM_GATEWAY_PROVIDER_TYPE)
-        if (providers.length === 0 && category !== 'custom') return null
+        // Hide empty groups entirely — including custom. Previously custom
+        // was exempted, which rendered a lone "Custom" header with no cards
+        // when the user hadn't added any custom provider yet.
+        if (providers.length === 0) return null
         return (
           <div key={category} className="space-y-1">
             <div className="px-1 text-[11px] font-semibold text-tertiary uppercase tracking-wider">
@@ -1721,7 +1762,11 @@ const groupedProviders = useMemo(
               <ProviderCard
                 key={type}
                 providerType={type}
-                displayName={meta.displayName}
+                // Locale-aware display name for the Chinese-brand providers
+                // (zh: 原中文品牌 / others: company pinyin/English brand).
+                // Falls back to the static meta.displayName for providers
+                // without an i18n mapping (OpenAI, Anthropic, ...).
+                displayName={localizedProviderName(t, type, meta.displayName)}
                 website={meta.website}
                 isCustom={isCustomProviderType(type)}
                 customProvider={

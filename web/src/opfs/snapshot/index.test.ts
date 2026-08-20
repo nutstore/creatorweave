@@ -57,16 +57,16 @@ vi.mock('@/opfs/utils/file-reader', () => ({
   readFileFromNativeFSMultiRoot: vi.fn(),
 }))
 
-import { formatGitDiff, gitDiff, gitRestore, gitStatus } from './index'
-import { formatGitLog, formatGitLogOneline, gitLog } from './index'
-import { formatGitShow, gitShow } from './index'
+import { formatSnapshotDiff, snapshotDiff, snapshotRestore, snapshotStatus } from './index'
+import { formatSnapshotLog, formatSnapshotLogOneline, snapshotLog } from './index'
+import { formatSnapshotShow, snapshotShow } from './index'
 import { readFileFromNativeFS } from '@/opfs/utils/file-reader'
 import { readFileFromNativeFSMultiRoot } from '@/opfs/utils/file-reader'
 
 const readFileFromNativeFSMock = vi.mocked(readFileFromNativeFS)
 const readFileFromNativeFSMultiRootMock = vi.mocked(readFileFromNativeFSMultiRoot)
 
-describe('opfs/git gitDiff', () => {
+describe('opfs/git snapshotDiff', () => {
   beforeEach(() => {
     listSnapshotsMock.mockReset()
     listSnapshotOpsMock.mockReset()
@@ -119,8 +119,8 @@ describe('opfs/git gitDiff', () => {
       afterContentBlob: null,
     })
 
-    const result = await gitDiff('ws_1', { mode: 'snapshot', snapshotId: 'snap_new' })
-    const rendered = formatGitDiff(result)
+    const result = await snapshotDiff('ws_1', { mode: 'snapshot', snapshotId: 'snap_new' })
+    const rendered = formatSnapshotDiff(result)
 
     expect(result.files).toHaveLength(1)
     expect(result.summary.insertions).toBeGreaterThanOrEqual(1)
@@ -157,8 +157,8 @@ describe('opfs/git gitDiff', () => {
       afterContentBlob: new Uint8Array([4, 5]),
     })
 
-    const result = await gitDiff('ws_1', { mode: 'snapshot', snapshotId: 'snap_bin' })
-    const rendered = formatGitDiff(result)
+    const result = await snapshotDiff('ws_1', { mode: 'snapshot', snapshotId: 'snap_bin' })
+    const rendered = formatSnapshotDiff(result)
 
     expect(result.files).toHaveLength(1)
     expect(rendered).toContain('[binary files differ]')
@@ -217,7 +217,7 @@ describe('opfs/git gitDiff', () => {
       afterContentBlob: null,
     }))
 
-    const result = await gitDiff('ws_1', { mode: 'cached' })
+    const result = await snapshotDiff('ws_1', { mode: 'cached' })
 
     expect(getUnsyncedSnapshotsMock).toHaveBeenCalledWith('ws_1')
     expect(result.to).toBe('s_new')
@@ -246,8 +246,8 @@ describe('opfs/git gitDiff', () => {
       readBaselineFile: vi.fn(async () => null),
     })
 
-    const result = await gitDiff('ws_1', { mode: 'working', directoryHandle: {} as FileSystemDirectoryHandle })
-    const rendered = formatGitDiff(result)
+    const result = await snapshotDiff('ws_1', { mode: 'working', directoryHandle: {} as FileSystemDirectoryHandle })
+    const rendered = formatSnapshotDiff(result)
 
     expect(rendered).toContain('-old line')
     expect(rendered).toContain('+new line')
@@ -274,8 +274,8 @@ describe('opfs/git gitDiff', () => {
       readBaselineFile: vi.fn(async () => 'before\n'),
     })
 
-    const result = await gitDiff('ws_1', { mode: 'working' })
-    const rendered = formatGitDiff(result)
+    const result = await snapshotDiff('ws_1', { mode: 'working' })
+    const rendered = formatSnapshotDiff(result)
 
     expect(rendered).toContain('-before')
     expect(rendered).toContain('+after')
@@ -310,8 +310,8 @@ describe('opfs/git gitDiff', () => {
       afterContentBlob: null,
     })
 
-    const result = await gitDiff('ws_1', { mode: 'snapshot', snapshotId: 'snap_u0', contextLines: 0 })
-    const rendered = formatGitDiff(result)
+    const result = await snapshotDiff('ws_1', { mode: 'snapshot', snapshotId: 'snap_u0', contextLines: 0 })
+    const rendered = formatSnapshotDiff(result)
 
     expect(rendered).toContain('-old line')
     expect(rendered).toContain('+new line')
@@ -357,10 +357,10 @@ describe('opfs/git gitDiff', () => {
       },
     }
 
-    const nameOnly = formatGitDiff(diffResult, { nameOnly: true })
-    const nameStatus = formatGitDiff(diffResult, { nameStatus: true })
-    const stat = formatGitDiff(diffResult, { stat: true })
-    const numstat = formatGitDiff(diffResult, { numstat: true })
+    const nameOnly = formatSnapshotDiff(diffResult, { nameOnly: true })
+    const nameStatus = formatSnapshotDiff(diffResult, { nameStatus: true })
+    const stat = formatSnapshotDiff(diffResult, { stat: true })
+    const numstat = formatSnapshotDiff(diffResult, { numstat: true })
 
     expect(nameOnly).toBe('src/a.ts\nsrc/new.ts')
     expect(nameStatus).toContain('M\tsrc/a.ts')
@@ -372,7 +372,7 @@ describe('opfs/git gitDiff', () => {
   })
 })
 
-describe('opfs/git gitLog', () => {
+describe('opfs/git snapshotLog', () => {
   beforeEach(() => {
     listSnapshotsMock.mockReset()
     listSnapshotOpsMock.mockReset()
@@ -415,7 +415,7 @@ describe('opfs/git gitLog', () => {
       },
     ])
 
-    const result = await gitLog('ws_1', { status: 'approved', limit: 10 })
+    const result = await snapshotLog('ws_1', { status: 'approved', limit: 10 })
 
     expect(result.commits.map((c) => c.id)).toEqual(['s2'])
   })
@@ -434,11 +434,11 @@ describe('opfs/git gitLog', () => {
       },
     ])
 
-    const result = await gitLog('ws_1', { limit: 10 })
+    const result = await snapshotLog('ws_1', { limit: 10 })
 
-    expect(formatGitLog(result)).toContain('Saved 3 files')
-    expect(formatGitLogOneline(result)).toContain('Saved 3 files')
-    expect(formatGitLogOneline(result)).not.toContain('(no message)')
+    expect(formatSnapshotLog(result)).toContain('Saved 3 files')
+    expect(formatSnapshotLogOneline(result)).toContain('Saved 3 files')
+    expect(formatSnapshotLogOneline(result)).not.toContain('(no message)')
   })
 
   it('filters snapshots by path prefix and computes hasMore after filtering', async () => {
@@ -485,14 +485,14 @@ describe('opfs/git gitLog', () => {
       return [{ path: 'src/b.ts' }]
     })
 
-    const result = await gitLog('ws_1', { path: 'src/', limit: 1 })
+    const result = await snapshotLog('ws_1', { path: 'src/', limit: 1 })
 
     expect(result.commits.map((c) => c.id)).toEqual(['s3'])
     expect(result.hasMore).toBe(true)
   })
 })
 
-describe('opfs/git gitShow', () => {
+describe('opfs/git snapshotShow', () => {
   beforeEach(() => {
     listSnapshotsMock.mockReset()
     listSnapshotOpsMock.mockReset()
@@ -552,11 +552,11 @@ describe('opfs/git gitShow', () => {
       afterContentBlob: null,
     })
 
-    const result = await gitShow('ws_1', 'snap_1', { includeDiff: true })
+    const result = await snapshotShow('ws_1', 'snap_1', { includeDiff: true })
 
     expect(result).not.toBeNull()
     expect(result?.diff).toBeDefined()
-    const rendered = formatGitShow(result!)
+    const rendered = formatSnapshotShow(result!)
     expect(rendered).toContain('Diff:')
     expect(rendered).toContain('-old line')
     expect(rendered).toContain('+new line')
@@ -576,14 +576,14 @@ describe('opfs/git gitShow', () => {
     })
     listSnapshotFilesMock.mockResolvedValue([])
 
-    const result = await gitShow('ws_1', 'snap_old_exact', { includeDiff: false })
+    const result = await snapshotShow('ws_1', 'snap_old_exact', { includeDiff: false })
 
     expect(result).not.toBeNull()
     expect(result?.id).toBe('snap_old_exact')
   })
 })
 
-describe('opfs/git gitStatus', () => {
+describe('opfs/git snapshotStatus', () => {
   beforeEach(() => {
     queryAllMock.mockReset()
     queryFirstMock.mockReset()
@@ -597,7 +597,7 @@ describe('opfs/git gitStatus', () => {
     ])
     queryFirstMock.mockResolvedValue({ name: 'main' })
 
-    const result = await gitStatus('ws_1')
+    const result = await snapshotStatus('ws_1')
 
     expect(result.pending).toHaveLength(1)
     expect(result.pending[0].path).toBe('src/a.ts')
@@ -613,14 +613,14 @@ describe('opfs/git gitStatus', () => {
     queryAllMock.mockResolvedValue([])
     queryFirstMock.mockResolvedValue({ name: 'main' })
 
-    const result = await gitStatus('ws_1')
+    const result = await snapshotStatus('ws_1')
 
     expect(result.counts.total).toBe(0)
     expect(result.branch).toBe('main')
   })
 })
 
-describe('opfs/git gitRestore', () => {
+describe('opfs/git snapshotRestore', () => {
   beforeEach(() => {
     listSnapshotOpsMock.mockReset()
     getSnapshotFileContentMock.mockReset()
@@ -650,7 +650,7 @@ describe('opfs/git gitRestore', () => {
     ])
     getOrCreateDraftChangesetMock.mockResolvedValue('draft_1')
 
-    const result = await gitRestore('ws_1', {
+    const result = await snapshotRestore('ws_1', {
       paths: ['src/a.ts'],
       staged: true,
     })
@@ -698,7 +698,7 @@ describe('opfs/git gitRestore', () => {
       afterContentBlob: null,
     })
 
-    const result = await gitRestore('ws_1', {
+    const result = await snapshotRestore('ws_1', {
       paths: ['src/a.ts', 'src/b.ts'],
       snapshotId: 'snap_1',
     })
@@ -715,7 +715,7 @@ describe('opfs/git gitRestore', () => {
     ])
     getOrCreateDraftChangesetMock.mockResolvedValue('draft_1')
 
-    const result = await gitRestore('ws_1', {
+    const result = await snapshotRestore('ws_1', {
       paths: [],
       staged: true,
     })
@@ -763,7 +763,7 @@ describe('opfs/git gitRestore', () => {
       afterContentBlob: null,
     })
 
-    const result = await gitRestore('ws_1', {
+    const result = await snapshotRestore('ws_1', {
       paths: [],
       snapshotId: 'snap_1',
     })
@@ -794,7 +794,7 @@ describe('opfs/git gitRestore', () => {
       },
     ])
 
-    const result = await gitRestore('ws_1', {
+    const result = await snapshotRestore('ws_1', {
       paths: [],
     })
 

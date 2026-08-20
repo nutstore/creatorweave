@@ -18,11 +18,13 @@ import {
   X,
   RefreshCw,
   Loader2,
+  Cable,
 } from 'lucide-react'
 import { useFolderAccessStore } from '@/store/folder-access.store'
 import { getRuntimeCapability } from '@/storage/runtime-capability'
 import { bindRuntimeDirectoryHandle } from '@/native-fs'
 import { useT } from '@/i18n'
+import { useNativeHostPing } from '@/hooks/useNativeHostPing'
 import { cn } from '@/lib/utils'
 import type { RootInfo } from '@/types/folder-access'
 
@@ -52,15 +54,20 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
   )
 
   // Multi-root state
-  const { roots, activeProjectId, addRoot, removeRoot, loadRoots, toggleReadOnly } =
+  const { roots, activeProjectId, addRoot, addNativeHostRoot, removeRoot, loadRoots, toggleReadOnly } =
     useFolderAccessStore()
 
   // UI state
   const [activeChip, setActiveChip] = useState<string | null>(null) // root.id of open dropdown
   const [isAdding, setIsAdding] = useState(false)
+  const [isAddingNativeHost, setIsAddingNativeHost] = useState(false)
 
   const runtimeCapability = getRuntimeCapability()
   const canPickDirectory = runtimeCapability.canPickDirectory
+  // Full-chain ping (page → extension → Rust host) instead of a shallow
+  // bridge-existence probe: hides the "Local connection" button when the
+  // Rust app is not installed. Re-probes on window focus.
+  const nativeHostAvailable = useNativeHostPing() === 'available'
 
   // Click outside to close dropdown
   useEffect(() => {
@@ -88,6 +95,16 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
       setIsAdding(false)
     }
   }, [addRoot, canPickDirectory, isAdding])
+
+  const handleAddNativeHostRoot = useCallback(async () => {
+    if (!nativeHostAvailable || isAddingNativeHost) return
+    setIsAddingNativeHost(true)
+    try {
+      await addNativeHostRoot()
+    } finally {
+      setIsAddingNativeHost(false)
+    }
+  }, [addNativeHostRoot, isAddingNativeHost, nativeHostAvailable])
 
   const handleRemoveRoot = useCallback(
     async (root: RootInfo) => {
@@ -138,7 +155,25 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
     [toggleReadOnly]
   )
 
-  // No roots: show simple "Open Folder" button
+  const nativeHostButton = nativeHostAvailable && (
+    <button
+      type="button"
+      onClick={handleAddNativeHostRoot}
+      disabled={isAddingNativeHost}
+      className={cn(
+        'flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1',
+        'text-xs font-normal text-secondary transition-colors hover:bg-primary-50 focus:outline-none',
+        'dark:border-border dark:bg-card dark:hover:bg-muted',
+        isAddingNativeHost && 'cursor-wait opacity-70'
+      )}
+      title={t('folderSelector.localConnectionDescription')}
+    >
+      {isAddingNativeHost ? <Loader2 className="h-[14px] w-[14px] animate-spin text-primary-600" /> : <Cable className="h-[14px] w-[14px]" />}
+      <span>{t('folderSelector.localConnection')}</span>
+    </button>
+  )
+
+  // No roots: show the two explicit authorization paths.
   if (roots.length === 0) {
     return (
       <div className="relative flex items-center gap-2" ref={containerRef}>
@@ -157,7 +192,7 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           title={
             !canPickDirectory
               ? t('folderSelector.sandboxMode')
-              : t('folderSelector.openFolder')
+              : t('folderSelector.browserAccessDescription')
           }
         >
           {isAdding ? (
@@ -166,9 +201,10 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
             <FolderOpen className="h-[14px] w-[14px]" />
           )}
           <span className="text-xs font-normal text-secondary">
-            {isAdding ? t('folderSelector.loading') : t('folderSelector.openFolder')}
+            {isAdding ? t('folderSelector.loading') : t('folderSelector.browserAccess')}
           </span>
         </button>
+        {nativeHostButton}
       </div>
     )
   }
@@ -211,6 +247,7 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           )}
         </button>
       )}
+      {nativeHostButton}
     </div>
   )
 }
@@ -264,6 +301,19 @@ function RootChip({
         />
         <span className="max-w-[100px] truncate">{root.name}</span>
         {root.readOnly && <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />}
+        {/* Native-host backend badge - shown only when the root is backed by
+            the native host (not the File System Access API). The cable icon
+            makes native-host roots visually distinct from browser-API roots,
+            which matters during testing and operation. */}
+        {(root.backend ?? 'fsaccess') === 'native-host' && (
+          <span
+            className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary-600 dark:text-primary-400"
+            title={t('projectRoots.nativeHostBadge')}
+            aria-label={t('projectRoots.nativeHostBadge')}
+          >
+            <Cable className="h-2.5 w-2.5" />
+          </span>
+        )}
       </button>
 
       {/* Dropdown menu */}

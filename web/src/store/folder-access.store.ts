@@ -27,6 +27,15 @@ import {
 } from '@/native-fs'
 import type { ProjectRoot } from '@/sqlite/repositories/project-root.repository'
 import { getProjectRootRepository } from '@/sqlite'
+import { isNativeHostAvailable } from '@/opfs/native-disk/executor'
+import { NativeHostExecutor } from '@/opfs/native-disk/executor-native-host'
+import { t as translateStatic } from '@creatorweave/i18n'
+import { useI18nStore } from '@/i18n/store'
+
+function i18nText(key: string, fallback: string, params?: Record<string, string | number>): string {
+  const translated = translateStatic(useI18nStore.getState().locale, key, params)
+  return translated === key ? fallback : translated
+}
 
 /**
  * Create an empty record
@@ -637,7 +646,15 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       if (allHandles.size === 0) {
         // Fallback: no root handles in memory, try current handle
         const handle = get().getCurrentHandle()
-        if (!handle) return []
+        if (!handle) {
+          // Last resort: native-host roots (no FS Access handle)
+          const nativeHostPaths = await get().refreshFilePathsNativeHost(projectId)
+          set((state) => {
+            state.allFilePaths[projectId] = nativeHostPaths
+            evictLRU(state, projectId)
+          })
+          return nativeHostPaths
+        }
         const { traverseDirectory } = await import('../services/traversal.service')
         const paths: string[] = []
         for await (const entry of traverseDirectory(handle)) {
@@ -663,11 +680,65 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           if (paths.length >= 5000) break
         }
       }
+
+      // Also scan native-host roots that have no FS Access handle
+      const nativeHostPaths = await get().refreshFilePathsNativeHost(projectId)
+      if (nativeHostPaths.length > 0) {
+        paths.push(...nativeHostPaths)
+      }
+
       set((state) => {
         state.allFilePaths[projectId] = paths
         evictLRU(state, projectId)
       })
       return paths
+    },
+
+    /**
+     * Scan native-host roots for file paths (no FileSystemDirectoryHandle).
+     * Uses the WorkspaceRuntime's diskExec.listDir to traverse.
+     */
+    refreshFilePathsNativeHost: async (projectId: string) => {
+      try {
+        const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+        const repo = getProjectRootRepository()
+        const roots = await repo.findByProject(projectId)
+        const nativeHostRoots = roots.filter((r: any) => r.backend === 'native-host')
+        if (nativeHostRoots.length === 0) return []
+
+        // Use WorkspaceManager to access diskExec
+        const { getWorkspaceManager } = await import('@/opfs')
+        const manager = await getWorkspaceManager()
+
+        const paths: string[] = []
+        for (const root of nativeHostRoots) {
+          paths.push(root.name)
+          // Find a workspace for this project to access the runtime
+          const workspaces = manager.getAllWorkspaces()
+          const projectWs = workspaces.find((ws: any) => ws.projectId === projectId)
+          if (!projectWs) continue
+          const workspace = await manager.getWorkspace(projectWs.workspaceId)
+          if (!workspace) continue
+          try {
+            // Pass root name as path prefix so resolvePath can match it
+            const entries = await workspace.scanDiskTree(root.name, 10, projectId, { maxEntries: 5000 })
+            if (entries) {
+              for (const entry of entries) {
+                if (entry.type === 'file') {
+                  paths.push(`${root.name}/${entry.path}`)
+                  if (paths.length >= 5000) break
+                }
+              }
+            }
+          } catch {
+            // skip workspace scan failures
+          }
+        }
+        console.log('[folder-access] refreshFilePathsNativeHost found', paths.length, 'paths for', nativeHostRoots.length, 'native-host roots')
+        return paths
+      } catch {
+        return []
+      }
     },
 
     clearFilePaths: () => {
@@ -736,6 +807,24 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
       const roots: RootInfo[] = await Promise.all(
         dbRoots.map(async (dbRoot) => {
+          if (dbRoot.backend === 'native-host') {
+            const ready = dbRoot.scopeId && isNativeHostAvailable()
+              ? await new NativeHostExecutor().hydrateRoot(projectId, dbRoot.scopeId)
+              : false
+            return {
+              id: dbRoot.id,
+              name: dbRoot.name,
+              isDefault: dbRoot.isDefault,
+              readOnly: dbRoot.readOnly,
+              backend: 'native-host',
+              scopeId: dbRoot.scopeId,
+              handle: null,
+              persistedHandle: null,
+              status: ready ? 'ready' : 'idle',
+              error: ready ? undefined : 'Native Host is unavailable or this folder authorization no longer exists',
+            }
+          }
+
           const runtimeHandle = runtimeHandles.get(dbRoot.name)
           let handle = runtimeHandle ?? null
 
@@ -773,6 +862,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             name: dbRoot.name,
             isDefault: dbRoot.isDefault,
             readOnly: dbRoot.readOnly,
+            backend: 'fsaccess',
+            scopeId: null,
             handle,
             persistedHandle,
             status,
@@ -883,12 +974,81 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       return true
     },
 
+    addNativeHostRoot: async () => {
+      const projectId = get().activeProjectId
+      if (!projectId || !isNativeHostAvailable()) {
+        toast.error(i18nText('projectRoots.nativeHostUnavailable', 'Local connection is unavailable'))
+        return false
+      }
+
+      try {
+        const root = await new NativeHostExecutor().authorizeRoot(projectId)
+        if (!root) return false
+        if (get().roots.some((item) => item.name === root.displayName)) {
+          toast.error(i18nText('projectRoots.rootAlreadyExists', `A folder named "${root.displayName}" already exists`, { name: root.displayName }))
+          return false
+        }
+        await getProjectRootRepository().createRoot({
+          projectId,
+          name: root.displayName,
+          backend: 'native-host',
+          scopeId: root.id,
+        })
+        await get().loadRoots()
+        try {
+          const { getWorkspaceManager } = await import('@/opfs')
+          ;(await getWorkspaceManager()).invalidateRootMapCache(projectId)
+        } catch { /* manager not ready */ }
+        get().clearFilePaths()
+        get().notifyFileTreeRefresh()
+        toast.success(i18nText('projectRoots.nativeRootAdded', `Added "${root.displayName}" through local connection`, { name: root.displayName }))
+        return true
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'unknown error'
+        toast.error(i18nText('projectRoots.nativeRootAddFailed', `Failed to add local connection: ${errorMessage}`, { error: errorMessage }))
+        return false
+      }
+    },
+
     removeRoot: async (rootId: string) => {
       const projectId = get().activeProjectId
       if (!projectId) return
 
       const root = get().roots.find((r) => r.id === rootId)
       if (!root) return
+
+      if (root.backend === 'native-host') {
+        // Best-effort revoke on the native host. NEVER abort the local removal:
+        // the SQLite row is the source of truth for the workspace view, and a
+        // scope that the host no longer knows (host reinstalled, scopes file
+        // lost, or extension/background bridge dead) would otherwise be
+        // unremovable forever — exactly the "unknown scope_id" deadlock.
+        if (!root.scopeId) {
+          console.warn(
+            '[FolderAccessStore] removeRoot: native-host root has no scopeId, removing locally only:',
+            root.name
+          )
+          toast.info(i18nText(
+            'projectRoots.nativeRootRemovedLocalOnly',
+            'Removed this folder from the project (no local-connection authorization to revoke)'
+          ))
+        } else {
+          try {
+            await new NativeHostExecutor().revokeRoot(projectId, root.scopeId)
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'unknown error'
+            console.warn(
+              '[FolderAccessStore] removeRoot: revokeRoot failed, continuing with local removal:',
+              errorMessage
+            )
+            toast.warning(i18nText(
+              'projectRoots.nativeRootRevokeFailedRemovedLocally',
+              'Removed this folder from the project, but revoking its local-connection authorization failed: {error}',
+              { error: errorMessage }
+            ))
+          }
+        }
+      }
 
       // Unbind handle
       unbindRuntimeDirectoryHandle(projectId, root.name)

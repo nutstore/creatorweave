@@ -193,6 +193,22 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     console.warn('[AgentLoop] Failed to inject external tools summary:', error)
   }
 
+  // ⑧.5b: Side-panel current-page WebMCP tools — tool names + descriptions +
+  // exact call_tool names, so the LLM can act on the page the user is browsing
+  // WITHOUT a search_tools round (search stays available for MCP / other hosts).
+  // Schemas are NOT inlined (token economy) — get_page_tools fetches them on
+  // demand. Placed in the DYNAMIC section because the page's toolset changes
+  // as the user navigates between sites/apps.
+  try {
+    const { buildSidePanelWebMCPBlock } = await import('../external-tool-bridge')
+    const webmcpBlock = buildSidePanelWebMCPBlock()
+    if (webmcpBlock) {
+      enhancedPrompt += '\n\n' + webmcpBlock
+    }
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to inject side-panel WebMCP block:', error)
+  }
+
   // ⑧.6: Today's log — injected in DYNAMIC section.
   //
   // The diary grows throughout the day (agent writes new entries during a

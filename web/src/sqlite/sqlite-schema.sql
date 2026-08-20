@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 15;
+PRAGMA user_version = 17;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS project_roots (
     name TEXT NOT NULL,                      -- handle.name or "_opfs" for browser-only
     is_default INTEGER NOT NULL DEFAULT 0,   -- exactly one default per project
     read_only INTEGER NOT NULL DEFAULT 0,    -- 1 = agent can only read
+    backend TEXT NOT NULL DEFAULT 'fsaccess', -- 'fsaccess' | 'native-host'
+    scope_id TEXT,                           -- Native Host scope_id; NULL for FS Access
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
     UNIQUE(project_id, name)

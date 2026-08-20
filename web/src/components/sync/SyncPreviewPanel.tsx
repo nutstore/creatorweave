@@ -190,10 +190,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           return
         }
         const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-        if (!nativeDir) {
-          if (!cancelled) setConflictPaths(new Set())
-          return
-        }
         const paths = pendingChanges.changes.map((c) => c.path)
         const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
         if (!cancelled) {
@@ -232,12 +228,10 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         throw new Error('No active workspace')
       }
 
-      // Get Native FS directory handle
+      // Browser roots provide a handle; Native Host roots are resolved by the
+      // workspace's persisted scope ID and intentionally have none.
       const { conversation } = activeConversation
       const nativeDir = await conversation.getNativeDirectoryHandle()
-      if (!nativeDir) {
-        throw new Error(t('settings.syncPanel.syncPreview.noActiveWorkspace'))
-      }
 
       // Pause Vite HMR during sync to prevent mid-sync page reloads
       // Unwatch the specific paths that will be written to avoid triggering HMR
@@ -363,7 +357,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           const activeConversation = await getActiveConversation()
           if (!activeConversation) return []
           const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-          if (!nativeDir) return []
           const filePaths = filesToSync.map((c) => c.path)
           return await activeConversation.conversation.detectSyncConflicts(nativeDir, filePaths)
         } catch {

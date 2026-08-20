@@ -80,7 +80,7 @@ export const pageSnapshotDefinition: ToolDefinition = {
 
 export const pageSnapshotExecutor: ToolExecutor = async (args) => {
   if (!isPageActionAvailable()) {
-    return toolErrorJson('page_snapshot', 'PAGE_ACTION_UNAVAILABLE', 'Page tools require the Browser Extension and side-panel mode. Open CreatorWeave as a side panel docked to the page you want to inspect.')
+    return toolErrorJson('page_snapshot', 'PAGE_ACTION_UNAVAILABLE', 'Page tools require the Browser Extension and side-panel mode. Open eo2weave as a side panel docked to the page you want to inspect.')
   }
   const result = await runPageAction({ type: 'snapshot', maxNodes: typeof args.maxNodes === 'number' ? args.maxNodes : undefined })
   if (!result.ok) {

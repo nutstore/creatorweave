@@ -99,7 +99,7 @@ describe('storage diagnostics', () => {
   it('renders markdown with all sections', async () => {
     const { runDiagnostics } = await import('../diagnostics')
     const report = await runDiagnostics()
-    expect(report.markdown).toContain('# CreatorWeave 诊断报告')
+    expect(report.markdown).toContain('# 怡氧知知诊断报告')
     expect(report.markdown).toContain('## SQLite')
     expect(report.markdown).toContain('## Browser Runtime')
     expect(report.markdown).toContain('## Storage Quota')

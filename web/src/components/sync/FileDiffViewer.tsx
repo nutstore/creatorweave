@@ -17,7 +17,6 @@ import {
   isImageFile,
   readFileFromOPFS,
   readBinaryFileFromOPFS,
-  readBinaryFileFromNativeFSMultiRoot,
   getFileContentType,
 } from '@/opfs'
 import { Columns2, UnfoldVertical, X, Eye, FileText, Download, Copy, Check, ClipboardCopy } from 'lucide-react'
@@ -86,33 +85,18 @@ async function downloadFile(filePath: string): Promise<void> {
 }
 
 /**
- * Read native file content using conversation's resolvePath to get correct root handle.
+ * Read native file content through WorkspaceRuntime's routed disk executor.
+ * This supports both browser-granted roots and Native Host scope roots.
  */
 async function readNativeFileViaConversation(
   conversation: import('@/opfs').WorkspaceRuntime,
   filePath: string
 ): Promise<string | null> {
   try {
-    const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-    const { getRuntimeDirectoryHandle } = await import('@/native-fs')
-    const activeProject = await getProjectRepository().findActiveProject()
-    if (!activeProject?.id) return null
-
-    const resolved = await conversation.resolvePath(filePath)
-    const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
-    if (!rootHandle) return null
-
-    // Navigate using the relative path (root prefix stripped)
-    const parts = resolved.relativePath.split('/').filter(Boolean)
-    if (parts.length === 0) return null
-
-    let current: FileSystemDirectoryHandle = rootHandle
-    for (let i = 0; i < parts.length - 1; i++) {
-      current = await current.getDirectoryHandle(parts[i])
-    }
-    const fileHandle = await current.getFileHandle(parts[parts.length - 1])
-    const file = await fileHandle.getFile()
-    return await file.text()
+    const result = await conversation.readFile(filePath, undefined, { policy: 'prefer_native' })
+    return result.source === 'native' && typeof result.content === 'string'
+      ? result.content
+      : null
   } catch {
     return null
   }
@@ -310,10 +294,17 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
           try {
             if (fileChange.type !== 'add') {
-              const nativeDir = await conversation.getNativeDirectoryHandle()
-              const nativeBase64 = await readBinaryFileFromNativeFSMultiRoot(nativeDir, filePath)
-              if (nativeBase64) {
-                nativeImageUrl = `data:${mimeType};base64,${nativeBase64}`
+              const native = await conversation.readFile(filePath, undefined, { policy: 'prefer_native' })
+              if (native.source === 'native') {
+                const nativeContent = native.content
+                const bytes = typeof nativeContent === 'string'
+                  ? new TextEncoder().encode(nativeContent)
+                  : nativeContent instanceof Blob
+                    ? new Uint8Array(await nativeContent.arrayBuffer())
+                    : new Uint8Array(nativeContent)
+                let binary = ''
+                for (const byte of bytes) binary += String.fromCharCode(byte)
+                nativeImageUrl = `data:${mimeType};base64,${btoa(binary)}`
               }
             }
           } catch (err) {

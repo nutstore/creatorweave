@@ -22,11 +22,8 @@ import {
 import { RefreshCw, ChevronRight, X, Check, AlertTriangle, FileInput } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
-import {
-  useSyncDialogStore,
-  type SyncExecutor,
-  type NotifyFn,
-} from '@/store/sync-dialog.store'
+import { useSyncDialogStore, type SyncExecutor, type NotifyFn } from '@/store/sync-dialog.store'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import type { SyncResult } from '@/opfs/types/opfs-types'
@@ -55,12 +52,18 @@ export function PendingSyncPanel() {
   // Use custom equality selector to prevent re-renders when pendingChanges
   // has the same logical content but a different object reference
   // (e.g. when refreshPendingChanges creates a new object during streaming)
+  // Use the folder-access store roots directly — the authoritative source
+  // of "is a local directory mounted right now". `hasDirectoryHandle` from
+  // conversation-context can be stale (set true by a previous FS Access grant
+  // or a native-host add that never notified the workspace store), while
+  // `roots.length` flips synchronously with addRoot/addNativeHostRoot/removeRoot.
+  const roots = useFolderAccessStore((state) => state.roots)
+  const hasLocalRoot = roots.length > 0
   const pendingChanges = useConversationContextStore(
     (state) => state.pendingChanges,
     arePendingChangesEqual,
   )
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
-  const hasDirectoryHandle = useConversationContextStore((state) => state.hasDirectoryHandle)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSyncing, setIsSyncing] = useState(false)
@@ -134,10 +137,6 @@ export function PendingSyncPanel() {
       }
 
       const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-      if (!nativeDir) {
-        setConflictPaths(new Set())
-        return
-      }
 
       const paths = pendingChanges.changes.map((c) => c.path)
       const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
@@ -294,45 +293,42 @@ export function PendingSyncPanel() {
         nativeDir
       )
 
-      // Only sync to disk when local directory exists
-      if (nativeDir) {
-        const allPaths = filesToSync.map((c) => c.path)
-        const forceOverwriteList = allPaths.filter((path) => overwritePaths.has(path))
-        const regularList = allPaths.filter((path) => !overwritePaths.has(path))
+      const allPaths = filesToSync.map((c) => c.path)
+      const forceOverwriteList = allPaths.filter((path) => overwritePaths.has(path))
+      const regularList = allPaths.filter((path) => !overwritePaths.has(path))
 
-        let result: SyncResult = {
-          success: 0,
-          failed: 0,
-          skipped: 0,
-          conflicts: [],
-        }
-        if (regularList.length > 0) {
-          result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, regularList))
-        }
-        if (forceOverwriteList.length > 0) {
-          result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
-        }
+      let result: SyncResult = {
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        conflicts: [],
+      }
+      if (regularList.length > 0) {
+        result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, regularList))
+      }
+      if (forceOverwriteList.length > 0) {
+        result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
+      }
 
-        if (result.failed > 0) {
-          console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
-          const conflictHint =
-            result.conflicts.length > 0
-              ? t('settings.pendingSyncPanel.conflictCount', { count: result.conflicts.length })
-              : ''
-          setSyncError(t('settings.pendingSyncPanel.syncFailedCount', { failed: result.failed, conflicts: conflictHint }))
-          setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
-          setTimeout(() => setSyncError(null), 6000)
-          return false
-        }
+      if (result.failed > 0 || result.success !== allPaths.length) {
+        console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
+        const conflictHint =
+          result.conflicts.length > 0
+            ? t('settings.pendingSyncPanel.conflictCount', { count: result.conflicts.length })
+            : ''
+        setSyncError(t('settings.pendingSyncPanel.syncFailedCount', { failed: result.failed || allPaths.length - result.success, conflicts: conflictHint }))
+        setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
+        setTimeout(() => setSyncError(null), 6000)
+        return false
+      }
 
-        // Keep partial or conflicted batches available to the recovery flow.
-        if (
-          snapshotResult?.snapshotId &&
-          result.conflicts.length === 0 &&
-          result.success === allPaths.length
-        ) {
-          await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
-        }
+      // Keep partial or conflicted batches available to the recovery flow.
+      if (
+        snapshotResult?.snapshotId &&
+        result.conflicts.length === 0 &&
+        result.success === allPaths.length
+      ) {
+        await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
       }
 
       // Refresh list after sync (supports partial sync)
@@ -396,7 +392,6 @@ export function PendingSyncPanel() {
           const activeConversation = await getActiveConversation()
           if (!activeConversation) return []
           const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-          if (!nativeDir) return []
           const paths = filesToSync.map((c) => c.path)
           return await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
         } catch {
@@ -434,15 +429,15 @@ export function PendingSyncPanel() {
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="text-4xl mb-3 opacity-20 transition-opacity duration-500 hover:opacity-30">
-              {hasDirectoryHandle ? '✓' : '📂'}
+              {hasLocalRoot ? '✓' : '📂'}
             </div>
             <p className="text-sm font-medium text-secondary">
-              {hasDirectoryHandle
+              {hasLocalRoot
                 ? t('settings.pendingSyncPanel.noPendingChanges')
                 : t('settings.pendingSyncPanel.pureOpfsMode')}
             </p>
             <p className="text-xs text-tertiary mt-1">
-              {hasDirectoryHandle
+              {hasLocalRoot
                 ? t('settings.pendingSyncPanel.newChangesAppearHere')
                 : t('settings.pendingSyncPanel.pureOpfsModeHint')}
             </p>

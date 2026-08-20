@@ -4,7 +4,7 @@ export const app = {
     preparing: "準備中...",
     loadProgress: "読み込み進捗",
     firstLoadHint: "初回読み込みには数秒かかる場合があります",
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     initComplete: "初期化完了",
     initFailed: "初期化に失敗しました",
     sessionStorageOnly:
@@ -71,7 +71,11 @@ export const app = {
     exportDatabaseSuccess: "データベースのバックアップをダウンロードしました：{filename}",
     exportDatabaseFailed: "エクスポートに失敗しました：{error}",
     backupSuccess: "完全バックアップをダウンロードしました：{filename}",
+    backupSuccessWithKey:
+      "完全バックアップをダウンロードしました（API キー含む、別デバイスに復元可能）：{filename}。安全に保管し、他人と共有しないでください。",
     backupFailed: "バックアップに失敗しました：{error}",
+    restoreSuccess: "バックアップを復元しました（{fileCount} ファイル）。再読み込み中…",
+    restoreFailed: "復元に失敗しました：{error}。現在のデータが不完全な可能性があります。インポートを再試行してください。",
     resetDatabase: "データベースをリセット",
     reloadPage: "ページを再読み込み",
     updateAvailable: "新しいバージョンが利用可能です。最新機能のために更新してください",

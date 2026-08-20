@@ -3,6 +3,12 @@ import { buildWebMCPGroupKey } from './group-key'
 import { buildToolsetSignature } from './toolset-signature'
 import { buildSafeFullName } from './tool-name'
 import { runWebMCPPageProbe } from './page-api'
+import {
+  entriesToDiscoveredTools,
+  getRegistryEntries,
+  getRegistrySilentTabs,
+  registerTab,
+} from './registry'
 
 type RouteEntry = {
   tabId: number
@@ -26,6 +32,8 @@ type DiscoveredTabInfo = {
 const recentRouteByToolAndGroup = new Map<string, RouteEntry>()
 const recentTabsByGroup = new Map<string, DiscoveredTabInfo[]>()
 
+// Legacy probe timeout — only used for registry-silent tabs (opened
+// before the extension (re)loaded, no static content script inside).
 const TAB_SCAN_TIMEOUT_MS = 5000
 
 function buildRouteKey(groupKey: string, fullToolName: string): string {
@@ -159,6 +167,22 @@ export async function getTabGroupInfo(tabId: number): Promise<DiscoveredTabInfo 
     if (!isSupportedTab(tab)) return null
     const hostname = parseHostname(tab.url)
     if (!hostname) return null
+
+    // Registry first: authoritative, fresh, no page execution needed.
+    const registryEntries = await getRegistryEntries()
+    const registryMatch = registryEntries.find((entry) => entry.tabId === tabId)
+    if (registryMatch && registryMatch.hostname === hostname) {
+      return {
+        tabId,
+        hostname,
+        toolsetSignature: registryMatch.toolsetSignature,
+        groupKey: registryMatch.groupKey,
+        toolNames: registryMatch.tools.map((tool) => tool.name),
+        seenAt: registryMatch.updatedAt,
+      }
+    }
+
+    // Legacy fallback: one-shot probe (registry-silent tab).
     const result = await discoverToolsInTab(tabId)
     if (!result.ok || !result.tools || result.tools.length === 0) return null
     const normalizedTools = result.tools.map((tool) => ({
@@ -179,77 +203,100 @@ export async function getTabGroupInfo(tabId: number): Promise<DiscoveredTabInfo 
   }
 }
 
-export async function discoverWebMCPToolsInCurrentWindow(windowId?: number): Promise<WebMCPDiscoverResponse> {
-  try {
-    const queryOpts: chrome.tabs.QueryInfo = windowId ? { windowId } : { currentWindow: true }
-    const tabs = await chrome.tabs.query(queryOpts)
-    const validTabs = tabs.filter(isSupportedTab)
-    const discoveredAt = Date.now()
+/**
+ * One-shot probe of registry-silent tabs — pages opened before the
+ * extension (re)load carry no static content script. Successful
+ * probes are fed INTO the registry so they persist for later reads.
+ */
+async function fallbackScanRegistrySilentTabs(windowId?: number): Promise<void> {
+  const silentTabs = await getRegistrySilentTabs()
+  const scoped =
+    typeof windowId === 'number'
+      ? silentTabs.filter((tab) => tab.windowId === windowId)
+      : silentTabs
 
-    const tools: WebMCPDiscoveredTool[] = []
-    const discoveredTabs = new Set<number>()
+  const probes = await Promise.allSettled(
+    scoped.map(async ({ tabId }) => {
+      const tab = await chrome.tabs.get(tabId)
+      const hostname = parseHostname(tab.url || '')
+      if (!hostname) return null
+      const result = await discoverToolsInTab(tabId)
+      if (!result.ok || !result.tools) return null
+      return { tab, hostname, result }
+    }),
+  )
 
-    const scanResults = await Promise.allSettled(
-      validTabs.map(async (tab) => {
-        const hostname = parseHostname(tab.url)
-        if (!hostname) return null
-        const result = await discoverToolsInTab(tab.id)
-        return { tab, hostname, result }
-      }),
-    )
-
-    for (const settled of scanResults) {
-      if (settled.status !== 'fulfilled') continue
-      const entry = settled.value
-      if (!entry) continue
-      const { tab, hostname, result } = entry
-      if (!result.ok || !result.tools || result.tools.length === 0) continue
-
-      const normalizedTools = result.tools.map((tool) => ({
-        name: String(tool.name),
-        description: tool.description || '',
-        inputSchema: normalizeInputSchema(tool.inputSchema),
-        annotations: tool.annotations,
-      }))
-      const toolsetSignature = buildToolsetSignature(normalizedTools)
-      const groupKey = buildWebMCPGroupKey(hostname, toolsetSignature)
-
-      discoveredTabs.add(tab.id)
-      rememberGroupTab({
-        tabId: tab.id,
+  for (const settled of probes) {
+    if (settled.status !== 'fulfilled') continue
+    const entry = settled.value
+    if (!entry) continue
+    const { tab, hostname, result } = entry
+    try {
+      await registerTab({
+        tabId: tab.id!,
         hostname,
-        toolsetSignature,
-        groupKey,
-        toolNames: normalizedTools.map((tool) => tool.name),
-        seenAt: discoveredAt,
-      })
-
-      for (const tool of normalizedTools) {
-        const fullName = buildSafeFullName(hostname, tool.name)
-        rememberRoute({
-          tabId: tab.id,
-          hostname,
-          groupKey,
-          toolName: tool.name,
-          fullToolName: fullName,
-          toolsetSignature,
-          seenAt: discoveredAt,
-        })
-
-        tools.push({
-          name: tool.name,
-          description: tool.description || '',
+        tabTitle: tab.title || '',
+        tabUrl: tab.url || '',
+        windowId: tab.windowId,
+        apiMode: result.mode,
+        tools: result.tools.map((tool) => ({
+          name: String(tool.name),
+          description: tool.description,
           inputSchema: tool.inputSchema,
           annotations: tool.annotations,
-          hostname,
-          groupKey,
-          toolsetSignature,
-          fullName,
-          tabId: tab.id,
-          tabTitle: tab.title || '',
-          tabUrl: tab.url,
-          discoveredAt,
-          apiMode: result.mode || 'navigatorModelContext',
+        })),
+      })
+    } catch {
+      // registration is best-effort; discovery still proceeds
+    }
+  }
+}
+
+export async function discoverWebMCPToolsInCurrentWindow(windowId?: number): Promise<WebMCPDiscoverResponse> {
+  try {
+    // Feed legacy tabs (pre-extension-load) into the registry first.
+    await fallbackScanRegistrySilentTabs(windowId)
+
+    const registryEntries =
+      typeof windowId === 'number'
+        ? (await getRegistryEntries()).filter((entry) => entry.windowId === windowId)
+        : await getRegistryEntries()
+
+    const discoveredAt = Date.now()
+    const rawTools = entriesToDiscoveredTools(registryEntries)
+    // Dedup: the same site (groupKey) opened in N tabs reports identical
+    // tools N times — surface each tool ONCE in the flat list so the model
+    // doesn't see phantom duplicates. Invoke routing below still learns
+    // every tab via rememberGroupTab/rememberRoute for fallback dispatch.
+    const seenKeys = new Set<string>()
+    const tools = rawTools.filter((t) => {
+      const key = `${t.groupKey ?? t.hostname}::${t.fullName ?? t.name}`
+      if (seenKeys.has(key)) return false
+      seenKeys.add(key)
+      return true
+    })
+    const discoveredTabs = new Set(registryEntries.map((entry) => entry.tabId))
+
+    // Refresh the invoke route cache from registry data (consumed by
+    // invoke.ts pickTargetTabId when no cached route exists yet).
+    for (const entry of registryEntries) {
+      rememberGroupTab({
+        tabId: entry.tabId,
+        hostname: entry.hostname,
+        toolsetSignature: entry.toolsetSignature,
+        groupKey: entry.groupKey,
+        toolNames: entry.tools.map((tool) => tool.name),
+        seenAt: entry.updatedAt,
+      })
+      for (const tool of entry.tools) {
+        rememberRoute({
+          tabId: entry.tabId,
+          hostname: entry.hostname,
+          groupKey: entry.groupKey,
+          toolName: tool.name,
+          fullToolName: buildSafeFullName(entry.hostname, tool.name),
+          toolsetSignature: entry.toolsetSignature,
+          seenAt: entry.updatedAt,
         })
       }
     }
@@ -257,7 +304,7 @@ export async function discoverWebMCPToolsInCurrentWindow(windowId?: number): Pro
     return {
       ok: true,
       tools,
-      scannedTabs: validTabs.length,
+      scannedTabs: registryEntries.length,
       discoveredTabs: discoveredTabs.size,
       discoveredAt,
     }

@@ -18,6 +18,7 @@ import { checkFileStaleness, refreshReadTimestamp } from './loop-guard'
 import { resolveNativeDirectoryHandleForPath, withToolTimeout, isToolTimeoutError } from './tool-utils'
 import { getResolvedPathForLoopGuard, formatToolErrorMessage } from './io-shared'
 import { getFormatHandler, buildFormatWriteContext } from './format-registry'
+import { stripEnvelopeEchoHeader } from './envelope-echo'
 
 // Ensure format handlers are registered before first use
 import './formats'
@@ -117,6 +118,11 @@ async function executeSingleWrite(
 ): Promise<string> {
   const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
 
+  // ── Defense-in-depth: strip envelope-echo header ──
+  // e.g. content arriving as "[HTML] index.html\n\n<!DOCTYPE…" gets the
+  // header removed before it hits disk. See stripEnvelopeEchoHeader docs.
+  const { content: safeContent, stripped: strippedEnvelopeEcho } = stripEnvelopeEchoHeader(content, path)
+
   try {
     const target = await resolveVfsTarget(path, context, 'write')
     const resolvedPath = getResolvedPathForLoopGuard(target)
@@ -150,6 +156,9 @@ async function executeSingleWrite(
 
     const buildMeta = (extra?: Record<string, unknown>) => ({
       ...(stalenessWarning ? { _warning: stalenessWarning } : {}),
+      ...(strippedEnvelopeEcho
+        ? { _notice: `Stripped envelope-echo header from content before writing (content began with a "[Label] ${path.split('/').pop()}" line copied from read() output). Do not prepend such headers when writing files.` }
+        : {}),
       ...extra,
     })
 
@@ -171,7 +180,7 @@ async function executeSingleWrite(
     if (formatHandler?.write) {
       const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
       try {
-        const binaryData = await formatHandler.write(content, path, writeContext)
+        const binaryData = await formatHandler.write(safeContent, path, writeContext)
         await writeWithTimeout(target.backend.writeFile(target.path, binaryData))
       } catch (formatError) {
         // FormatWriteError: handler rejected the content with a progressive hint
@@ -189,12 +198,12 @@ async function executeSingleWrite(
         hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.`,
       })
     } else {
-      await writeWithTimeout(target.backend.writeFile(target.path, content))
+      await writeWithTimeout(target.backend.writeFile(target.path, safeContent))
     }
 
     // Collect asset metadata for assets backend (so UI shows AssetCard)
     if (source === 'assets') {
-      collectAssetsFromWrite(target.path, content.length, isNew, context.workspaceId)
+      collectAssetsFromWrite(target.path, safeContent.length, isNew, context.workspaceId)
     }
 
     // Post-write metadata: workspace needs pending tracking
@@ -217,7 +226,7 @@ async function executeSingleWrite(
 
     const session = useRemoteStore.getState().session
     if (session) {
-      const preview = isNew ? `New file: ${path}` : `Modified: ${path} (${content.length} bytes)`
+      const preview = isNew ? `New file: ${path}` : `Modified: ${path} (${safeContent.length} bytes)`
       session.broadcastFileChange(path, isNew ? 'create' : 'modify', preview)
     }
 
@@ -238,7 +247,7 @@ async function executeSingleWrite(
       {
         path,
         action: isNew ? 'create' : 'modify',
-        size: content.length,
+        size: safeContent.length,
         status,
         pendingCount,
         message,

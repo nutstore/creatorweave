@@ -90,8 +90,8 @@ export type { WorkspaceFiles } from './workspace'
 // Project
 export { ProjectManager, type ProjectInfo } from './project'
 
-// Full OPFS backup (zip)
-export { exportOPFSBackup, downloadOPFSBackup } from './backup'
+// Full OPFS backup (zip) — export & import (full restore)
+export { exportOPFSBackup, downloadOPFSBackup, importOPFSBackup } from './backup'
 
 // Agent
 export {

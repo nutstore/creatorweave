@@ -24,13 +24,16 @@ export const htmlHandler: FormatHandler = {
     + 'Write/edit is supported — provide valid HTML content. '
     + 'For self-contained HTML (inline CSS/JS), the file can be previewed directly in the browser.',
 
-  async read(data: ArrayBuffer | Uint8Array, path: string): Promise<FormatReadResult> {
+  async read(data: ArrayBuffer | Uint8Array, _path: string): Promise<FormatReadResult> {
     const text = new TextDecoder('utf-8').decode(data instanceof ArrayBuffer ? new Uint8Array(data) : data)
-    const fileName = path.split('/').pop() || path
 
+    // IMPORTANT: never prefix content with a header like `[HTML] ${fileName}`.
+    // The tool envelope already carries path/kind metadata. A content-side header
+    // gets echoed back by models on write(), corrupting the file at the very top
+    // (see the recurring "[HTML] index.html" pollution incidents).
     if (text.trim() === '') {
       return {
-        content: `[HTML] ${fileName}\n(empty file)`,
+        content: '(empty file)',
         kind: 'html',
       }
     }
@@ -39,7 +42,7 @@ export const htmlHandler: FormatHandler = {
     if (text.length > MAX_READ_LENGTH) {
       const truncated = text.slice(0, MAX_READ_LENGTH)
       return {
-        content: `[HTML] ${fileName}\n(${text.length.toLocaleString()} chars, showing first ${MAX_READ_LENGTH.toLocaleString()})\n\n${truncated}\n\n... (${(text.length - MAX_READ_LENGTH).toLocaleString()} more chars truncated)`,
+        content: `(${text.length.toLocaleString()} chars, showing first ${MAX_READ_LENGTH.toLocaleString()})\n\n${truncated}\n\n... (${(text.length - MAX_READ_LENGTH).toLocaleString()} more chars truncated)`,
         kind: 'html',
         metadata: {
           totalLength: text.length,
@@ -49,7 +52,7 @@ export const htmlHandler: FormatHandler = {
     }
 
     return {
-      content: `[HTML] ${fileName}\n\n${text}`,
+      content: text,
       kind: 'html',
     }
   },

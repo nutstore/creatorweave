@@ -35,6 +35,7 @@ import { ContextUsageBar } from './ContextUsageBar'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { MessageNavBar } from './MessageNavBar'
 import { AssetsPopover } from './AssetsPopover'
+import { ProcessesPopover } from './ProcessesPopover'
 import { ConversationActionContext } from './ConversationActionContext'
 import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
@@ -474,6 +475,9 @@ export function ConversationView({
 
         {/* Assets popover — small trigger button, expands to show workspace assets */}
         <AssetsPopover convId={convId ?? undefined} onPreviewAsset={onPreviewAsset} />
+
+        {/* Background processes popover — dev servers etc started via exec (STATUS.md §17) */}
+        <ProcessesPopover />
 
         {/* Message navigation dots */}
         {activeMessages.length > 1 && (

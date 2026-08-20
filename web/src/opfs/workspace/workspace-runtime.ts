@@ -27,8 +27,10 @@ import {
   hasConflictMarkers,
 } from './conflict-markers'
 import { scanFilesInWorker } from '@/workers/diff-worker-manager'
-import { getRuntimeDirectoryHandle, getRuntimeHandlesForProject } from '@/native-fs'
+import { getRuntimeDirectoryHandle, getRuntimeHandlesForProject, buildHandleKey } from '@/native-fs'
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
+import type { DiskExecutor } from '../native-disk/executor'
+import { FSAccessExecutor } from '../native-disk/executor-fsaccess'
 
 const WORKSPACE_METADATA_FILE = 'workspace.json'
 const FILES_DIR = 'files'
@@ -44,6 +46,10 @@ const ASSETS_DIR = 'assets'
 interface ResolvedRoot {
   /** Root name (matches project_roots.name) */
   rootName: string
+  /** Persisted executor address: compound FS Access key or Native Host scope ID. */
+  rootId: string | null
+  /** Authorization backend for this root. */
+  backend: 'fsaccess' | 'native-host'
   /** Path relative to the root (after stripping the root prefix) */
   relativePath: string
   /** Whether this root is read-only */
@@ -120,16 +126,34 @@ export class WorkspaceRuntime {
   /**
    * Multi-root mapping for this workspace's project.
    * Populated lazily on first access via resolvePath().
-   * Key = rootName, value = { readOnly, isDefault }.
+   * Key = rootName, value = persisted disk root routing metadata.
    * When null, no project_roots entries exist yet.
    */
-  private _rootMap: Map<string, { readOnly: boolean; isDefault: boolean }> | null = null
+  private _rootMap: Map<string, {
+    readOnly: boolean
+    isDefault: boolean
+    backend: 'fsaccess' | 'native-host'
+    rootId: string | null
+  }> | null = null
   private _rootMapProjectId: string | null = null
 
-  constructor(workspaceId: string, workspaceDir: FileSystemDirectoryHandle, rootDirectory: string) {
+  /**
+   * Disk executor — prepared for Native Host injection. OPFS-internal
+   * operations continue to use `workspaceDir` directly.
+   */
+  private readonly diskExec: DiskExecutor
+
+  constructor(
+    workspaceId: string,
+    workspaceDir: FileSystemDirectoryHandle,
+    rootDirectory: string,
+    diskExec?: DiskExecutor
+  ) {
     this.workspaceId = workspaceId
     this.workspaceDir = workspaceDir
     this.rootDirectory = rootDirectory
+
+    this.diskExec = diskExec ?? new FSAccessExecutor()
 
     // Initialize pending manager (files/ is the source of truth)
     this.pendingManager = new WorkspacePendingManager(workspaceId, workspaceDir)
@@ -646,6 +670,7 @@ export class WorkspaceRuntime {
     // (otherwise readFromNativeFS misses the file and falls back to OPFS).
     // Otherwise, resolve the per-root handle based on path prefix.
     let nativeHandle: FileSystemDirectoryHandle | null
+    let diskRootId: string | null = null
     let nativePath = normalizedPath
     if (directoryHandle) {
       nativeHandle = directoryHandle
@@ -660,11 +685,12 @@ export class WorkspaceRuntime {
       // Resolve the path relative to the root (strip root prefix for native FS access)
       const resolved = await this.resolvePath(normalizedPath, projectId)
       nativePath = resolved.relativePath || normalizedPath
+      diskRootId = resolved.rootId
     }
 
-    if (nativeHandle && preferNative) {
+    if (diskRootId && preferNative) {
       try {
-        const native = await this.readFromNativeFS(nativePath, nativeHandle)
+        const native = await this.readFromDiskRoot(diskRootId, nativePath)
         return { ...native, source: 'native' }
       } catch {
         // Fallback to OPFS branch below.
@@ -675,7 +701,7 @@ export class WorkspaceRuntime {
     // If disk mtime differs from OPFS baseline, disk is newer - read disk.
     // This handles the conflict scenario where disk has been updated but OPFS hasn't.
     const isPendingPath = this.pendingManager.hasPendingPath(normalizedPath)
-    if (nativeHandle && isPendingPath) {
+    if ((nativeHandle || diskRootId) && isPendingPath) {
       let fromFilesDir: {
         content: FileContent
         mtime: number
@@ -709,13 +735,17 @@ export class WorkspaceRuntime {
       if (!preferOpfs) {
         // Check if disk has been modified since OPFS recorded baseline
         try {
-          const diskMeta = await this.getFileMetadata(nativeHandle, nativePath)
+          const diskMeta = diskRootId
+            ? await this.getDiskFileMetadata(diskRootId, nativePath)
+            : await this.getFileMetadata(nativeHandle!, nativePath)
           const pendingChanges = await this.pendingManager.getAll()
           const pending = pendingChanges.find(
             (p) => this.normalizeWorkspacePath(p.path) === normalizedPath
           )
           if (pending && pending.fsMtime && diskMeta.mtime > pending.fsMtime) {
-            const diskContent = await this.readFromNativeFS(nativePath, nativeHandle)
+            const diskContent = diskRootId
+              ? await this.readFromDiskRoot(diskRootId, nativePath)
+              : await this.readFromNativeFS(nativePath, nativeHandle!)
             const baseline = await this.readFromBaselineDir(normalizedPath)
             if (baseline) {
               const diskMatchesBaseline = await this.areFileContentsEqual(baseline.content, diskContent.content)
@@ -769,11 +799,13 @@ export class WorkspaceRuntime {
       }
     }
 
-    if (nativeHandle && !isPendingPath && !preferOpfs) {
+    if ((nativeHandle || diskRootId) && !isPendingPath && !preferOpfs) {
       // For non-pending files, always prefer native disk view so external
       // filesystem changes are visible to tools immediately.
       try {
-        const native = await this.readFromNativeFS(nativePath, nativeHandle)
+        const native = diskRootId
+          ? await this.readFromDiskRoot(diskRootId, nativePath)
+          : await this.readFromNativeFS(nativePath, nativeHandle!)
         return { ...native, source: 'native' }
       } catch {
         // Disk read failed (e.g. file only exists in OPFS, not yet synced).
@@ -799,9 +831,11 @@ export class WorkspaceRuntime {
     }
 
     // prefer_opfs can still fall back to native when OPFS body is missing.
-    if (nativeHandle) {
+    if (nativeHandle || diskRootId) {
       try {
-        const native = await this.readFromNativeFS(nativePath, nativeHandle)
+        const native = diskRootId
+          ? await this.readFromDiskRoot(diskRootId, nativePath)
+          : await this.readFromNativeFS(nativePath, nativeHandle!)
         return { ...native, source: 'native' }
       } catch {
         // Fall through to not-found error below.
@@ -818,13 +852,10 @@ export class WorkspaceRuntime {
     directoryHandle: FileSystemDirectoryHandle,
     path: string
   ): Promise<{ mtime: number; size: number; contentType: 'text' | 'binary' }> {
-    const fileHandle = await this.getFileHandle(directoryHandle, path)
-    const file = await fileHandle.getFile()
-    return {
-      mtime: file.lastModified,
-      size: file.size,
-      contentType: getFileContentType(path),
-    }
+    const rootId = await this.resolveRootIdForHandle(directoryHandle)
+    const stat = await this.diskExec.stat(rootId, path)
+    if (!stat) throw new Error(`File not found: ${path}`)
+    return { mtime: stat.mtime, size: stat.size, contentType: stat.contentType }
   }
 
   /**
@@ -834,25 +865,15 @@ export class WorkspaceRuntime {
     path: string,
     directoryHandle: FileSystemDirectoryHandle
   ): Promise<{ content: FileContent; metadata: FileMetadata }> {
-    const fileHandle = await this.getFileHandle(directoryHandle, path)
-    const file = await fileHandle.getFile()
-    const mtime = file.lastModified
-    const size = file.size
-    const contentType = getFileContentType(path)
-    let content: FileContent
-    if (contentType === 'text') {
-      content = await file.text()
-    } else {
-      content = await file.arrayBuffer()
-    }
-
+    const rootId = await this.resolveRootIdForHandle(directoryHandle)
+    const result = await this.diskExec.read(rootId, path)
     return {
-      content,
+      content: result.content,
       metadata: {
         path,
-        mtime,
-        size,
-        contentType,
+        mtime: result.stat.mtime,
+        size: result.stat.size,
+        contentType: result.stat.contentType,
       },
     }
   }
@@ -879,6 +900,71 @@ export class WorkspaceRuntime {
     const normalizedPath = this.normalizeWorkspacePath(path)
     const baseline = await this.readFromBaselineDir(normalizedPath)
     return baseline?.content ?? null
+  }
+
+  /**
+   * Read a file directly from the native disk (bypassing OPFS cache).
+   * Supports BOTH FS Access roots (via directoryHandle) and native-host
+   * roots (via diskExec). Used by conflict resolution UI (FileDiffViewer)
+   * to show the "本机版本" side of a conflict.
+   *
+   * Returns null if the file does not exist on disk.
+   */
+  async readDiskFile(path: string): Promise<FileContent | null> {
+    if (!this.initialized) await this.initialize()
+    const normalizedPath = this.normalizeWorkspacePath(path)
+    try {
+      // Try FS Access handle first
+      const nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
+      if (nativeHandle) {
+        const resolved = await this.resolvePath(normalizedPath)
+        const nativePath = resolved.relativePath || normalizedPath
+        const fromNative = await this.readFromNativeFS(nativePath, nativeHandle)
+        return fromNative.content
+      }
+      // Fall back to native-host executor
+      const resolved = await this.resolvePath(normalizedPath).catch(() => null)
+      if (resolved?.rootId) {
+        const nativePath = resolved.relativePath || normalizedPath
+        const fromDisk = await this.readFromDiskRoot(resolved.rootId, nativePath)
+        return fromDisk.content
+      }
+      return null
+    } catch (err: unknown) {
+      const errorName = err && typeof err === 'object' && 'name' in err ? (err as { name: string }).name : undefined
+      if (errorName === 'NotFoundError') return null
+      // NativeHostExecutor throws NotFoundError for missing files
+      if (err instanceof Error && err.message.includes('not found')) return null
+      throw err
+    }
+  }
+
+  /**
+   * Check if a file exists on the native disk (bypassing OPFS cache).
+   * Supports BOTH FS Access roots and native-host roots.
+   * Used by conflict resolution UI to decide whether to show disk version.
+   */
+  async fileExistsOnDisk(path: string): Promise<boolean> {
+    if (!this.initialized) await this.initialize()
+    const normalizedPath = this.normalizeWorkspacePath(path)
+    try {
+      const nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
+      if (nativeHandle) {
+        const resolved = await this.resolvePath(normalizedPath)
+        const nativePath = resolved.relativePath || normalizedPath
+        const stat = await this.diskExec.stat(await this.resolveRootIdForHandle(nativeHandle), nativePath)
+        return stat !== null
+      }
+      const resolved = await this.resolvePath(normalizedPath).catch(() => null)
+      if (resolved?.rootId) {
+        const nativePath = resolved.relativePath || normalizedPath
+        const stat = await this.diskExec.stat(resolved.rootId, nativePath)
+        return stat !== null
+      }
+      return false
+    } catch {
+      return false
+    }
   }
 
   /**
@@ -915,6 +1001,7 @@ export class WorkspaceRuntime {
 
     // Multi-root: resolve the correct native handle for this path
     let nativeHandle: FileSystemDirectoryHandle | null
+    let diskRootId: string | null = null
     let nativePath = normalizedPath
     if (directoryHandle) {
       nativeHandle = directoryHandle
@@ -933,6 +1020,7 @@ export class WorkspaceRuntime {
       nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
       const resolved = await this.resolvePath(normalizedPath, projectId)
       nativePath = resolved.relativePath || normalizedPath
+      diskRootId = resolved.rootId
     }
 
     // Get baseline mtime for conflict detection
@@ -941,10 +1029,12 @@ export class WorkspaceRuntime {
     let isNewFile = false
     let baselineContent: FileContent | null = null
     try {
-      if (nativeHandle) {
+      if (nativeHandle || diskRootId) {
         // Always use native mtime as conflict baseline when directory handle is available.
         // OPFS cache mtime can diverge from native disk mtime after prior approvals/syncs.
-        const fromNative = await this.readFromNativeFS(nativePath, nativeHandle)
+        const fromNative = diskRootId
+          ? await this.readFromDiskRoot(diskRootId, nativePath)
+          : await this.readFromNativeFS(nativePath, nativeHandle!)
         baselineFsMtime = fromNative.metadata.mtime
         baselineContent = fromNative.content
       } else {
@@ -996,7 +1086,7 @@ export class WorkspaceRuntime {
     if (
       !isNewFile &&
       baselineContent !== null &&
-      nativeHandle &&
+      (nativeHandle || diskRootId) &&
       typeof content === 'string' &&
       baselineFsMtime > 0
     ) {
@@ -1262,20 +1352,29 @@ export class WorkspaceRuntime {
    * @returns Sync result
    */
   async syncToDisk(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle?: FileSystemDirectoryHandle | null,
     onlyPaths?: string[],
     forceOverwrite?: boolean
   ): Promise<SyncResult> {
     if (!this.initialized) await this.initialize()
 
     const allHandles = await this.getAllNativeDirectoryHandles()
+    const projectId = await this.resolveProjectId()
+    const rootMap = projectId ? await this.ensureRootMap(projectId) : null
 
-    // No handles → fallback to passed directoryHandle
+    // Browser roots can use the explicit fallback handle. Native Host roots
+    // have no FileSystemDirectoryHandle and are routed by their persisted
+    // scope ID inside syncToDiskMultiRoot.
     if (allHandles.size === 0) {
-      return this.syncToDiskSingleRoot(directoryHandle, onlyPaths, forceOverwrite)
+      if (directoryHandle) {
+        return this.syncToDiskSingleRoot(directoryHandle, onlyPaths, forceOverwrite)
+      }
+      if (!rootMap || rootMap.size === 0) {
+        throw new Error('No authorized local folder is available for sync')
+      }
     }
 
-    return this.syncToDiskMultiRoot(allHandles, onlyPaths, forceOverwrite)
+    return this.syncToDiskMultiRoot(allHandles, onlyPaths, forceOverwrite, directoryHandle ?? null)
   }
 
   /**
@@ -1308,7 +1407,16 @@ export class WorkspaceRuntime {
       },
     }
 
-    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths, forceOverwrite, pathTransform)
+    // Build DiskAccessor if we can resolve rootId for this handle
+    let disk: { rootId: string; exec: DiskExecutor } | undefined
+    try {
+      const rootId = await this.resolveRootIdForHandle(directoryHandle)
+      disk = { rootId, exec: this.diskExec }
+    } catch {
+      // Handle not in runtime map — fall back to raw handle path
+    }
+
+    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths, forceOverwrite, pathTransform, disk)
     await this.cleanupStaleBaselines()
     this.metadata.lastAccessedAt = Date.now()
     await this.saveMetadata()
@@ -1321,7 +1429,8 @@ export class WorkspaceRuntime {
   private async syncToDiskMultiRoot(
     rootHandles: Map<string, FileSystemDirectoryHandle>,
     onlyPaths?: string[],
-    forceOverwrite?: boolean
+    forceOverwrite?: boolean,
+    fallbackHandle: FileSystemDirectoryHandle | null = null,
   ): Promise<SyncResult> {
     const aggregated: SyncResult = {
       success: 0,
@@ -1344,7 +1453,9 @@ export class WorkspaceRuntime {
     // Sync each root's paths with the corresponding handle
     for (const [rootName, rootPaths] of pathsByRoot) {
       const handle = rootHandles.get(rootName)
-      if (!handle) {
+      const resolvedRoot = await this.resolvePath(rootPaths[0])
+      const rootId = resolvedRoot.rootId
+      if (!handle && !rootId) {
         // Defensive: a path was routed to rootName but no native handle is
         // bound for it. This usually means the SQLite `project_roots` table
         // has a row with no matching FileSystemDirectoryHandle (handle revoked,
@@ -1366,7 +1477,33 @@ export class WorkspaceRuntime {
         return path
       }
 
-      const result = await this.syncToDiskSingleRoot(handle, rootPaths, forceOverwrite, pathTransform)
+      if (handle) {
+        const result = await this.syncToDiskSingleRoot(handle, rootPaths, forceOverwrite, pathTransform)
+        aggregated.success += result.success
+        aggregated.failed += result.failed
+        aggregated.skipped += result.skipped
+        aggregated.conflicts.push(...result.conflicts)
+        continue
+      }
+
+      // Native Host root: pending manager uses the disk accessor exclusively;
+      // its directory handle parameter is never touched on this branch.
+      const disk = { rootId: rootId!, exec: this.diskExec }
+      const cacheInterface = {
+        readCached: async (path: string) => (await this.readFromFilesDir(path))?.content ?? null,
+        read: async (path: string) => {
+          const fromFiles = await this.readFromFilesDir(path)
+          return fromFiles ? { content: fromFiles.content } : null
+        },
+      }
+      const result = await this.pendingManager.sync(
+        fallbackHandle as FileSystemDirectoryHandle,
+        cacheInterface,
+        rootPaths,
+        forceOverwrite,
+        pathTransform,
+        disk,
+      )
       aggregated.success += result.success
       aggregated.failed += result.failed
       aggregated.skipped += result.skipped
@@ -1389,18 +1526,26 @@ export class WorkspaceRuntime {
   }
 
   async detectSyncConflicts(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle?: FileSystemDirectoryHandle | null,
     onlyPaths?: string[]
   ): Promise<SyncResult['conflicts']> {
     if (!this.initialized) await this.initialize()
 
     const allHandles = await this.getAllNativeDirectoryHandles()
 
-    // No handles → fallback to passed directoryHandle
+    // Browser roots can use the optional fallback handle. Native Host roots
+    // are checked through their persisted disk root ID below.
     if (allHandles.size === 0) {
-      const conflicts = await this.pendingManager.detectConflicts(directoryHandle, onlyPaths)
-      await this.materializeTextConflictMarkers(directoryHandle, conflicts)
-      return conflicts
+      if (directoryHandle) {
+        let disk: { rootId: string; exec: DiskExecutor } | undefined
+        try {
+          const rootId = await this.resolveRootIdForHandle(directoryHandle)
+          disk = { rootId, exec: this.diskExec }
+        } catch { /* fall back to raw handle */ }
+        const conflicts = await this.pendingManager.detectConflicts(directoryHandle, onlyPaths, undefined, disk)
+        await this.materializeTextConflictMarkers(directoryHandle, conflicts)
+        return conflicts
+      }
     }
 
     // Group paths by root and detect conflicts per root
@@ -1416,7 +1561,7 @@ export class WorkspaceRuntime {
     }
 
     for (const [rootName, rootPaths] of pathsByRoot) {
-      const handle = allHandles.get(rootName) ?? directoryHandle
+      const handle = allHandles.get(rootName) ?? directoryHandle ?? null
       // Build pathTransform to strip root prefix for native FS operations
       const stripPrefix = (rootName + '/').toLowerCase()
       const pathTransform = (path: string) => {
@@ -1424,16 +1569,32 @@ export class WorkspaceRuntime {
         if (lower.startsWith(stripPrefix)) return path.slice(stripPrefix.length)
         return path
       }
-      const conflicts = await this.pendingManager.detectConflicts(handle, rootPaths, pathTransform)
+      // Build DiskAccessor for this root
+      let disk: { rootId: string; exec: DiskExecutor } | undefined
+      const resolvedRoot = await this.resolvePath(rootPaths[0])
+      if (handle) {
+        try {
+          const rootId = await this.resolveRootIdForHandle(handle)
+          disk = { rootId, exec: this.diskExec }
+        } catch { /* fall back to raw handle */ }
+      } else if (resolvedRoot.rootId) {
+        disk = { rootId: resolvedRoot.rootId, exec: this.diskExec }
+      } else {
+        continue
+      }
+      const conflicts = await this.pendingManager.detectConflicts(handle as FileSystemDirectoryHandle, rootPaths, pathTransform, disk)
       allConflicts.push(...conflicts)
     }
 
-    await this.materializeTextConflictMarkers(directoryHandle, allConflicts)
+    // Always materialize conflict markers — materializeTextConflictMarkers
+    // handles both FS Access handles (non-null directoryHandle) and native-host
+    // roots (null directoryHandle, routed via resolvePath + diskExec).
+    await this.materializeTextConflictMarkers(directoryHandle ?? null, allConflicts)
     return allConflicts
   }
 
   private async materializeTextConflictMarkers(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle: FileSystemDirectoryHandle | null,
     conflicts: SyncResult['conflicts']
   ): Promise<void> {
     for (const conflict of conflicts) {
@@ -1447,17 +1608,35 @@ export class WorkspaceRuntime {
           continue
         }
 
-        // Resolve to correct root handle and strip prefix for native FS read
+        // Resolve to correct root and strip prefix for native FS read
         const resolved = await this.resolvePath(path)
-        const nativeHandle = await this.getNativeDirectoryHandleForPath(path) ?? directoryHandle
         const nativePath = resolved.relativePath || path
 
-        const fromNative = await this.readFromNativeFS(nativePath, nativeHandle)
-        if (fromNative.metadata.contentType !== 'text' || typeof fromNative.content !== 'string') {
+        // Try FS Access handle first (if available), then fall back to executor
+        // for native-host roots (which have no FileSystemDirectoryHandle).
+        const nativeHandle = (await this.getNativeDirectoryHandleForPath(path)) ?? directoryHandle
+        let nativeContent: string | null = null
+
+        if (nativeHandle) {
+          const fromNative = await this.readFromNativeFS(nativePath, nativeHandle)
+          if (fromNative.metadata.contentType !== 'text' || typeof fromNative.content !== 'string') {
+            continue
+          }
+          nativeContent = fromNative.content
+        } else if (resolved.rootId) {
+          // Native-host root: read directly via executor (no handle available)
+          const readResult = await this.diskExec.read(resolved.rootId, nativePath)
+          if (readResult.stat.contentType !== 'text') {
+            continue
+          }
+          nativeContent = typeof readResult.content === 'string'
+            ? readResult.content
+            : new TextDecoder().decode(readResult.content)
+        } else {
           continue
         }
 
-        const merged = buildConflictMarkerContent(fromFiles.content, fromNative.content)
+        const merged = buildConflictMarkerContent(fromFiles.content, nativeContent)
         await this.writeToFilesDir(path, merged)
       } catch {
         // Best effort: leave conflict unresolved if marker materialization fails.
@@ -2003,17 +2182,31 @@ export class WorkspaceRuntime {
     directoryHandle: FileSystemDirectoryHandle,
     path: string
   ): Promise<void> {
-    try {
-      const parts = path.split('/').filter(Boolean)
-      if (parts.length === 0) return
-      let current = directoryHandle
-      for (let i = 0; i < parts.length - 1; i++) {
-        current = await current.getDirectoryHandle(parts[i])
-      }
-      await current.removeEntry(parts[parts.length - 1])
-    } catch {
-      // Ignore if file doesn't exist.
+    const rootId = await this.resolveRootIdForHandle(directoryHandle)
+    await this.diskExec.delete(rootId, path)
+  }
+
+  /**
+   * Resolve a FileSystemDirectoryHandle back to its rootId (compoundKey).
+   * Used to bridge legacy handle-based call sites to the DiskExecutor API.
+   * Throws if the handle is not registered in the runtime handle map.
+   */
+  private async resolveRootIdForHandle(
+    directoryHandle: FileSystemDirectoryHandle
+  ): Promise<string> {
+    const projectId = await this.resolveProjectId()
+    if (!projectId) {
+      throw new Error('[WorkspaceRuntime] Cannot resolve rootId: no projectId')
     }
+    const handles = getRuntimeHandlesForProject(projectId)
+    for (const [rootName, handle] of handles) {
+      if (handle === directoryHandle) {
+        return buildHandleKey(projectId, rootName)
+      }
+    }
+    throw new Error(
+      `[WorkspaceRuntime] Handle not found in runtime map (directoryHandle.name=${directoryHandle.name}, projectId=${projectId})`
+    )
   }
 
   /**
@@ -2054,13 +2247,9 @@ export class WorkspaceRuntime {
     directoryHandle: FileSystemDirectoryHandle,
     path: string
   ): Promise<string | ArrayBuffer> {
-    const handle = await this.getFileHandle(directoryHandle, path)
-    const file = await handle.getFile()
-    try {
-      return await file.text()
-    } catch {
-      return await file.arrayBuffer()
-    }
+    const rootId = await this.resolveRootIdForHandle(directoryHandle)
+    const result = await this.diskExec.read(rootId, path)
+    return result.content
   }
 
   private async writeNativeFile(
@@ -2068,19 +2257,8 @@ export class WorkspaceRuntime {
     path: string,
     content: string | ArrayBuffer
   ): Promise<void> {
-    const parts = path.split('/').filter(Boolean)
-    if (parts.length === 0) return
-
-    const fileName = parts[parts.length - 1]
-    let current = directoryHandle
-    for (let i = 0; i < parts.length - 1; i++) {
-      current = await current.getDirectoryHandle(parts[i], { create: true })
-    }
-
-    const targetFile = await current.getFileHandle(fileName, { create: true })
-    const writable = await targetFile.createWritable()
-    await writable.write(content)
-    await writable.close()
+    const rootId = await this.resolveRootIdForHandle(directoryHandle)
+    await this.diskExec.write(rootId, path, content)
   }
 
   private async readCacheContentForPath(path: string): Promise<string | ArrayBuffer | null> {
@@ -2252,7 +2430,142 @@ export class WorkspaceRuntime {
    */
   async hasAnyNativeDirectoryHandle(): Promise<boolean> {
     const handles = await this.getAllNativeDirectoryHandles()
-    return handles.size > 0
+    if (handles.size > 0) return true
+    const projectId = await this.resolveProjectId()
+    const rootMap = projectId ? await this.ensureRootMap(projectId) : null
+    return [...(rootMap?.values() ?? [])].some((root) => root.backend === 'native-host' && !!root.rootId)
+  }
+
+  /**
+   * List disk directory entries via executor (supports native-host roots).
+   * Used by ls tool when the root is native-host-backed (no FileSystemDirectoryHandle).
+   *
+   * @param path Workspace-relative path (may include rootName prefix)
+   * @returns Array of entries, or null if the root is FS Access (caller should use handle instead)
+   */
+  async listDiskDir(
+    path: string,
+    projectId?: string | null
+  ): Promise<Array<{ name: string; kind: 'file' | 'directory'; size?: number; mtime?: number }> | null> {
+    if (!this.initialized) await this.initialize()
+    try {
+      const resolved = await this.resolvePath(path, projectId)
+      // Only handle native-host roots — FS Access roots use handle-based scanning
+      if (resolved.backend !== 'native-host' || !resolved.rootId) {
+        return null
+      }
+      const nativePath = resolved.relativePath || ''
+      const entries = await this.diskExec.listDir(resolved.rootId, nativePath)
+      return entries.map((e) => ({
+        name: e.name,
+        kind: e.kind,
+        size: e.stat?.size,
+        mtime: e.stat?.mtime,
+      }))
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Recursively scan a native-host disk root up to maxDepth.
+   * Returns entries with paths relative to the root.
+   */
+  async scanDiskTree(
+    path: string,
+    maxDepth: number,
+    projectId?: string | null,
+    options?: { includeSizes?: boolean; excludeDirs?: string[]; maxEntries?: number; deadlineMs?: number }
+  ): Promise<Array<{ path: string; type: 'file' | 'directory'; size: number; depth: number }> | null> {
+    if (!this.initialized) await this.initialize()
+    try {
+      const resolved = await this.resolvePath(path, projectId)
+      if (resolved.backend !== 'native-host' || !resolved.rootId) {
+        return null
+      }
+
+      const rootId = resolved.rootId
+      const basePath = resolved.relativePath || ''
+      const excludeSet = new Set(options?.excludeDirs ?? [])
+      const maxEntries = options?.maxEntries
+      const deadlineAt = Date.now() + (options?.deadlineMs ?? 25000)
+      const includeSizes = options?.includeSizes ?? false
+
+      const entries: Array<{ path: string; type: 'file' | 'directory'; size: number; depth: number }> = []
+
+      const queue: Array<{ dirPath: string; displayPath: string; depth: number }> = [
+        { dirPath: basePath, displayPath: '', depth: 0 },
+      ]
+
+      while (queue.length > 0) {
+        if (Date.now() > deadlineAt) break
+        const current = queue.shift()!
+
+        let dirEntries
+        try {
+          dirEntries = await this.diskExec.listDir(rootId, current.dirPath)
+        } catch {
+          continue
+        }
+
+        for (const entry of dirEntries) {
+          if (Date.now() > deadlineAt) break
+
+          const childDepth = current.depth + 1
+          if (childDepth > maxDepth) continue
+
+          const relPath = current.displayPath ? `${current.displayPath}/${entry.name}` : entry.name
+
+          if (entry.kind === 'directory') {
+            // Skip excluded dirs (from caller's excludeDirs parameter)
+            const lowerName = entry.name.toLowerCase()
+            if (excludeSet.has(lowerName) || excludeSet.has(entry.name)) continue
+            // Don't recurse into known heavy dirs to avoid massive scans.
+            // The ls tool's default maxDepth (2) usually keeps these shallow,
+            // but we skip recursion into them regardless of depth.
+            if (lowerName === 'node_modules' || lowerName === '.git' || lowerName === 'target' || lowerName === '.next' || lowerName === 'dist') {
+              entries.push({ path: relPath, type: 'directory', size: 0, depth: childDepth })
+              continue // list the dir itself, but don't recurse into it
+            }
+
+            entries.push({ path: relPath, type: 'directory', size: 0, depth: childDepth })
+            queue.push({
+              dirPath: current.dirPath ? `${current.dirPath}/${entry.name}` : entry.name,
+              displayPath: relPath,
+              depth: childDepth,
+            })
+          } else {
+            entries.push({
+              path: relPath,
+              type: 'file',
+              size: includeSizes ? (entry.stat?.size ?? 0) : 0,
+              depth: childDepth,
+            })
+          }
+
+          if (maxEntries !== undefined && entries.length >= maxEntries) break
+        }
+        if (maxEntries !== undefined && entries.length >= maxEntries) break
+      }
+
+      return entries
+    } catch {
+      return null
+    }
+  }
+
+  private async readFromDiskRoot(rootId: string, path: string): Promise<{ content: FileContent; metadata: FileMetadata }> {
+    const result = await this.diskExec.read(rootId, path)
+    return {
+      content: result.content,
+      metadata: { path, mtime: result.stat.mtime, size: result.stat.size, contentType: result.stat.contentType },
+    }
+  }
+
+  private async getDiskFileMetadata(rootId: string, path: string): Promise<{ mtime: number; size: number; contentType: 'text' | 'binary' }> {
+    const stat = await this.diskExec.stat(rootId, path)
+    if (!stat) throw new Error(`File not found: ${path}`)
+    return { mtime: stat.mtime, size: stat.size, contentType: stat.contentType }
   }
 
   // ===========================================================================
@@ -2288,7 +2601,12 @@ export class WorkspaceRuntime {
    */
   private async ensureRootMap(
     projectId: string
-  ): Promise<Map<string, { readOnly: boolean; isDefault: boolean }> | null> {
+  ): Promise<Map<string, {
+    readOnly: boolean
+    isDefault: boolean
+    backend: 'fsaccess' | 'native-host'
+    rootId: string | null
+  }> | null> {
     if (this._rootMap && this._rootMapProjectId === projectId) {
       return this._rootMap
     }
@@ -2313,6 +2631,10 @@ export class WorkspaceRuntime {
         this._rootMap.set(root.name, {
           readOnly: root.readOnly,
           isDefault: root.isDefault,
+          backend: root.backend,
+          rootId: root.backend === 'native-host'
+            ? root.scopeId
+            : buildHandleKey(projectId, root.name),
         })
       }
 
@@ -2321,7 +2643,12 @@ export class WorkspaceRuntime {
       if (defaultRoot && this._rootMap.has(defaultRoot.name)) {
         const entry = this._rootMap.get(defaultRoot.name)!
         this._rootMap.delete(defaultRoot.name)
-        const sorted = new Map<string, { readOnly: boolean; isDefault: boolean }>()
+        const sorted = new Map<string, {
+          readOnly: boolean
+          isDefault: boolean
+          backend: 'fsaccess' | 'native-host'
+          rootId: string | null
+        }>()
         sorted.set(defaultRoot.name, entry)
         for (const [k, v] of this._rootMap) {
           sorted.set(k, v)
@@ -2364,14 +2691,14 @@ export class WorkspaceRuntime {
 
     // No project → fallback
     if (!projectId) {
-      return { rootName: '_default', relativePath: normalized, readOnly: false }
+      return { rootName: '_default', rootId: null, backend: 'fsaccess', relativePath: normalized, readOnly: false }
     }
 
     const rootMap = await this.ensureRootMap(projectId)
 
     // No root map → fallback
     if (!rootMap || rootMap.size === 0) {
-      return { rootName: projectId, relativePath: normalized, readOnly: false }
+      return { rootName: projectId, rootId: null, backend: 'fsaccess', relativePath: normalized, readOnly: false }
     }
 
     // Check if first segment matches a known root
@@ -2382,6 +2709,8 @@ export class WorkspaceRuntime {
       const rootInfo = rootMap.get(firstSegment)!
       return {
         rootName: firstSegment,
+        rootId: rootInfo.rootId,
+        backend: rootInfo.backend,
         relativePath: segments.slice(1).join('/'),
         readOnly: rootInfo.readOnly,
       }
@@ -2400,7 +2729,13 @@ export class WorkspaceRuntime {
     }
     // Single root: no ambiguity, route to the only root silently
     const firstEntry = rootMap.entries().next().value!
-    return { rootName: firstEntry[0], relativePath: normalized, readOnly: firstEntry[1].readOnly }
+    return {
+      rootName: firstEntry[0],
+      rootId: firstEntry[1].rootId,
+      backend: firstEntry[1].backend,
+      relativePath: normalized,
+      readOnly: firstEntry[1].readOnly,
+    }
   }
 
   /**
@@ -2469,54 +2804,59 @@ export class WorkspaceRuntime {
 
     const opfsFilesDir = await this.getFilesDir()
 
-    // Multi-root: resolve each file's path to the correct native handle
+    // Multi-root: resolve each file's path to the correct root
     const allHandles = await this.getAllNativeDirectoryHandles()
+    const hasDiskRoot = await this.hasAnyNativeDirectoryHandle()
 
     for (const filePath of files) {
       try {
         // Validate and normalize path
         const normalizedPath = this.validatePath(filePath)
 
-        // Resolve the native handle for this file's path
-        let nativeDir: FileSystemDirectoryHandle
-        let nativePath = normalizedPath
+        // Resolve the native handle / disk root for this file's path
+        const resolved = await this.resolvePath(normalizedPath)
+        const nativePath = resolved.relativePath || normalizedPath
 
-        if (allHandles.size > 1) {
-          // Multi-root: find the right handle
-          const resolved = await this.resolvePath(normalizedPath)
-          const handle = allHandles.get(resolved.rootName)
-          if (!handle) {
-            throw new Error(`未找到项目文件夹 "${resolved.rootName}" 的目录句柄`)
-          }
-          nativeDir = handle
-          nativePath = resolved.relativePath || normalizedPath
-        } else {
-          // No path prefix match: use the first root handle
-          nativeDir = allHandles.values().next().value
-            ?? (await this.getNativeDirectoryHandle())!
-          if (!nativeDir) {
-            throw new Error('未设置 Native FS 目录句柄，请先选择项目目录')
-          }
-        }
-
-        // Get file from Native FS
-        const fileHandle = await this.getFileHandle(nativeDir, nativePath)
-        const file = await fileHandle.getFile()
-        const size = file.size
-
-        // Check if large file (>50MB)
-        const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024
-        if (size > LARGE_FILE_THRESHOLD && onProgress) {
-          await this.copyFileWithProgress(
-            fileHandle,
-            opfsFilesDir,
-            normalizedPath,
-            (progress) => onProgress(filePath, progress)
-          )
-        } else {
-          // Direct copy for small files
-          const content = await file.arrayBuffer()
+        if (resolved.rootId && resolved.backend === 'native-host') {
+          // ---- Native host root: read via executor ----
+          const result = await this.diskExec.read(resolved.rootId, nativePath)
+          const content = typeof result.content === 'string'
+            ? new TextEncoder().encode(result.content).buffer as ArrayBuffer
+            : result.content
           await this.writeFileToOPFS(opfsFilesDir, normalizedPath, content)
+        } else {
+          // ---- FS Access root: use handle directly ----
+          let nativeDir: FileSystemDirectoryHandle
+          if (allHandles.size > 0) {
+            const handle = allHandles.get(resolved.rootName)
+            if (!handle) {
+              throw new Error(`未找到项目文件夹 "${resolved.rootName}" 的目录句柄`)
+            }
+            nativeDir = handle
+          } else if (!hasDiskRoot) {
+            throw new Error('未设置 Native FS 目录句柄，请先选择项目目录')
+          } else {
+            throw new Error(`未找到项目文件夹 "${resolved.rootName}" 的磁盘根`)
+          }
+
+          const fileHandle = await this.getFileHandle(nativeDir, nativePath)
+          const file = await fileHandle.getFile()
+          const size = file.size
+
+          // Check if large file (>50MB)
+          const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024
+          if (size > LARGE_FILE_THRESHOLD && onProgress) {
+            await this.copyFileWithProgress(
+              fileHandle,
+              opfsFilesDir,
+              normalizedPath,
+              (progress) => onProgress(filePath, progress)
+            )
+          } else {
+            // Direct copy for small files
+            const content = await file.arrayBuffer()
+            await this.writeFileToOPFS(opfsFilesDir, normalizedPath, content)
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -2767,9 +3107,6 @@ export class WorkspaceRuntime {
 
     // 3. Reconcile pending queue against current OPFS state
     const detectedChanges: FileChange[] = []
-    let detectedAdded = 0
-    let detectedModified = 0
-    let detectedDeleted = 0
 
     // Check for modified/restored files that are already tracked by pending queue.
     // NOTE: Do NOT auto-create new pending records for every file found in files/.
@@ -2787,7 +3124,6 @@ export class WorkspaceRuntime {
         // Note: fsMtime will be set during sync, just update timestamp here
         await this.pendingManager.add(pendingPath, pendingItem.fsMtime)
         detectedChanges.push({ type: 'modify', path: pendingPath, size: item.size, mtime: item.mtime })
-        detectedModified++
       }
       // If pending item is 'delete', file was restored - remove from pending
       else if (pendingItem.type === 'delete') {
@@ -2801,7 +3137,6 @@ export class WorkspaceRuntime {
         // Now add as created/modified
         await this.pendingManager.markAsCreated(pendingPath, item.mtime)
         detectedChanges.push({ type: 'add', path: pendingPath, size: item.size, mtime: item.mtime })
-        detectedAdded++
       }
     }
 
@@ -2826,7 +3161,6 @@ export class WorkspaceRuntime {
         // File was deleted, add delete record
         await this.pendingManager.markForDeletion(pending.path)
         detectedChanges.push({ type: 'delete', path: pending.path })
-        detectedDeleted++
       }
     }
 
@@ -2944,7 +3278,38 @@ export class WorkspaceRuntime {
           nativeFsMtime = change.mtime
         }
       } else {
-        nativeFsMtime = change.mtime
+        // No directoryHandle — check native-host roots via executor
+        try {
+          const resolved = await this.resolvePath(normalizedPath).catch(() => null)
+          if (resolved?.rootId) {
+            const nativePath = resolved.relativePath || normalizedPath
+            const stat = await this.diskExec.stat(resolved.rootId, nativePath)
+            if (stat) {
+              nativeFsMtime = stat.mtime
+              if (change.type === 'add') {
+                effectiveType = 'modify'
+              }
+              if (effectiveType === 'modify') {
+                const readResult = await this.diskExec.read(resolved.rootId, nativePath)
+                const nativeContent = typeof readResult.content === 'string'
+                  ? new TextEncoder().encode(readResult.content).buffer as ArrayBuffer
+                  : readResult.content
+                const opfsContent = await this.readFromFilesDir(normalizedPath)
+                if (opfsContent && await this.areFileContentsEqual(nativeContent, opfsContent.content)) {
+                  console.log(`[WorkspaceRuntime] Skipping no-op mtime change: ${normalizedPath}`)
+                  continue
+                }
+                await this.captureModifyBaseline(normalizedPath, nativeContent)
+              }
+            } else {
+              nativeFsMtime = change.mtime
+            }
+          } else {
+            nativeFsMtime = change.mtime
+          }
+        } catch {
+          nativeFsMtime = change.mtime
+        }
       }
 
       if (effectiveType === 'add') {
@@ -2964,16 +3329,24 @@ export class WorkspaceRuntime {
    * @returns Sync result
    */
   async syncToNative(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle: FileSystemDirectoryHandle | null,
     changes: FileChange[]
   ): Promise<{ synced: number; failed: number }> {
     if (!this.initialized) await this.initialize()
 
     const allHandles = await this.getAllNativeDirectoryHandles()
 
-    // No handles → fallback to passed directoryHandle
+    // No FS Access handles → check native-host roots or fallback
     if (allHandles.size === 0) {
-      return this.syncToNativeSingleRoot(directoryHandle, changes)
+      const hasDiskRoot = await this.hasAnyNativeDirectoryHandle()
+      if (hasDiskRoot) {
+        // Native-host only: route each change via resolvePath + executor
+        return this.syncToNativeDiskRoots(changes)
+      }
+      if (!directoryHandle) {
+        return { synced: 0, failed: changes.length }
+      }
+      return this.syncToNativeSingleRoot(directoryHandle!, changes)
     }
 
     // Group changes by root and sync each group
@@ -2990,17 +3363,111 @@ export class WorkspaceRuntime {
 
     for (const [rootName, rootChanges] of changesByRoot) {
       const handle = allHandles.get(rootName)
-      if (!handle) {
-        failed += rootChanges.length
+      if (handle) {
+        const result = await this.syncToNativeSingleRoot(handle, rootChanges)
+        synced += result.synced
+        failed += result.failed
+      } else {
+        // No FS Access handle — might be a native-host root
+        const resolved = await this.resolvePath(rootChanges[0].path)
+        if (resolved.rootId && resolved.backend === 'native-host') {
+          const result = await this.syncToNativeDiskRoot(resolved.rootId, rootChanges)
+          synced += result.synced
+          failed += result.failed
+        } else {
+          failed += rootChanges.length
+        }
+      }
+    }
+
+    this.scanFilesCache = undefined
+    return { synced, failed }
+  }
+
+  /**
+   * syncToNative for native-host roots (no FileSystemDirectoryHandle).
+   * Routes all changes through a single rootId.
+   */
+  private async syncToNativeDiskRoot(
+    rootId: string,
+    changes: FileChange[]
+  ): Promise<{ synced: number; failed: number }> {
+    let synced = 0
+    let failed = 0
+    const filesDir = await this.getFilesDir()
+
+    for (const change of changes) {
+      try {
+        const resolved = await this.resolvePath(change.path)
+        const nativePath = resolved.relativePath || change.path
+
+        if (change.type === 'delete') {
+          await this.diskExec.delete(rootId, nativePath)
+        } else {
+          await this.copyToNativeDiskRoot(rootId, filesDir, change.path, nativePath)
+        }
+        synced++
+      } catch (err) {
+        console.error(`Failed to sync ${change.path}:`, err)
+        failed++
+      }
+    }
+    return { synced, failed }
+  }
+
+  /**
+   * syncToNative for native-host-only projects (all roots are native-host).
+   */
+  private async syncToNativeDiskRoots(
+    changes: FileChange[]
+  ): Promise<{ synced: number; failed: number }> {
+    let synced = 0
+    let failed = 0
+
+    const changesByRoot = new Map<string, { rootId: string; changes: FileChange[] }>()
+    for (const change of changes) {
+      const resolved = await this.resolvePath(change.path)
+      if (!resolved.rootId) {
+        failed++
         continue
       }
-      const result = await this.syncToNativeSingleRoot(handle, rootChanges)
+      const entry = changesByRoot.get(resolved.rootName) ?? { rootId: resolved.rootId, changes: [] }
+      entry.changes.push(change)
+      changesByRoot.set(resolved.rootName, entry)
+    }
+
+    for (const { rootId, changes: rootChanges } of changesByRoot.values()) {
+      const result = await this.syncToNativeDiskRoot(rootId, rootChanges)
       synced += result.synced
       failed += result.failed
     }
 
     this.scanFilesCache = undefined
     return { synced, failed }
+  }
+
+  /**
+   * Copy file from OPFS to native-host disk root via executor.
+   */
+  private async copyToNativeDiskRoot(
+    rootId: string,
+    opfsDir: FileSystemDirectoryHandle,
+    path: string,
+    diskPath = path,
+  ): Promise<void> {
+    const parts = path.split('/').filter(Boolean)
+    const fileName = parts[parts.length - 1]
+
+    // Read file from OPFS
+    let opfsCurrent = opfsDir
+    for (let i = 0; i < parts.length - 1; i++) {
+      opfsCurrent = await opfsCurrent.getDirectoryHandle(parts[i])
+    }
+    const opfsFile = await opfsCurrent.getFileHandle(fileName)
+    const file = await opfsFile.getFile()
+    const content = await file.arrayBuffer()
+
+    await this.diskExec.write(rootId, diskPath, content)
   }
 
   /**
@@ -3056,8 +3523,29 @@ export class WorkspaceRuntime {
     const diffs: string[] = []
 
     if (rootHandles.size === 0) {
-      // No native handle at all — every OPFS file is "OPFS-only".
-      for (const path of opfsFiles.keys()) diffs.push(path)
+      // No FS Access handles — check if there are native-host roots.
+      // If yes, compare OPFS files against native-host roots via executor.
+      // If no, every OPFS file is "OPFS-only".
+      const hasDiskRoot = await this.hasAnyNativeDirectoryHandle()
+      if (!hasDiskRoot) {
+        for (const path of opfsFiles.keys()) diffs.push(path)
+        return diffs
+      }
+      // Native-host only: check each file via executor
+      for (const path of opfsFiles.keys()) {
+        try {
+          const resolved = await this.resolvePath(path)
+          if (resolved.rootId) {
+            const nativePath = resolved.relativePath || path
+            const stat = await this.diskExec.stat(resolved.rootId, nativePath)
+            if (!stat) diffs.push(path)  // not on disk → OPFS-only
+          } else {
+            diffs.push(path)
+          }
+        } catch {
+          diffs.push(path)
+        }
+      }
       return diffs
     }
 
@@ -3065,16 +3553,21 @@ export class WorkspaceRuntime {
     for (const path of opfsFiles.keys()) {
       try {
         const resolved = await this.resolvePath(path)
-        const handle = rootHandles.get(resolved.rootName)
-        if (!handle) {
-          // Root not mounted — count as needing sync.
-          diffs.push(path)
-          continue
-        }
         const nativePath = resolved.relativePath || path
-        // Only flag as OPFS-only if the native file does NOT exist.
-        // This avoids overwriting user's existing files on first sync.
-        await this.readFromNativeFS(nativePath, handle)
+
+        if (resolved.backend === 'native-host' && resolved.rootId) {
+          // Native-host root: check via executor
+          const stat = await this.diskExec.stat(resolved.rootId, nativePath)
+          if (!stat) diffs.push(path)
+        } else {
+          // FS Access root: check via handle
+          const handle = rootHandles.get(resolved.rootName)
+          if (!handle) {
+            diffs.push(path)
+            continue
+          }
+          await this.readFromNativeFS(nativePath, handle)
+        }
       } catch {
         // NotFoundError → OPFS-only. Other errors also default to needing sync.
         diffs.push(path)
@@ -3088,7 +3581,7 @@ export class WorkspaceRuntime {
    * sync flow after first mount.
    */
   async syncOpfsFilesToNative(
-    directoryHandle: FileSystemDirectoryHandle,
+    directoryHandle: FileSystemDirectoryHandle | null,
     paths: string[]
   ): Promise<{ synced: number; failed: number }> {
     if (!this.initialized) await this.initialize()
@@ -3107,37 +3600,21 @@ export class WorkspaceRuntime {
     opfsDir: FileSystemDirectoryHandle,
     path: string
   ): Promise<void> {
-    const parts = path.split('/')
+    const parts = path.split('/').filter(Boolean)
     const fileName = parts[parts.length - 1]
 
-    // Navigate to parent directory in OPFS
+    // Read file from OPFS
     let opfsCurrent = opfsDir
     for (let i = 0; i < parts.length - 1; i++) {
-      if (!parts[i]) continue
       opfsCurrent = await opfsCurrent.getDirectoryHandle(parts[i])
     }
-
-    // Read file from OPFS
     const opfsFile = await opfsCurrent.getFileHandle(fileName)
     const file = await opfsFile.getFile()
     const content = await file.arrayBuffer()
 
-    // Navigate to parent directory in Native FS
-    let nativeCurrent = nativeDir
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!parts[i]) continue
-      try {
-        nativeCurrent = await nativeCurrent.getDirectoryHandle(parts[i], { create: true })
-      } catch {
-        throw new Error(`Failed to create directory: ${parts[i]}`)
-      }
-    }
-
-    // Write to Native FS
-    const nativeFile = await nativeCurrent.getFileHandle(fileName, { create: true })
-    const writable = await nativeFile.createWritable()
-    await writable.write(content)
-    await writable.close()
+    // Write to Native FS via executor
+    const rootId = await this.resolveRootIdForHandle(nativeDir)
+    await this.diskExec.write(rootId, path, content)
   }
 
   /**
@@ -3147,18 +3624,8 @@ export class WorkspaceRuntime {
     nativeDir: FileSystemDirectoryHandle,
     path: string
   ): Promise<void> {
-    const parts = path.split('/')
-    const fileName = parts[parts.length - 1]
-
-    // Navigate to parent directory
-    let current = nativeDir
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!parts[i]) continue
-      current = await current.getDirectoryHandle(parts[i])
-    }
-
-    // Delete file
-    await current.removeEntry(fileName)
+    const rootId = await this.resolveRootIdForHandle(nativeDir)
+    await this.diskExec.delete(rootId, path)
   }
 
   //=============================================================================

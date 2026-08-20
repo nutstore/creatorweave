@@ -1,8 +1,8 @@
 /**
- * Renderer for `git_status` tool — file-centric working tree status.
+ * Renderer for `snapshot_status` tool — file-centric working tree status.
  *
  * Data shape from backend (via toolOkJson envelope):
- *   ctx.result = { ok: true, tool: "git_status", version: 2, data: { format, output?, status } }
+ *   ctx.result = { ok: true, tool: "snapshot_status", version: 2, data: { format, output?, status } }
  *   ctx.result.data.status = GitStatusResult {
  *     workspaceId, branch,
  *     pending: FileChangeEntry[],   // awaiting review
@@ -171,20 +171,20 @@ function StreamingPlaceholder() {
 // ── Renderer registration ──────────────────────────────────────────────────
 
 registerRenderer({
-  name: 'git_status',
+  name: 'snapshot_status',
   icon: <GitBranch className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     if (ctx.isExecuting) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-foreground">git_status</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_status</code>
           <span className="text-xs text-blue-500">loading...</span>
         </>
       )
     }
 
     const { branch, counts } = extractStatus(ctx)
-    const label = branch ? `git_status(${branch})` : 'git_status'
+    const label = branch ? `snapshot_status(${branch})` : 'snapshot_status'
 
     const parts: string[] = []
     if (counts.pending > 0) parts.push(`${counts.pending} pending`)

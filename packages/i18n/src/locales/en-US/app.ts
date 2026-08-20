@@ -4,7 +4,7 @@ export const app = {
     preparing: "Preparing...",
     loadProgress: "Load Progress",
     firstLoadHint: "First load may take a few seconds",
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     initComplete: "Initialization complete",
     initFailed: "Initialization failed",
     sessionStorageOnly:
@@ -68,7 +68,11 @@ export const app = {
     exportDatabaseSuccess: "Database backup downloaded: {filename}",
     exportDatabaseFailed: "Export failed: {error}",
     backupSuccess: "Full backup downloaded: {filename}",
+    backupSuccessWithKey:
+      "Full backup downloaded (includes API keys, restorable across devices): {filename}. Store it safely and never share it.",
     backupFailed: "Backup failed: {error}",
+    restoreSuccess: "Backup restored ({fileCount} files). Reloading…",
+    restoreFailed: "Restore failed: {error}. Current data may be incomplete — retry the import.",
     resetDatabase: "Reset Database",
     reloadPage: "Reload Page",
     updateAvailable: "A new version is available, update for the latest features",

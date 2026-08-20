@@ -4,13 +4,23 @@
 
 import { discoverWebMCPToolsInCurrentWindow } from './webmcp/discovery'
 import { invokeWebMCPTool } from './webmcp/invoke'
+import {
+  getHostAuthorizationMap,
+  getGroupAuthorizationMap,
+  setHostEnabled as setWebMCPHostEnabled,
+  setGroupEnabled as setWebMCPGroupEnabled,
+  annotateToolsWithHostAuthorization,
+} from './webmcp/authorization'
 import { streamPluginDownload } from './webmcp/plugin-download-transfer'
 import type { WebMCPPluginDownloadPlan } from './webmcp/types'
+import { registerTab, unregisterTab } from './webmcp/registry'
+import { WEBMCP_TAB_REPORT_TYPE } from './webmcp/relay-protocol'
 import {
   isSidePanelBindingId,
   isTrustedCreatorWeaveSenderUrl,
 } from '../lib/page-action-authorization'
 import { SidePanelBindingStore, type SidePanelBinding } from '../lib/side-panel-binding-store'
+import { getCwWebappBaseUrl } from '../lib/webapp-origins'
 
 // Config
 const CONFIG = {
@@ -189,9 +199,13 @@ async function searchDuckDuckGo(query, limit) {
 /** Fetch Baidu search results HTML (raw, unparsed) */
 async function fetchBaiduHtml(query, limit) {
   const url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}&rn=${Math.min(limit * 2, 20)}`;
+  // No spoofed User-Agent: the extension's own identity is used. Baidu serves
+  // /s results fine without a browser UA (verified), and an honest UA avoids
+  // impersonation concerns in store review. Note: in MV3 service workers the
+  // User-Agent header is browser-controlled anyway and custom values are
+  // ignored by fetch (it's a forbidden header) — kept here only as Accept/A-L.
   const resp = await fetchWithTimeout(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     },
@@ -481,7 +495,56 @@ async function handleFetchRender(message) {
 
 // ============================================================
 // Codex auth + proxy (minimal version)
+//
+// FEATURE FLAG: the whole block below is guarded by __CW_CODEX_OAUTH__
+// (build-time define, see wxt.config.ts). In the Chrome Web Store build
+// (CW_CODEX_OAUTH=0) every OpenAI endpoint / client_id / UA string is
+// treeshaken out of the bundle — no OpenAI code ships at all.
 // ============================================================
+
+declare const __CW_CODEX_OAUTH__: boolean;
+const CODEX_OAUTH_ENABLED: boolean = __CW_CODEX_OAUTH__;
+
+// Module-level holder for the Codex block's exports. The block below keeps
+// its original `if (CODEX_OAUTH_ENABLED) {}` scoping (store build: block is
+// folded away, CODEX stays null, no OpenAI strings ship). Dev build (no
+// minify): the block RUNS and populates CODEX, so call sites inside
+// defineBackground can access the helpers via CODEX.xxx — fixing the
+// ReferenceError where bare names leaked across the block boundary.
+interface CodexTokensLike { access_token?: string | null; refresh_token?: string; [k: string]: unknown }
+interface CodexBlockExports {
+  getCodexTokens(): Promise<CodexTokensLike | null>;
+  decodeJwtPayload(token: string): Record<string, any> | null;
+  refreshCodexAccessToken(tokens: CodexTokensLike): Promise<CodexTokensLike>;
+  saveCodexTokens(tokens: unknown): Promise<void>;
+  getPendingCodexAuth(): Promise<Record<string, any> | null>;
+  savePendingCodexAuth(data: unknown): Promise<void>;
+  clearPendingCodexAuth(): Promise<void>;
+  pollCodexAuthOnce(deviceAuthId: string, userCode: string): Promise<Record<string, any>>;
+  parseJsonSafe(resp: Response): Promise<{ text: string; json: any }>;
+  codexHeaders(tokens: CodexTokensLike): Record<string, string>;
+  getCodexResetCredits(tokens: CodexTokensLike): Promise<unknown>;
+  consumeCodexResetCredit(tokens: CodexTokensLike, creditId: string): Promise<unknown>;
+  DEVICEAUTH_USERCODE_URL: string;
+  DEVICE_VERIFY_URL: string;
+  CODEX_CLIENT_ID: string;
+  CODEX_AUTH_POLL_ALARM: string;
+  CODEX_RESPONSES_URL: string;
+  TOKEN_REFRESH_MARGIN_MS: number;
+  CODEX_DEFAULT_MODELS: unknown;
+}
+let CODEX = null as null | CodexBlockExports;
+
+// The entire Codex block below is wrapped in `if (CODEX_OAUTH_ENABLED) {}`.
+// This is what makes the store build (CW_CODEX_OAUTH=0) actually DROP the
+// code: esbuild folds `if (false) { ... }` at block level and eliminates the
+// whole scope — every OpenAI URL / client_id / UA string vanishes from the
+// bundle. (A bare top-level `const FLAG && ...` guard is NOT enough: the
+// helper functions and their string constants stay module-scope and survive
+// tree-shaking — verified by grepping the first store build.)
+// All call sites outside this block already check CODEX_OAUTH_ENABLED before
+// referencing these helpers, so the internal block scoping is safe.
+if (CODEX_OAUTH_ENABLED) {
 
 const DEVICEAUTH_USERCODE_URL = 'https://auth.openai.com/api/accounts/deviceauth/usercode';
 const DEVICEAUTH_TOKEN_URL = 'https://auth.openai.com/api/accounts/deviceauth/token';
@@ -704,35 +767,67 @@ async function pollCodexAuthOnce(deviceAuthId: string, userCode: string) {
   return { ok: true, done: true };
 }
 
+// Populate the module-level holder so defineBackground call sites can reach
+// these block-scoped helpers. Runs only when CODEX_OAUTH_ENABLED (dev/prod
+// internal builds); the store build folds the whole block away.
+CODEX = {
+  getCodexTokens,
+  decodeJwtPayload,
+  refreshCodexAccessToken,
+  saveCodexTokens,
+  getPendingCodexAuth,
+  savePendingCodexAuth,
+  clearPendingCodexAuth,
+  pollCodexAuthOnce,
+  parseJsonSafe,
+  codexHeaders,
+  getCodexResetCredits,
+  consumeCodexResetCredit,
+  DEVICEAUTH_USERCODE_URL,
+  DEVICE_VERIFY_URL,
+  CODEX_CLIENT_ID,
+  CODEX_AUTH_POLL_ALARM,
+  CODEX_RESPONSES_URL,
+  TOKEN_REFRESH_MARGIN_MS,
+  CODEX_DEFAULT_MODELS,
+};
+
+}
+
 // ============================================================
 // Message listener
 // ============================================================
 
 export default defineBackground(() => {
+  if (!CODEX_OAUTH_ENABLED) {
+    // Store build: Codex OAuth stripped. Alarm listener below still registers
+    // the non-Codex branches (schedule triggers), so keep going — only the
+    // Codex-specific proactive refresh and auth-poll branches are skipped.
+  }
   // ── Proactive token refresh: check on startup and every 5 minutes ──
   const CODEX_TOKEN_REFRESH_ALARM = 'codex_token_refresh_alarm';
 
   async function proactiveRefreshIfNeeded() {
     try {
-      const tokens = await getCodexTokens();
+      const tokens = await CODEX!.getCodexTokens();
       if (!tokens?.access_token) return;
 
-      const payload = decodeJwtPayload(tokens.access_token);
+      const payload = CODEX!.decodeJwtPayload(tokens.access_token);
       if (!payload?.exp) return; // can't determine expiry, skip
 
       const expiresAt = payload.exp * 1000; // JWT exp is in seconds
       const now = Date.now();
 
-      if (now >= expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+      if (now >= expiresAt - CODEX!.TOKEN_REFRESH_MARGIN_MS) {
         // Token is expired or about to expire — try refresh
         if (tokens.refresh_token) {
           try {
-            await refreshCodexAccessToken(tokens);
+            await CODEX!.refreshCodexAccessToken(tokens);
           } catch (err) {
             console.warn('[Codex] Proactive refresh failed:', err instanceof Error ? err.message : err);
             // Clear tokens if refresh fails and token is already expired
             if (now >= expiresAt) {
-              await saveCodexTokens({ ...tokens, access_token: null });
+              await CODEX!.saveCodexTokens({ ...tokens, access_token: null });
             }
           }
         }
@@ -743,13 +838,13 @@ export default defineBackground(() => {
   }
 
   // Check on service worker startup
-  proactiveRefreshIfNeeded();
+  if (CODEX_OAUTH_ENABLED) proactiveRefreshIfNeeded();
 
   // Schedule periodic checks (every 5 minutes)
-  chrome.alarms.create(CODEX_TOKEN_REFRESH_ALARM, { periodInMinutes: 5 });
+  if (CODEX_OAUTH_ENABLED) chrome.alarms.create(CODEX_TOKEN_REFRESH_ALARM, { periodInMinutes: 5 });
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === CODEX_TOKEN_REFRESH_ALARM) {
+    if (CODEX_OAUTH_ENABLED && alarm.name === CODEX_TOKEN_REFRESH_ALARM) {
       await proactiveRefreshIfNeeded();
       return;
     }
@@ -761,18 +856,18 @@ export default defineBackground(() => {
       return
     }
 
-    if (alarm.name !== CODEX_AUTH_POLL_ALARM) return;
+    if (!CODEX_OAUTH_ENABLED || alarm.name !== CODEX!.CODEX_AUTH_POLL_ALARM) return;
     try {
-      const pending = await getPendingCodexAuth();
+      const pending = await CODEX!.getPendingCodexAuth();
       if (!pending) {
-        await chrome.alarms.clear(CODEX_AUTH_POLL_ALARM);
+        await chrome.alarms.clear(CODEX!.CODEX_AUTH_POLL_ALARM);
         return;
       }
       if (!pending.expires_at || pending.expires_at <= Date.now()) {
-        await clearPendingCodexAuth();
+        await CODEX!.clearPendingCodexAuth();
         return;
       }
-      await pollCodexAuthOnce(pending.device_auth_id, pending.user_code);
+      await CODEX!.pollCodexAuthOnce(pending.device_auth_id, pending.user_code);
     } catch {
       // keep alarm for next retry
     }
@@ -816,6 +911,9 @@ export default defineBackground(() => {
 
   chrome.tabs.onRemoved.addListener((tabId) => {
     _sidePanelTabs.delete(tabId)
+    // Tab closed → its WebMCP registry entry is stale; drop it so the
+    // popup/discover snapshot never lists tools from dead tabs.
+    unregisterTab(tabId).catch(() => {})
   })
 
   /**
@@ -872,6 +970,104 @@ export default defineBackground(() => {
     }
   }
 
+  // ── Agent completion notifications ────────────────────────────────────────
+  // The Web SW's showNotification cannot focus a tab (Web SWs lack tab
+  // privileges), so agent-loop-complete notifications route through the
+  // extension background instead: chrome.notifications + onClicked →
+  // chrome.tabs.update(tabId, { active: true }) refocuses the CreatorWeave tab.
+
+  /** sender tab ids of pending agent notifications, keyed by notification id */
+  const _agentNotifTabs = new Map<string, number>()
+
+  /** Show an agent-completion notification that focuses the sender tab on click. */
+  async function showAgentNotification(options: {
+    title: string
+    body: string
+    conversationId?: string
+    tabId?: number
+  }): Promise<void> {
+    try {
+      const notifId = `agent-${Date.now()}`
+      if (typeof options.tabId === 'number') {
+        _agentNotifTabs.set(notifId, options.tabId)
+      }
+      await chrome.notifications.create(notifId, {
+        type: 'basic',
+        iconUrl: '/icon.png',
+        title: options.title,
+        message: options.body,
+        priority: 1,
+        requireInteraction: false,
+      })
+    } catch {
+      // notifications may not be available
+    }
+  }
+
+  chrome.notifications.onClicked.addListener((notifId) => {
+    const tabId = _agentNotifTabs.get(notifId)
+    if (tabId === undefined) return // not an agent notification
+    _agentNotifTabs.delete(notifId)
+    chrome.tabs.update(tabId, { active: true }).catch(() => {
+      // Tab may be closed — ignore
+    })
+    // Also raise the tab's window (tab activation alone may not unminimize).
+    chrome.tabs.get(tabId).then((tab) => {
+      if (tab.windowId) chrome.windows.update(tab.windowId, { focused: true }).catch(() => {})
+    }).catch(() => {})
+  })
+
+  chrome.notifications.onClosed.addListener((notifId) => {
+    _agentNotifTabs.delete(notifId)
+  })
+
+  // ── Side panel open (shared: floating page button toggle + popup CTA) ──
+  // Synchronous on purpose: chrome.sidePanel.open() must be called within
+  // the user-gesture call stack of the triggering onMessage handler.
+  function openSidePanelForTab(tabId: number, pageUrl: string): void {
+    const bindingId = crypto.randomUUID()
+    rememberSidePanelBinding(bindingId, tabId)
+
+    const params = new URLSearchParams()
+    params.set('source', 'side_panel')
+    params.set('binding', bindingId)
+    if (pageUrl) {
+      try {
+        params.set('origin', new URL(pageUrl).origin)
+      } catch {}
+    }
+
+    // Site (.cn/.com) is chosen at runtime by browser language; dev builds
+    // target the local Vite server (handled inside getCwWebappBaseUrl).
+    const cwBase = getCwWebappBaseUrl()
+    const cwUrl = `${cwBase}/#/?${params.toString()}`
+    // eslint-disable-next-line no-console
+    console.log('[CreatorWeave][bg] opening side panel', {
+      tabId,
+      pageUrl,
+      cwUrl,
+    })
+
+    // setOptions must run BEFORE open; do NOT await (preserves user gesture).
+    // Pattern from Chrome's official sample + the user-gesture thread:
+    // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
+    chrome.sidePanel.setOptions({
+      tabId,
+      path: cwUrl,
+      enabled: true,
+    })
+
+    chrome.sidePanel.open({ tabId }).then(() => {
+      _sidePanelTabs.add(tabId)
+    }).catch((err: any) => {
+      console.warn(
+        '[CreatorWeave] Side panel open failed, falling back to new tab:',
+        err,
+      )
+      chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
+    })
+  }
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // ── Side Panel: toggle open/close on user click ──
     // Per Chrome's official sample, chrome.sidePanel.open() can be called
@@ -910,47 +1106,31 @@ export default defineBackground(() => {
       }
 
       // ── Toggle open ──
-      const pageUrl = typeof message.url === 'string' ? message.url : ''
-      const bindingId = crypto.randomUUID()
-      rememberSidePanelBinding(bindingId, tabId)
+      openSidePanelForTab(tabId, typeof message.url === 'string' ? message.url : '')
+      return false
+    }
 
-      const params = new URLSearchParams()
-      params.set('source', 'side_panel')
-      params.set('binding', bindingId)
-      if (pageUrl) {
-        try {
-          params.set('origin', new URL(pageUrl).origin)
-        } catch {}
+    // ── Side panel: binding registration, from the popup CTA ──
+    // The popup calls chrome.sidePanel.open() DIRECTLY (in its own click
+    // handler) because the user gesture required by open() does NOT survive
+    // the popup → background message hop (it does for the floating button's
+    // content-script click → background hop, which is the documented special
+    // case this listener was built for). The popup still needs the binding
+    // registered here (storage) and the tab marked as panel-open so the
+    // floating button's toggle semantics stay correct.
+    // Fire-and-forget from the popup: storage.local writes settle in ~ms,
+    // while the panel's web app resolves the binding much later (at the
+    // first page-context pull), so the race window is negligible.
+    if (message.type === 'cw_side_panel_register_binding') {
+      const bindingId = message.bindingId
+      const tabId = message.tabId
+      if (typeof bindingId !== 'string' || typeof tabId !== 'number') {
+        sendResponse({ ok: false, error: 'missing bindingId or tabId' })
+        return false
       }
-
-      const isDev = import.meta.env.MODE === 'development'
-      const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
-      const cwUrl = `${cwBase}/#/?${params.toString()}`
-      // eslint-disable-next-line no-console
-      console.log('[CreatorWeave][bg] opening side panel', {
-        tabId,
-        pageUrl,
-        cwUrl,
-      })
-
-      // setOptions must run BEFORE open; do NOT await (preserves user gesture).
-      // Pattern from Chrome's official sample + the user-gesture thread:
-      // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
-      chrome.sidePanel.setOptions({
-        tabId,
-        path: cwUrl,
-        enabled: true,
-      })
-
-      chrome.sidePanel.open({ tabId }).then(() => {
-        _sidePanelTabs.add(tabId)
-      }).catch((err: any) => {
-        console.warn(
-          '[CreatorWeave] Side panel open failed, falling back to new tab:',
-          err,
-        )
-        chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
-      })
+      rememberSidePanelBinding(bindingId, tabId)
+      _sidePanelTabs.add(tabId)
+      sendResponse({ ok: true })
       return false
     }
 
@@ -1073,7 +1253,15 @@ export default defineBackground(() => {
               },
             })
             const result = Array.isArray(results) ? results[0]?.result : null
-            sendResponse(result ?? null)
+            // Attach the bound tab's id so the web app can scope WebMCP tool
+            // groups to THIS tab (same-hostname tabs in different apps —
+            // e.g. jmail.world / vs /messages — expose disjoint toolsets;
+            // hostname-only filtering would merge them).
+            const payload =
+              result && typeof result === 'object'
+                ? { ...(result as Record<string, unknown>), tabId: targetTabId }
+                : result ?? null
+            sendResponse(payload)
           } catch (err: any) {
             console.warn('[Background] requestBoundPageContext failed:', err?.message || err)
             sendResponse(null)
@@ -1231,9 +1419,132 @@ export default defineBackground(() => {
           return;
         }
 
+        // ── WebMCP registry feed (static content scripts) ──
+        // Tab reports arrive from webmcp.content.ts (ISOLATED relay) with
+        // the browser-verified sender.tab. Identity (tabId/hostname/title/
+        // url/windowId) comes ONLY from _sender — the page payload carries
+        // nothing but the validated tool list, so a hostile page cannot
+        // forge reports about other tabs. Empty toolset → unregister.
+        if (message.type === WEBMCP_TAB_REPORT_TYPE) {
+          const tab = _sender?.tab;
+          if (!tab || typeof tab.id !== 'number' || typeof tab.url !== 'string') {
+            sendResponse({ ok: false, error: 'webmcp_tab_report requires a tab sender' });
+            return;
+          }
+          let hostname = '';
+          try {
+            const parsed = new URL(tab.url);
+            hostname = parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.hostname : '';
+          } catch {
+            hostname = '';
+          }
+          if (!hostname) {
+            sendResponse({ ok: false, error: 'webmcp_tab_report sender is not an http(s) tab' });
+            return;
+          }
+          const tools = Array.isArray(message.tools) ? message.tools : [];
+          try {
+            // Empty toolset → registerTab keeps the tab in the "seen" set
+            // (so legacy probe skips it) while removing any stale entry.
+            // unregisterTab is reserved for tab-close cleanup.
+            await registerTab({
+              tabId: tab.id,
+              hostname,
+              tabTitle: tab.title || '',
+              tabUrl: tab.url,
+              windowId: tab.windowId,
+              apiMode: typeof message.apiMode === 'string' ? message.apiMode : undefined,
+              tools,
+            });
+            sendResponse({ ok: true });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
+          }
+          return;
+        }
+
         if (message.type === 'webmcp_discover_tools') {
-          const senderWindowId = _sender?.tab?.windowId;
-          sendResponse(await discoverWebMCPToolsInCurrentWindow(senderWindowId));
+          // Window scoping: a web page sender is scoped to ITS window via
+          // sender.tab.windowId. The popup (no sender.tab) must scope itself
+          // explicitly — it passes options.windowId from its own
+          // chrome.windows.getCurrent(). Without this the popup's discover
+          // returned a CROSS-WINDOW global list (“ghost” sites from other
+          // windows). Only trusted extension-internal senders may override.
+          const isExtensionInternalSender = !_sender?.tab;
+          const senderWindowId = _sender?.tab?.windowId
+            ?? (isExtensionInternalSender && typeof message?.options?.windowId === 'number'
+              ? message.options.windowId
+              : undefined);
+          const response = await discoverWebMCPToolsInCurrentWindow(senderWindowId);
+          // Authorization is enforced at DISCOVERY time: tools from disabled
+          // hosts/groups are filtered out entirely — a disabled site simply
+          // does not exist for consumers. Unauthorized metadata (names,
+          // schemas, source tabs) must not leak to pages either.
+          // The popup is exempt: it needs the full picture to let the user
+          // re-enable hidden sites, so it passes includeDisabled.
+          if (response.ok) {
+            const [hostMap, groupMap] = await Promise.all([
+              getHostAuthorizationMap(),
+              getGroupAuthorizationMap(),
+            ]);
+            const annotated = annotateToolsWithHostAuthorization(
+              response.tools || [],
+              hostMap,
+              groupMap
+            );
+            // includeDisabled is honored ONLY for extension-internal senders
+            // (popup/background pages have no sender.tab). Messages relayed
+            // from web pages always carry sender.tab — even if a page forges
+            // the flag, it is ignored here. Disabled tools must not exist
+            // for web content.
+            const isExtensionInternal = !_sender?.tab;
+            const includeDisabled = isExtensionInternal && message?.options?.includeDisabled === true;
+            (response as any).tools = includeDisabled
+              ? annotated
+              : annotated.filter((tool: any) => tool.hostEnabled !== false && tool.groupEnabled !== false);
+          }
+          sendResponse(response);
+          return;
+        }
+
+        if (message.type === 'webmcp_get_host_authorization') {
+          const [hostMap, groupMap] = await Promise.all([
+            getHostAuthorizationMap(),
+            getGroupAuthorizationMap(),
+          ]);
+          sendResponse({ ok: true, enabledByHost: hostMap, enabledByGroup: groupMap });
+          return;
+        }
+
+        if (message.type === 'webmcp_set_host_enabled') {
+          const hostname = typeof message.hostname === 'string' ? message.hostname : '';
+          const enabled = message.enabled === true;
+          if (!hostname) {
+            sendResponse({ ok: false, error: 'hostname is required' });
+            return;
+          }
+          try {
+            const map = await setWebMCPHostEnabled(hostname, enabled);
+            sendResponse({ ok: true, enabledByHost: map });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
+          }
+          return;
+        }
+
+        if (message.type === 'webmcp_set_group_enabled') {
+          const groupKey = typeof message.groupKey === 'string' ? message.groupKey : '';
+          const enabled = message.enabled === true;
+          if (!groupKey) {
+            sendResponse({ ok: false, error: 'groupKey is required' });
+            return;
+          }
+          try {
+            const map = await setWebMCPGroupEnabled(groupKey, enabled);
+            sendResponse({ ok: true, enabledByGroup: map });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
+          }
           return;
         }
 
@@ -1262,13 +1573,13 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_auth_start') {
-          const resp = await fetch(DEVICEAUTH_USERCODE_URL, {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_auth_start') {
+          const resp = await fetch(CODEX!.DEVICEAUTH_USERCODE_URL, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ client_id: CODEX_CLIENT_ID }),
+            body: JSON.stringify({ client_id: CODEX!.CODEX_CLIENT_ID }),
           });
-          const { text, json } = await parseJsonSafe(resp);
+          const { text, json } = await CODEX!.parseJsonSafe(resp);
           if (!resp.ok) {
             sendResponse({ ok: false, status: resp.status, error: json || text });
             return;
@@ -1276,11 +1587,11 @@ export default defineBackground(() => {
 
           const data = {
             ...json,
-            verification_uri: DEVICE_VERIFY_URL,
-            verification_uri_complete: DEVICE_VERIFY_URL,
+            verification_uri: CODEX!.DEVICE_VERIFY_URL,
+            verification_uri_complete: CODEX!.DEVICE_VERIFY_URL,
           };
 
-          await savePendingCodexAuth({
+          await CODEX!.savePendingCodexAuth({
             user_code: data.user_code,
             device_auth_id: data.device_auth_id,
             verification_uri: data.verification_uri,
@@ -1289,18 +1600,18 @@ export default defineBackground(() => {
             interval: data.interval || 5,
           });
 
-          await chrome.alarms.create(CODEX_AUTH_POLL_ALARM, { periodInMinutes: 1 });
+          await chrome.alarms.create(CODEX!.CODEX_AUTH_POLL_ALARM, { periodInMinutes: 1 });
 
           sendResponse({ ok: true, data });
           return;
         }
 
-        if (message.type === 'codex_auth_poll') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_auth_poll') {
           let deviceAuthId = message.deviceAuthId;
           let userCode = message.userCode;
 
           if (!deviceAuthId || !userCode) {
-            const pending = await getPendingCodexAuth();
+            const pending = await CODEX!.getPendingCodexAuth();
             deviceAuthId = pending?.device_auth_id;
             userCode = pending?.user_code;
           }
@@ -1310,28 +1621,28 @@ export default defineBackground(() => {
             return;
           }
 
-          const result = await pollCodexAuthOnce(deviceAuthId, userCode);
+          const result = await CODEX!.pollCodexAuthOnce(deviceAuthId, userCode);
           sendResponse(result);
           return;
         }
 
-        if (message.type === 'codex_get_status') {
-          const tokens = await getCodexTokens();
-          const pending = await getPendingCodexAuth();
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_status') {
+          const tokens = await CODEX!.getCodexTokens();
+          const pending = await CODEX!.getPendingCodexAuth();
           let authState: string = 'idle';
           let authorized = false;
 
           if (tokens?.access_token) {
             // Check if access token is actually still valid (JWT exp)
-            const payload = decodeJwtPayload(tokens.access_token);
+            const payload = CODEX!.decodeJwtPayload(tokens.access_token);
             const expiresAt = payload?.exp ? payload.exp * 1000 : 0;
             const now = Date.now();
 
-            if (expiresAt && now >= expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+            if (expiresAt && now >= expiresAt - CODEX!.TOKEN_REFRESH_MARGIN_MS) {
               // Token expired or about to expire — try proactive refresh
               if (tokens.refresh_token) {
                 try {
-                  await refreshCodexAccessToken(tokens);
+                  await CODEX!.refreshCodexAccessToken(tokens);
                   authState = 'authorized';
                   authorized = true;
                 } catch {
@@ -1351,7 +1662,7 @@ export default defineBackground(() => {
           } else if (pending) {
             // Remove expired/orphaned device-code state so the popup cannot
             // keep polling an old login attempt forever.
-            await clearPendingCodexAuth();
+            await CODEX!.clearPendingCodexAuth();
             if (tokens && !tokens.access_token) authState = 'expired';
           } else if (tokens && !tokens.access_token) {
             authState = 'expired';
@@ -1362,27 +1673,27 @@ export default defineBackground(() => {
             data: {
               authorized,
               authState,
-              models: CODEX_DEFAULT_MODELS,
+              models: CODEX!.CODEX_DEFAULT_MODELS,
               updatedAt: tokens ? await chrome.storage.local.get('codex_token_saved_at').then(r => r.codex_token_saved_at || null) : null,
             },
           });
           return;
         }
 
-        if (message.type === 'codex_get_usage') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_usage') {
           const { codex_usage } = await chrome.storage.local.get('codex_usage');
           sendResponse({ ok: true, data: codex_usage || null });
           return;
         }
 
-        if (message.type === 'codex_get_reset_credits') {
-          const tokens = await getCodexTokens();
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_reset_credits') {
+          const tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
             return;
           }
           try {
-            const data = await getCodexResetCredits(tokens);
+            const data = await CODEX!.getCodexResetCredits(tokens);
             sendResponse({ ok: true, data });
           } catch (err: any) {
             sendResponse({ ok: false, errorCode: 'RESET_CREDITS_UNAVAILABLE', status: 502, message: String(err?.message || err) });
@@ -1390,8 +1701,8 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_consume_reset_credit') {
-          const tokens = await getCodexTokens();
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_consume_reset_credit') {
+          const tokens = await CODEX!.getCodexTokens();
           const creditId = typeof message.creditId === 'string' ? message.creditId : '';
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
@@ -1402,7 +1713,7 @@ export default defineBackground(() => {
             return;
           }
           try {
-            const data = await consumeCodexResetCredit(tokens, creditId);
+            const data = await CODEX!.consumeCodexResetCredit(tokens, creditId);
             sendResponse({ ok: true, data });
           } catch (err: any) {
             sendResponse({ ok: false, errorCode: 'RESET_CREDIT_CONSUME_FAILED', status: 502, message: String(err?.message || err) });
@@ -1410,14 +1721,14 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_proxy_fetch') {
-          let tokens = await getCodexTokens();
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_proxy_fetch') {
+          let tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
             return;
           }
 
-          const requestUrl = message.url || CODEX_RESPONSES_URL;
+          const requestUrl = message.url || CODEX!.CODEX_RESPONSES_URL;
           const requestInit: RequestInit = {
             method: message.method || 'POST',
             body: message.body ? JSON.stringify(message.body) : undefined,
@@ -1425,15 +1736,15 @@ export default defineBackground(() => {
 
           let resp = await fetch(requestUrl, {
             ...requestInit,
-            headers: codexHeaders(tokens.access_token, message.headers || {}),
+            headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
           });
 
           if (resp.status === 401 && tokens?.refresh_token) {
             try {
-              tokens = await refreshCodexAccessToken(tokens);
+              tokens = await CODEX!.refreshCodexAccessToken(tokens);
               resp = await fetch(requestUrl, {
                 ...requestInit,
-                headers: codexHeaders(tokens.access_token, message.headers || {}),
+                headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
               });
             } catch (refreshErr) {
               sendResponse({ ok: false, errorCode: 'REAUTH_REQUIRED', status: 401, message: 'Token refresh failed. Please re-authorize in the extension popup.' });
@@ -1494,6 +1805,24 @@ export default defineBackground(() => {
           return
         }
 
+        if (message.type === 'cw_agent_show_notification') {
+          // Agent-loop-complete notification — clicking it refocuses the
+          // sender tab (see showAgentNotification above for rationale).
+          const { title, body, conversationId } = message as {
+            title: string
+            body: string
+            conversationId?: string
+          }
+          await showAgentNotification({
+            title,
+            body,
+            conversationId,
+            tabId: _sender?.tab?.id,
+          })
+          sendResponse({ ok: true })
+          return
+        }
+
         if (message.type === 'cw_schedule_disable_notification') {
           // CreatorWeave notifies us that a schedule was disabled (e.g., bound conversation deleted)
           const { scheduleId, reason } = message as { scheduleId: string; reason?: string }
@@ -1507,6 +1836,81 @@ export default defineBackground(() => {
             body: reason ? `原因：${reason}` : '定时任务已被禁用',
           })
           sendResponse({ ok: true })
+          return
+        }
+
+        if (message.type === 'native_host_call') {
+          // Native Host: disk file I/O via Chrome Native Messaging
+          // content.ts relays page payload fields at the top level
+          // ({ type, ...payload }). Keep the nested-payload fallback for
+          // direct/legacy callers, but never lose the current action field.
+          const nestedPayload = message.payload as Record<string, any> | undefined
+          const action = (message.action ?? nestedPayload?.action) as string
+          const allowedActions = new Set([
+            'ping', 'list_scopes', 'pick_folder', 'remove_scope',
+            'stat_file', 'list_dir', 'read_file', 'read_file_at',
+            'write_file', 'write_file_at', 'delete_file',
+            'check_policy', 'exec_sync',
+            'get_execpolicy', 'set_execpolicy',
+            // Background process management (STATUS.md §17)
+            'exec_start', 'exec_logs', 'exec_status', 'exec_stop', 'exec_list',
+          ])
+          if (!action || !allowedActions.has(action)) {
+            sendResponse({ ok: false, error: `action not allowed: ${action || '(empty)'}` })
+            return
+          }
+          try {
+            const { type: _type, __agentWebBridge: _bridge, id: _id, payload: _payload, ...topLevelPayload } = message as Record<string, any>
+            const nativePayload = message.action !== undefined ? topLevelPayload : nestedPayload
+            const actionName = typeof nativePayload?.action === 'string' ? nativePayload.action : ''
+            const configuredExecTimeoutSeconds =
+              typeof nativePayload?.timeout === 'number' && nativePayload.timeout > 0
+                ? nativePayload.timeout
+                : 120
+            // File operations should fail promptly when the host is broken,
+            // but exec_sync and pick_folder are deliberately long-running:
+            // the former has its own command timeout and the latter waits for
+            // an explicit user choice. A single 20-second timeout for every
+            // action incorrectly labels healthy work as a host failure.
+            const NATIVE_HOST_TIMEOUT_MS = actionName === 'exec_sync'
+              ? Math.max(20_000, configuredExecTimeoutSeconds * 1_000 + 5_000)
+              : actionName === 'pick_folder'
+                ? 5 * 60_000
+                : 20_000
+            const sendNativeMessageWithTimeout = () => new Promise<any>((resolve, reject) => {
+              let settled = false
+              const timer = setTimeout(() => {
+                if (settled) return
+                settled = true
+                const timeoutError = new Error(`Native host did not respond within ${NATIVE_HOST_TIMEOUT_MS / 1000}s`)
+                ;(timeoutError as Error & { code?: string }).code = 'NATIVE_HOST_TIMEOUT'
+                reject(timeoutError)
+              }, NATIVE_HOST_TIMEOUT_MS)
+              chrome.runtime.sendNativeMessage(
+                'com.creatorweave.nativehost',
+                nativePayload,
+                (response: any) => {
+                  if (settled) return
+                  settled = true
+                  clearTimeout(timer)
+                  const runtimeError = chrome.runtime.lastError
+                  if (runtimeError) {
+                    reject(new Error(String(runtimeError.message || runtimeError)))
+                    return
+                  }
+                  resolve(response ?? { ok: false, error: 'Empty response from native host' })
+                }
+              )
+            })
+            const response = await sendNativeMessageWithTimeout()
+            sendResponse(response)
+          } catch (err: any) {
+            sendResponse({
+              ok: false,
+              error: String(err?.message || err),
+              errorCode: err?.code === 'NATIVE_HOST_TIMEOUT' ? 'NATIVE_HOST_TIMEOUT' : 'NATIVE_HOST_ERROR',
+            })
+          }
           return
         }
 
@@ -1640,7 +2044,7 @@ export default defineBackground(() => {
         return;
       }
 
-      if (message.type !== 'codex_proxy_fetch_stream') return;
+      if (!CODEX_OAUTH_ENABLED || message.type !== 'codex_proxy_fetch_stream') return;
 
       (async () => {
         // Per-request timeout: 5 minutes for streaming (long-running requests)
@@ -1651,7 +2055,7 @@ export default defineBackground(() => {
         }, STREAM_TIMEOUT_MS);
 
         try {
-          let tokens = await getCodexTokens();
+          let tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
             clearTimeout(timeoutId);
             port.postMessage({ type: 'error', errorCode: 'NOT_AUTHORIZED', message: 'Not authorized. Please complete device code login first.' });
@@ -1659,23 +2063,23 @@ export default defineBackground(() => {
             return;
           }
 
-          const requestUrl = message.url || CODEX_RESPONSES_URL;
+          const requestUrl = message.url || CODEX!.CODEX_RESPONSES_URL;
           const body = { ...(message.body || {}), stream: true };
 
           let resp = await fetch(requestUrl, {
             method: 'POST',
             body: JSON.stringify(body),
-            headers: codexHeaders(tokens.access_token, message.headers || {}),
+            headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
           });
 
           // Auto-refresh on 401
           if (resp.status === 401 && tokens?.refresh_token) {
             try {
-              tokens = await refreshCodexAccessToken(tokens);
+              tokens = await CODEX!.refreshCodexAccessToken(tokens);
               resp = await fetch(requestUrl, {
                 method: 'POST',
                 body: JSON.stringify(body),
-                headers: codexHeaders(tokens.access_token, message.headers || {}),
+                headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
               });
             } catch (refreshErr) {
               clearTimeout(timeoutId);

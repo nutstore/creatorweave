@@ -225,9 +225,10 @@ export const csvHandler: FormatHandler = {
     'This is a CSV (Comma-Separated Values) file. read() returns data as a Markdown table. '
     + 'For small files (≤50 data rows), full content is shown. '
     + 'For larger files, header + first 50 rows + summary are shown. '
-    + 'Write/edit is supported — provide valid CSV text content.',
+    + 'Write/edit is supported — provide valid CSV text content (raw CSV, not the Markdown rendering). '
+    + 'For deeper analysis use Python: pd.read_csv(path).',
 
-  async read(data: ArrayBuffer | Uint8Array, path: string): Promise<FormatReadResult> {
+  async read(data: ArrayBuffer | Uint8Array, _path: string): Promise<FormatReadResult> {
     const text = new TextDecoder('utf-8').decode(data instanceof ArrayBuffer ? new Uint8Array(data) : data)
 
     // Handle BOM
@@ -235,7 +236,7 @@ export const csvHandler: FormatHandler = {
 
     if (cleaned.trim() === '') {
       return {
-        content: `[CSV] ${path}\n(empty file)`,
+        content: '(empty file)',
         kind: 'csv',
       }
     }
@@ -244,20 +245,18 @@ export const csvHandler: FormatHandler = {
 
     if (headers.length === 0) {
       return {
-        content: `[CSV] ${path}\nNo parseable content found.`,
+        content: 'No parseable content found.',
         kind: 'csv',
       }
     }
 
-    // Build output
+    // Build output — content is the Markdown table only (+ truncation note).
+    // IMPORTANT: no `[CSV] path` header / Rows / Columns / Delimiter lines here:
+    // the envelope carries path/kind and stats live in metadata. Content-side
+    // headers get echoed back by models on write() and corrupt files
+    // (see the "[HTML] index.html" pollution incidents — same class of bug).
     const parts: string[] = []
     const isSmall = totalRows <= FULL_ROWS_THRESHOLD
-
-    parts.push(`[CSV] ${path}`)
-    parts.push(`Rows: ${totalRows}`)
-    parts.push(`Columns: ${totalCols}`)
-    parts.push(`Delimiter: "${delimiter === '\t' ? 'tab' : delimiter}"`)
-    parts.push('')
 
     if (totalRows === 0) {
       parts.push('(empty — headers only)')
@@ -271,12 +270,6 @@ export const csvHandler: FormatHandler = {
       const remaining = totalRows - FULL_ROWS_THRESHOLD
       parts.push(`... ${remaining} more row${remaining !== 1 ? 's' : ''} (showing first ${FULL_ROWS_THRESHOLD} of ${totalRows})`)
     }
-
-    // Add pandas analysis hint for all csv reads
-    const csvFileName = path.split('/').pop()!
-    parts.push('')
-    parts.push(`💡 Use Python (pandas) for deeper analysis: pd.read_csv('${csvFileName}')`)
-    parts.push('   Example: df = pd.read_csv(...); df.describe(); df.groupby(...).agg(...); df.plot(...)')
 
     return {
       content: parts.join('\n'),

@@ -690,7 +690,7 @@ export function MCPSettings() {
               {tf('mcp.extensionRequired', 'Browser extension required')}
             </p>
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400/80">
-              {tf('mcp.extensionRequiredHint', 'MCP service connections require the CreatorWeave browser extension. Go to the Extension tab in Settings to install it.')}
+              {tf('mcp.extensionRequiredHint', 'MCP service connections require the eo2weave browser extension. Go to the Extension tab in Settings to install it.')}
             </p>
           </div>
         </div>

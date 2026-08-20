@@ -4,12 +4,15 @@ import { BASE_SCHEMA_VERSION, initializeSchema } from './index'
 class SchemaDatabase {
   statements: string[] = []
   private missingConversationColumns: Set<string>
+  private missingProjectRootColumns: Set<string>
 
   constructor(
     public userVersion = 0,
     missingConversationColumns: string[] = [],
+    missingProjectRootColumns: string[] = [],
   ) {
     this.missingConversationColumns = new Set(missingConversationColumns)
+    this.missingProjectRootColumns = new Set(missingProjectRootColumns)
   }
 
   exec(sql: string): Array<{ values: number[][] }> {
@@ -25,9 +28,22 @@ class SchemaDatabase {
       throw new Error(`no such column: ${missingSelectedColumn}`)
     }
 
+    const selectedProjectRootColumns = [...sql.matchAll(/\b(?:backend|scope_id)\b/g)]
+      .map((match) => match[0])
+    const missingProjectRootColumn = selectedProjectRootColumns.find((column) =>
+      this.missingProjectRootColumns.has(column)
+    )
+    if (sql.includes('FROM project_roots LIMIT 0') && missingProjectRootColumn) {
+      throw new Error(`no such column: ${missingProjectRootColumn}`)
+    }
+
     const addedColumn = sql.match(/ALTER TABLE conversations ADD COLUMN (compressed_context_\w+)/)
     if (addedColumn) {
       this.missingConversationColumns.delete(addedColumn[1])
+    }
+    const addedProjectRootColumn = sql.match(/ALTER TABLE project_roots\s+ADD COLUMN (backend|scope_id)/)
+    if (addedProjectRootColumn) {
+      this.missingProjectRootColumns.delete(addedProjectRootColumn[1])
     }
 
     this.statements.push(sql)
@@ -67,7 +83,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(15)
+    expect(db.userVersion).toBe(17)
     expect(db.statements).toContainEqual(
       expect.stringContaining('CREATE TABLE IF NOT EXISTS flow_templates')
     )
@@ -87,7 +103,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(15)
+    expect(db.userVersion).toBe(17)
     expect(db.statements).toContainEqual(
       expect.stringContaining('ADD COLUMN compressed_context_summary')
     )
@@ -100,5 +116,47 @@ describe('initializeSchema', () => {
     const db = new SchemaDatabase(15, ['compressed_context_summary'])
 
     await expect(initializeSchema(db)).rejects.toThrow('SCHEMA_INCOMPATIBLE')
+  })
+
+  it('adds persisted backend identity to project roots when upgrading a v15 database', async () => {
+    const db = new SchemaDatabase(15)
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(17)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining("ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
+    )
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ADD COLUMN scope_id TEXT')
+    )
+  })
+
+  it('repairs project root columns when a v16 database is missing physical DDL', async () => {
+    const db = new SchemaDatabase(16, [], ['backend', 'scope_id'])
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(17)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining("ALTER TABLE project_roots ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
+    )
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ALTER TABLE project_roots ADD COLUMN scope_id TEXT')
+    )
+  })
+
+  it('repairs project root columns even when the database already reports v17', async () => {
+    const db = new SchemaDatabase(17, [], ['backend', 'scope_id'])
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(17)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining("ALTER TABLE project_roots ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
+    )
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ALTER TABLE project_roots ADD COLUMN scope_id TEXT')
+    )
   })
 })

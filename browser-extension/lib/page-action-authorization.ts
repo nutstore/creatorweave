@@ -1,10 +1,12 @@
 // Page-action calls cross from the CreatorWeave web app into extension
-// privileges. Keep this allowlist intentionally exact: production plus the
-// local Vite origin used during development.
-const TRUSTED_CREATORWEAVE_ORIGINS = new Set([
-  'https://creatorweave.eo2suite.cn',
-  'http://localhost:5173',
-])
+// privileges. Keep this allowlist intentionally exact: the dual-site
+// production origins (weave.eo2suite.cn / weave.eo2suite.com), the legacy
+// creatorweave.eo2suite.cn origin (trusted during the migration window), and
+// the local Vite origin used during development. Single source of truth:
+// lib/webapp-origins.ts.
+import { CW_WEBAPP_ORIGINS } from './webapp-origins'
+
+const TRUSTED_CREATORWEAVE_ORIGINS = new Set(CW_WEBAPP_ORIGINS)
 
 /** True only when the message originated from an approved CreatorWeave origin. */
 export function isTrustedCreatorWeaveSenderUrl(senderUrl: string | undefined): boolean {

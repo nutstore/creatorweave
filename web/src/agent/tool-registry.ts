@@ -24,20 +24,20 @@ import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm
 // Bash shell tool (just-bash sandbox)
 import { bashDefinition, bashToolExecutor, bashPromptDoc } from './tools/bash.tool'
 
-// Git tools
+// Snapshot tools (OPFS change review — NOT real git; real git goes through exec)
 import {
-  gitStatusDefinition,
-  gitStatusExecutor,
-  gitDiffDefinition,
-  gitDiffExecutor,
-  gitLogDefinition,
-  gitLogExecutor,
-  gitShowDefinition,
-  gitShowExecutor,
-  gitRestoreDefinition,
-  gitRestoreExecutor,
-  gitPromptDoc,
-} from './tools/git.tool'
+  snapshotStatusDefinition,
+  snapshotStatusExecutor,
+  snapshotDiffDefinition,
+  snapshotDiffExecutor,
+  snapshotLogDefinition,
+  snapshotLogExecutor,
+  snapshotShowDefinition,
+  snapshotShowExecutor,
+  snapshotRestoreDefinition,
+  snapshotRestoreExecutor,
+  snapshotPromptDoc,
+} from './tools/snapshot.tool'
 
 // Import skill tools
 import {
@@ -155,6 +155,21 @@ import {
 import { isPageActionAvailable } from './tools/page-action-bridge'
 import { supportsImageInput } from './llm/pi-ai-model-resolver'
 
+// Exec tool — run shell commands via Native Host (Tier 1.5, conditional)
+import {
+  isExecBridgeAvailable,
+  execDefinition,
+  execExecutor,
+  execPromptDoc,
+} from './tools/exec.tool'
+
+// Processes tool — inspect/manage background processes (STATUS.md §17, conditional on exec bridge)
+import {
+  processesDefinition,
+  processesExecutor,
+  processesPromptDoc,
+} from './tools/processes.tool'
+
 // Image generation tool (conditional — requires image gen model in provider cache)
 import {
   isImageGenAvailable,
@@ -170,8 +185,12 @@ import {
   searchToolsExecutor,
   callToolDefinition,
   callToolExecutor,
+  getPageToolsDefinition,
+  getPageToolsExecutor,
   unifiedExternalToolsPromptDoc,
+  getPageToolsPromptDoc,
 } from './external-tool-bridge'
+import { isSidePanelMode } from './workspace-assistant-context'
 
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
@@ -194,12 +213,12 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   ...(import.meta.env.DEV
     ? [{ definition: dbQueryTool.definition, executor: dbQueryTool.executor }]
     : []),
-  // Git tools
-  { definition: gitStatusDefinition, executor: gitStatusExecutor },
-  { definition: gitDiffDefinition, executor: gitDiffExecutor },
-  { definition: gitLogDefinition, executor: gitLogExecutor },
-  { definition: gitShowDefinition, executor: gitShowExecutor },
-  { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
+  // Snapshot tools (OPFS change review — NOT real git; real git goes through exec)
+  { definition: snapshotStatusDefinition, executor: snapshotStatusExecutor },
+  { definition: snapshotDiffDefinition, executor: snapshotDiffExecutor },
+  { definition: snapshotLogDefinition, executor: snapshotLogExecutor },
+  { definition: snapshotShowDefinition, executor: snapshotShowExecutor },
+  { definition: snapshotRestoreDefinition, executor: snapshotRestoreExecutor },
   // Sync native files to OPFS
   { definition: syncToOPFSDefinition, executor: syncToOPFSExecutor },
   // Changeset & sync tools (detect_conflicts always available; checkpoint tools registered dynamically)
@@ -235,7 +254,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   bashPromptDoc,
   ocrPromptDoc,
   canvasPromptDoc,
-  gitPromptDoc,
+  snapshotPromptDoc,
   changesetPromptDoc,
   searchConversationsPromptDoc,
   subagentPromptDoc,
@@ -247,10 +266,13 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   searchSkillsPromptDoc,
   installSkillPromptDoc,
   unifiedExternalToolsPromptDoc,
+  getPageToolsPromptDoc,
   imageGenPromptDoc,
   // Page action tools (only rendered when available — see getAvailableToolsDoc)
   pageReadPromptDoc,
   pageWritePromptDoc,
+  execPromptDoc,
+  processesPromptDoc,
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -312,6 +334,10 @@ export class ToolRegistry {
       if (doc.category === 'web' && !isWebBridgeAvailable()) continue
       // Skip page action tools if not available (extension + side panel)
       if (doc.category === 'page' && !isPageActionAvailable()) continue
+      // Skip get_page_tools doc outside side-panel mode — the tool is not
+      // registered there (see registerPageToolsFastPath) and its doc would
+      // advertise a capability that does not exist in this session.
+      if (doc === getPageToolsPromptDoc && !isSidePanelMode()) continue
       // External tools doc always shown — search_tools is always useful even with 0 external tools connected
       // Skip image gen tools if image gen model is not available
       if (doc.category === 'file-ops' && doc === imageGenPromptDoc && !isImageGenAvailable()) continue
@@ -550,6 +576,33 @@ export class ToolRegistry {
     }
   }
 
+  //=============================================================================
+  // Page Tools Fast Path (side-panel mode only)
+  //=============================================================================
+
+  /**
+   * Register get_page_tools — the side-panel fast path to the current page's
+   * WebMCP tool schemas. STRICTLY side-panel-gated: in regular workspace
+   * sessions there is no bound upstream page, so the tool is never registered
+   * (it would only ever return an error). Mirrors the register/unregister
+   * pattern of registerPageActionTools — idempotent, safe to call every
+   * getToolRegistry() access since side-panel mode can flip on mid-session.
+   */
+  registerPageToolsFastPath(): boolean {
+    const shouldHave = isSidePanelMode()
+    const has = this.has('get_page_tools')
+    if (shouldHave && !has) {
+      this.register(getPageToolsDefinition, getPageToolsExecutor)
+      console.log('[ToolRegistry] ✅ get_page_tools registered (side-panel mode)')
+      return true
+    }
+    if (!shouldHave && has) {
+      this.unregister('get_page_tools')
+      console.log('[ToolRegistry] get_page_tools unregistered (not in side-panel mode)')
+    }
+    return shouldHave
+  }
+
   /**
    * Unregister page action tools (e.g. when leaving side-panel mode
    * or when feature flags are toggled off).
@@ -564,6 +617,36 @@ export class ToolRegistry {
     this.unregister('page_type')
     this.unregister('page_scroll')
     this.unregister('page_evaluate')
+  }
+
+  //=============================================================================
+  // Exec Tool (Native Host — Tier 1.5 command execution)
+  //=============================================================================
+
+  /**
+   * Register the exec tool if the Native Host exec bridge is available.
+   * This lets the agent run shell commands (tests, builds, linters) on the
+   * user's machine via the authorized native-host root.
+   * Safe to call multiple times.
+   */
+  registerExecTool(): boolean {
+    if (!isExecBridgeAvailable()) return false
+    if (!this.has('exec')) {
+      this.register(execDefinition, execExecutor)
+      console.log('[ToolRegistry] ✅ Exec tool registered (Native Host bridge detected)')
+    }
+    // Background-process management rides along with the exec bridge.
+    if (!this.has('processes')) {
+      this.register(processesDefinition, processesExecutor)
+      console.log('[ToolRegistry] ✅ Processes tool registered')
+    }
+    return true
+  }
+
+  /** Unregister the exec tool (e.g. when native host disconnects). */
+  unregisterExecTool(): void {
+    this.unregister('exec')
+    this.unregister('processes')
   }
 
   //=============================================================================
@@ -724,8 +807,12 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerSkillTools()
     // Conditionally register web bridge tools (Browser Extension)
     instance.registerWebBridgeTools()
+    // Conditionally register exec tool (Native Host Tier 1.5)
+    instance.registerExecTool()
     // Conditionally register page action tools (Browser Extension + side panel)
     instance.registerPageActionTools()
+    // Conditionally register get_page_tools (side-panel mode only)
+    instance.registerPageToolsFastPath()
     // Set up listener for model cache updates (triggers image gen tool re-registration)
     ensureImageGenListener()
   } else {
@@ -733,8 +820,12 @@ export function getToolRegistry(): ToolRegistry {
     // installed after page load). registerWebBridgeTools() is idempotent — it
     // checks both availability and existing registration.
     instance.registerWebBridgeTools()
+    // Also try exec tool (native host may have been installed after page load)
+    instance.registerExecTool()
     // Also try page action tools (side-panel mode may have just become active)
     instance.registerPageActionTools()
+    // Re-check get_page_tools (side-panel mode may have flipped mid-session)
+    instance.registerPageToolsFastPath()
     // Also re-check image gen tool on every access
     instance.registerImageGenTool()
   }

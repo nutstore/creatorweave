@@ -1,3 +1,9 @@
+// Build-time Codex OAuth feature flag (see wxt.config.ts).
+// Store builds (CW_CODEX_OAUTH=0) hide the whole Codex box in the popup.
+declare const __CW_CODEX_OAUTH__: boolean;
+
+import { getCwWebappBaseUrl } from '../../lib/webapp-origins';
+
 function t(key: string, substitutions?: string | string[]): string {
   return chrome.i18n.getMessage(key as any, substitutions) || key;
 }
@@ -14,7 +20,9 @@ function localizeStaticContent(): void {
 localizeStaticContent();
 try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.getManifest().version; } catch {}
 
-// Show build mode (dev/prod)
+// Show build mode badge — DEV builds only.
+// Production builds hide the badge entirely: store users shouldn't see a
+// "PROD" tag (it leaks internal jargon and looks unpolished).
 (function () {
   var el = document.getElementById('buildMode');
   if (!el) return;
@@ -22,31 +30,536 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   // MODE is one of 'development' | 'production' per Vite contract.
   var mode = import.meta.env.MODE || 'production';
   var isDev = mode === 'development';
+  if (!isDev) {
+    el.remove();
+    return;
+  }
+  // DEV build: reveal and fill the badge (static HTML ships it hidden/empty).
+  el.removeAttribute('hidden');
   el.className = 'build-mode ' + (isDev ? 'dev' : 'prod');
   el.textContent = isDev ? 'DEV' : 'PROD';
 })();
 
-// Check injection status
+// ── L1 primary action: open the side-panel workbench ──
+// chrome.sidePanel.open() requires a user gesture, and that gesture does
+// NOT survive the popup → background message hop — so the popup calls
+// open() DIRECTLY, synchronously in its own click handler. The active tab
+// is cached at popup load time so the click handler stays synchronous.
+// Binding registration goes to the background fire-and-forget
+// (cw_side_panel_register_binding): storage writes settle in ~ms while the
+// panel web app resolves the binding much later, so the race is negligible.
 (function () {
-  var el = document.getElementById('status')!;
-  var dot = document.getElementById('statusDot')!;
-  var text = document.getElementById('statusText')!;
+  var btn = document.getElementById('openWorkbenchBtn');
+  if (!btn) return;
 
-  function setStatus(type: string, msg: string) {
-    el.className = 'status ' + type;
-    dot.className = 'status-dot ' + type;
-    text.textContent = msg;
+  // Cache the active tab once at popup load (async) so the click handler
+  // below runs fully synchronously — preserving the user gesture.
+  var activeTab: { id?: number; url?: string } | null = null;
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    var tab = tabs && tabs[0];
+    if (tab) activeTab = { id: tab.id, url: tab.url || '' };
+  });
+
+  btn.addEventListener('click', function () {
+    var tabId = activeTab && activeTab.id;
+    if (typeof tabId !== 'number') {
+      // No valid tab yet (very rare — popup opened before query resolved):
+      // open the web app in a plain tab as a graceful fallback.
+      chrome.tabs.create({ url: getCwWebappBaseUrl() + '/#/' });
+      window.close();
+      return;
+    }
+
+    // 1) Register the binding + panel-open marker (fire-and-forget).
+    var bindingId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    var cwBase = getCwWebappBaseUrl();
+    var params = new URLSearchParams();
+    params.set('source', 'side_panel');
+    params.set('binding', bindingId);
+    var pageUrl = (activeTab && activeTab.url) || '';
+    if (pageUrl) {
+      try { params.set('origin', new URL(pageUrl).origin); } catch {}
+    }
+    chrome.runtime.sendMessage(
+      { type: 'cw_side_panel_register_binding', bindingId: bindingId, tabId: tabId },
+      function () { void chrome.runtime.lastError; }
+    );
+
+    // 2) Configure the panel for this tab, then open it — directly from the
+    //    popup (user gesture intact). Same ordering contract as the floating
+    //    button's background handler: fire setOptions WITHOUT awaiting, then
+    //    call open() synchronously right after — Chrome processes both
+    //    browser-process calls in order, and open() stays on the gesture
+    //    call stack instead of inside a promise callback.
+    chrome.sidePanel.setOptions({
+      tabId: tabId,
+      path: cwBase + '/#/?' + params.toString(),
+      enabled: true,
+    }).catch(function (err: any) {
+      // eslint-disable-next-line no-console
+      console.warn('[EO2Weave popup] sidePanel.setOptions failed:', err);
+    });
+    chrome.sidePanel.open({ tabId: tabId }).then(function () {
+      window.close();
+    }).catch(function (err: any) {
+      // eslint-disable-next-line no-console
+      console.warn('[EO2Weave popup] side panel open failed, falling back to new tab:', err);
+      chrome.tabs.create({ url: cwBase + '/#/' }).catch(function () {});
+      window.close();
+    });
+  });
+})();
+
+// ── L2 capability block: two quiet rows summarizing what works right now ──
+// Two async writers feed one state object (injection check + WebMCP
+// discovery); renderCapline() merges them so the block never flickers between
+// competing updates. Search runs in the background service worker and works
+// regardless of injection — injection only gates page reading/acting.
+// Layout: row 1 = search status; row 2 (only when tools exist) = tool count
+// + manage toggle right-aligned — structured rows instead of one wrapping
+// long line (mid-sentence wraps looked broken at 360px).
+var capState = {
+  search: 'checking' as 'checking' | 'ready' | 'inactive' | 'internal' | 'unavailable' | 'error',
+  tools: null as null | { hosts: number; total: number },
+  note: '' as string, // diagnosability detail (tooltip only)
+};
+var capExpanded = false;
+
+function renderCapline(): void {
+  var dot = document.getElementById('capDot');
+  var text = document.getElementById('capText');
+  var toolsRow = document.getElementById('capToolsRow');
+  var toolsText = document.getElementById('capToolsText');
+  var mgr = document.getElementById('mgrToggle');
+  if (!dot || !text || !mgr || !toolsRow || !toolsText) return;
+
+  var base = '';
+  var dotCls = 'cap-dot ok';
+  switch (capState.search) {
+    case 'ready': base = t('capReady'); break;
+    case 'inactive': dotCls = 'cap-dot warn'; base = t('capInactive'); break;
+    case 'internal': dotCls = 'cap-dot warn'; base = t('capInternal'); break;
+    case 'unavailable': dotCls = 'cap-dot warn'; base = t('capUnavailable'); break;
+    case 'error': dotCls = 'cap-dot warn'; base = t('capCheckFailed'); break;
+    default: base = t('checking');
+  }
+  dot.className = dotCls;
+  text.textContent = base;
+  text.title = capState.note || '';
+
+  if (capState.tools && capState.tools.hosts > 0) {
+    toolsText.textContent = chrome.i18n.getMessage('capTools', [String(capState.tools.hosts)]) || String(capState.tools.hosts);
+    toolsText.title = chrome.i18n.getMessage('webmcpFoundSummary', [String(capState.tools.hosts), String(capState.tools.total)]) || '';
+    toolsRow.style.display = '';
+    mgr.style.display = '';
+    mgr.textContent = capExpanded ? t('hideTools') : t('manageTools');
+  } else {
+    toolsRow.style.display = 'none';
+    mgr.style.display = 'none';
+  }
+}
+
+(function () {
+  var mgr = document.getElementById('mgrToggle');
+  var box = document.getElementById('webmcpBox');
+  if (!mgr || !box) return;
+  mgr.addEventListener('click', function () {
+    capExpanded = !capExpanded;
+    box.style.display = capExpanded && capState.tools ? '' : 'none';
+    renderCapline();
+  });
+})();
+
+// WebMCP tools discovered in this window — grouped by hostname.
+// Mirrors the web app's Settings → WebMCP host list (WebMCPHostList.tsx):
+// hostname + tool count + per-host authorization switch. Clicking the
+// host name jumps to the source tab; the switch writes the extension-side
+// authorization store (enforced by the background invoke gate).
+(function () {
+  var box = document.getElementById('webmcpBox');
+  var list = document.getElementById('webmcpList');
+  var summary = document.getElementById('webmcpSummary');
+  if (!box || !list || !summary) return;
+
+  // hostname → latest authorization state (default: enabled)
+  var hostEnabled: Record<string, boolean> = {};
+
+  function renderIdle() {
+    box.style.display = 'none';
   }
 
+  function renderEmpty() {
+    box.style.display = 'none';
+    capState.tools = null;
+    capState.note = '';
+    renderCapline();
+  }
+
+  // Debug visibility: with the collapsed design, "no tools" and "discovery
+  // crashed" would be indistinguishable (the section just never appears).
+  // Keep the detail in the capability line's tooltip so issues stay
+  // diagnosable at a glance without cluttering the row.
+  function renderNoTools(detail?: string) {
+    box.style.display = 'none';
+    capState.tools = null;
+    capState.note = detail || '';
+    renderCapline();
+  }
+
+  function renderError(detail: string) {
+    box.style.display = 'none';
+    capState.tools = null;
+    capState.note = (chrome.i18n.getMessage('webmcpDiscoverError') || 'webmcpDiscoverError') + ': ' + detail;
+    renderCapline();
+  }
+
+  function cssEscape(value: string): string {
+    return (window as any).CSS && CSS.escape ? CSS.escape(value) : value.replace(/["\\]/g, '\\$&');
+  }
+
+  function setHostEnabledState(hostname: string, enabled: boolean) {
+    hostEnabled[hostname] = enabled;
+    var row = list && list.querySelector('[data-host="' + cssEscape(hostname) + '"]');
+    if (row) {
+      row.classList.toggle('disabled-host', !enabled);
+      var toggle = row.querySelector('input.webmcp-toggle') as HTMLInputElement | null;
+      if (toggle) {
+        toggle.checked = enabled;
+        toggle.disabled = false;
+        toggle.title = enabled
+          ? (chrome.i18n.getMessage('webmcpToggleHostTitle') || 'webmcpToggleHostTitle')
+          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled');
+      }
+      var leftEl = row.querySelector('.webmcp-host-left') as HTMLElement | null;
+      if (leftEl) {
+        leftEl.title = enabled
+          ? (row.getAttribute('data-tools') || '')
+          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled');
+      }
+    }
+  }
+
+  function buildToggle(opts: {
+    checked: boolean;
+    disabled?: boolean;
+    titleOn: string;
+    titleOff: string;
+    disabledTitle?: string;
+    onToggle: (next: boolean, done: (ok: boolean) => void) => void;
+  }): HTMLLabelElement {
+    var toggleLabel = document.createElement('label');
+    toggleLabel.style.margin = '0';
+    toggleLabel.style.flex = '0 0 auto';
+    var toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.className = 'webmcp-toggle';
+    toggle.checked = opts.checked;
+    toggle.disabled = !!opts.disabled;
+    if (opts.disabled && opts.disabledTitle) {
+      toggle.title = opts.disabledTitle;
+    } else {
+      toggle.title = opts.checked ? opts.titleOn : opts.titleOff;
+    }
+    toggle.addEventListener('change', function () {
+      var next = toggle.checked;
+      toggle.disabled = true;
+      opts.onToggle(next, function (ok) {
+        if (!ok) {
+          toggle.checked = !next;
+          toggle.disabled = false;
+          return;
+        }
+        toggle.checked = next;
+        toggle.disabled = false;
+        toggle.title = next ? opts.titleOn : opts.titleOff;
+      });
+    });
+    toggleLabel.appendChild(toggle);
+    return toggleLabel;
+  }
+
+  function sendSetEnabled(message: any, done: (ok: boolean) => void) {
+    chrome.runtime.sendMessage(message, function (resp: any) {
+      if (chrome.runtime.lastError || !resp || !resp.ok) { done(false); return; }
+      done(true);
+    });
+  }
+
+  function renderList(tools: any[]) {
+    if (!tools || tools.length === 0) {
+      renderEmpty();
+      return;
+    }
+    box.style.display = capExpanded ? '' : 'none';
+    // Group by hostname → { groups: Map<groupKey, ...>, hostEnabled }
+    var byHost: Record<string, {
+      count: number;
+      tabId: number;
+      groups: Record<string, { count: number; tabId: number; toolNames: string[]; tabTitles: string[]; enabled?: boolean }>;
+      enabled?: boolean;
+    }> = {};
+    for (var i = 0; i < tools.length; i++) {
+      var tool = tools[i];
+      var host = tool.hostname || 'unknown';
+      if (!byHost[host]) byHost[host] = { count: 0, tabId: tool.tabId, groups: {} };
+      byHost[host].count++;
+      if (typeof tool.hostEnabled === 'boolean') byHost[host].enabled = tool.hostEnabled;
+      var gk = tool.groupKey || (host + '_default');
+      if (!byHost[host].groups[gk]) byHost[host].groups[gk] = { count: 0, tabId: tool.tabId, toolNames: [], tabTitles: [] };
+      byHost[host].groups[gk].count++;
+      if (typeof tool.groupEnabled === 'boolean') byHost[host].groups[gk].enabled = tool.groupEnabled;
+      if (byHost[host].groups[gk].toolNames.length < 6 && byHost[host].groups[gk].toolNames.indexOf(tool.name) === -1) byHost[host].groups[gk].toolNames.push(tool.name);
+      var tt = (tool.tabTitle || '').trim();
+      if (tt && byHost[host].groups[gk].tabTitles.indexOf(tt) === -1 && byHost[host].groups[gk].tabTitles.length < 3) byHost[host].groups[gk].tabTitles.push(tt);
+    }
+    var hosts = Object.keys(byHost);
+    var totalTools = tools.length;
+    // chrome.i18n.getMessage handles $HOSTS$/$TOOLS$ via declared placeholders
+    // + substitutions — bare $NAME in the message gets eaten by Chrome's own
+    // substitution parser ("$HOSTS" rendered as "OSTS").
+    summary.textContent = chrome.i18n.getMessage('webmcpFoundSummary', [String(hosts.length), String(totalTools)])
+      || (hosts.length + ' site(s), ' + totalTools + ' tool(s)');
+    // Fold the counts into the capability line and refresh the manage toggle.
+    capState.tools = { hosts: hosts.length, total: totalTools };
+    renderCapline();
+
+    list.textContent = '';
+    hosts.sort().forEach(function (host) {
+      var info = byHost[host];
+      var hostOn = info.enabled !== false;
+      hostEnabled[host] = hostOn;
+
+      var item = document.createElement('div');
+      item.className = 'webmcp-host' + (hostOn ? '' : ' disabled-host');
+      item.dataset.host = host;
+
+      var left = document.createElement('div');
+      left.className = 'webmcp-host-left';
+      left.addEventListener('click', function () {
+        if (typeof info.tabId === 'number') {
+          chrome.tabs.update(info.tabId, { active: true });
+          window.close();
+        }
+      });
+      var name = document.createElement('span');
+      name.className = 'webmcp-host-name';
+      name.textContent = host;
+      var count = document.createElement('span');
+      count.className = 'webmcp-host-count';
+      count.textContent = String(info.count);
+      left.appendChild(name);
+      left.appendChild(count);
+
+      // Group rows register here so the host switch can cascade state to
+      // them (mirrors web WebMCPHostList: host off → group switches disabled).
+      var groupUpdaters: Array<(hostOn: boolean) => void> = [];
+
+      var hostToggle = buildToggle({
+        checked: hostOn,
+        titleOn: chrome.i18n.getMessage('webmcpToggleHostTitle') || 'webmcpToggleHostTitle',
+        titleOff: chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled',
+        onToggle: function (next, done) {
+          sendSetEnabled({ type: 'webmcp_set_host_enabled', hostname: host, enabled: next }, function (ok) {
+            if (ok) {
+              hostEnabled[host] = next;
+              item.classList.toggle('disabled-host', !next);
+              left.title = next ? String(info.count) + ' tool(s)' : (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled');
+              for (var u = 0; u < groupUpdaters.length; u++) groupUpdaters[u](next);
+            }
+            done(ok);
+          });
+        },
+      });
+      // Header row keeps name area and switch on the same line.
+      var head = document.createElement('div');
+      head.className = 'webmcp-host-head';
+      head.appendChild(left);
+      head.appendChild(hostToggle);
+      item.appendChild(head);
+
+      // Nested group rows (mirror the web app's WebMCPHostList hierarchy).
+      var groupKeys = Object.keys(info.groups);
+      if (groupKeys.length > 0) {
+        var groupsWrap = document.createElement('div');
+        groupsWrap.className = 'webmcp-groups';
+        groupKeys.forEach(function (gk, idx) {
+          var g = info.groups[gk];
+          // Switch position reflects the group's OWN state; the host gate is
+          // expressed via disabled + row dimming (mirrors web BrandSwitch:
+          // checked={groupChecked} disabled={!globalEnabled || !checked}).
+          // Using effective state here made the switch show "off" while the
+          // group itself was on — clicking then toggled the wrong direction.
+          var groupOwn = g.enabled !== false;
+          var effective = hostOn && groupOwn;
+          var row = document.createElement('div');
+          row.className = 'webmcp-group' + (effective ? '' : ' disabled-host');
+
+          // Group title = source tab title — that's a group's identity
+          // (one toolset version from one page). Tool names go to the
+          // preview line. Fallback: tabTitle → first tool name → Group N.
+          var titleText = (g.tabTitles && g.tabTitles[0])
+            || g.toolNames[0]
+            || ('Group ' + (idx + 1));
+
+          var gLeft = document.createElement('div');
+          gLeft.className = 'webmcp-group-left';
+          gLeft.title = g.toolNames.join(', ') + (g.tabTitles.length ? '\n' + g.tabTitles.join('\n') : '');
+          gLeft.addEventListener('click', function () {
+            if (typeof g.tabId === 'number') {
+              chrome.tabs.update(g.tabId, { active: true });
+              window.close();
+            }
+          });
+          var gNameWrap = document.createElement('div');
+          gNameWrap.className = 'webmcp-group-name-wrap';
+          var gName = document.createElement('span');
+          gName.className = 'webmcp-group-name';
+          gName.textContent = titleText;
+          var gCount = document.createElement('span');
+          gCount.className = 'webmcp-group-count';
+          gCount.textContent = String(g.count);
+          gCount.title = chrome.i18n.getMessage('webmcpToolCountTitle') || 'webmcpToolCountTitle';
+          var gNameRow = document.createElement('div');
+          gNameRow.className = 'webmcp-group-name-row';
+          gNameRow.appendChild(gName);
+          gNameRow.appendChild(gCount);
+          gNameWrap.appendChild(gNameRow);
+          // Tool name preview (light, one line, ellipsized) — mirrors the
+          // web group card's tool preview strip.
+          if (g.toolNames.length > 0) {
+            var gPreview = document.createElement('div');
+            gPreview.className = 'webmcp-group-preview';
+            gPreview.textContent = g.toolNames.join(' · ');
+            gNameWrap.appendChild(gPreview);
+          }
+          gLeft.appendChild(gNameWrap);
+
+          var gToggleInput: HTMLInputElement | null = null;
+          var gToggle = buildToggle({
+            checked: groupOwn,
+            disabled: !hostOn,
+            titleOn: chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'webmcpToggleGroupTitle',
+            titleOff: chrome.i18n.getMessage('webmcpGroupDisabled') || 'webmcpGroupDisabled',
+            disabledTitle: chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled',
+            onToggle: function (next, done) {
+              sendSetEnabled({ type: 'webmcp_set_group_enabled', groupKey: gk, enabled: next }, function (ok) {
+                if (ok) {
+                  g.enabled = next;
+                  row.classList.toggle('disabled-host', !(hostEnabled[host] && next));
+                }
+                done(ok);
+              });
+            },
+          });
+          gToggleInput = gToggle.querySelector('input.webmcp-toggle');
+
+          // Cascade registration: recompute this group row's visual + switch
+          // state whenever the host switch changes. Mirrors the web app's
+          // effective = hostOn && groupOn semantics.
+          groupUpdaters.push(function (hostOnNow: boolean) {
+            var effective = hostOnNow && g.enabled !== false;
+            row.classList.toggle('disabled-host', !effective);
+            if (gToggleInput) {
+              gToggleInput.disabled = !hostOnNow;
+              gToggleInput.title = !hostOnNow
+                ? (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled')
+                : (gToggleInput.checked
+                    ? (chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'webmcpToggleGroupTitle')
+                    : (chrome.i18n.getMessage('webmcpGroupDisabled') || 'webmcpGroupDisabled'));
+            }
+          });
+
+          row.appendChild(gLeft);
+          row.appendChild(gToggle);
+          groupsWrap.appendChild(row);
+        });
+        item.appendChild(groupsWrap);
+      }
+
+      list.appendChild(item);
+    });
+  }
+
+  renderIdle();
+  // includeDisabled: the popup IS the management surface — it must see
+  // disabled hosts/groups so the user can re-enable them. Regular pages
+  // get the filtered view (disabled sites simply don't exist for them).
+  //
+  // Discovery is now registry-backed (event-fed by the static content
+  // scripts), so this first read is fast (no per-tab scan). The registry
+  // broadcast below re-triggers it whenever a tab reports new tools.
+  //
+  // Window scoping: the popup has no sender.tab, so background can't tell
+  // which window to scope to. Cache chrome.windows.getCurrent()'s id at
+  // popup-open time and forward it via options.windowId — otherwise the
+  // response would be a CROSS-WINDOW global list.
+  let popupWindowId: number | undefined;
+  chrome.windows.getCurrent(function (win) {
+    if (win && typeof win.id === 'number') popupWindowId = win.id;
+  });
+
+  function loadTools() {
+    chrome.runtime.sendMessage(
+      { type: 'webmcp_discover_tools', options: { includeDisabled: true, windowId: popupWindowId } },
+      function (resp: any) {
+        if (chrome.runtime.lastError) {
+          renderError(chrome.runtime.lastError.message || 'runtime error');
+          return;
+        }
+        if (!resp) {
+          renderError('no response from background');
+          return;
+        }
+        if (!resp.ok) {
+          renderError(resp.error || 'unknown error');
+          return;
+        }
+        const tools = resp.tools || [];
+        if (tools.length === 0) {
+          renderNoTools(resp.scannedTabs != null ? `${resp.scannedTabs} tab(s) scanned, 0 tools` : undefined);
+          return;
+        }
+        renderList(tools);
+      }
+    );
+  }
+
+  // Incremental refresh: background broadcasts webmcp_registry_updated
+  // whenever a tab pushes a new snapshot (ready/toolchange/poll-diff).
+  // Debounced so a burst of tab reports coalesces into one re-render.
+  var refreshTimer: number | null = null;
+  chrome.runtime.onMessage.addListener(function (message: any) {
+    if (message?.type === 'webmcp_registry_updated') {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(function () {
+        refreshTimer = null;
+        loadTools();
+      }, 150);
+      return false;
+    }
+    return false;
+  });
+
+  loadTools();
+})();
+
+// L2 writer #1: page injection check. Feeds the capability line — search
+// itself runs in the background service worker, so "ready" here means
+// "page reading is available on the current tab".
+(function () {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     var tab = tabs && tabs[0];
     if (!tab || !tab.id) {
-      setStatus('disabled', t('cannotAccessCurrentPage'));
+      capState.search = 'unavailable';
+      capState.note = t('cannotAccessCurrentPage');
+      renderCapline();
       return;
     }
     var url = tab.url || '';
     if (url.indexOf('chrome') === 0 || url.indexOf('about:') === 0) {
-      setStatus('disabled', t('browserInternalPage'));
+      capState.search = 'internal';
+      capState.note = t('browserInternalPage');
+      renderCapline();
       return;
     }
     chrome.scripting.executeScript({
@@ -55,19 +568,26 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       func: function () { return !!(window.__agentWeb && (window.__agentWeb as any).ready); }
     }, function (results) {
       if (chrome.runtime.lastError) {
-        setStatus('disabled', t('injectionCheckFailed'));
+        capState.search = 'error';
+        capState.note = t('injectionCheckFailed') + ': ' + chrome.runtime.lastError.message;
+        renderCapline();
         return;
       }
       if (results && results[0] && results[0].result === true) {
-        setStatus('active', t('apiReady'));
+        capState.search = 'ready';
       } else {
-        setStatus('inactive', t('apiInactive'));
+        capState.search = 'inactive';
       }
+      renderCapline();
     });
   });
 })();
 
 (function () {
+  // Whole IIFE is folded away in store builds (CW_CODEX_OAUTH=0) via the
+  // __CW_CODEX_OAUTH__ block guard; markup/CSS/locales are also stripped at
+  // build time (wxt.config.ts). Dev builds keep full functionality.
+  if (__CW_CODEX_OAUTH__) {
   var logEl = document.getElementById('codexLog')!;
   var btn = document.getElementById('codexLoginBtn')!;
   var resetBtn = document.getElementById('codexResetBtn')!;
@@ -485,6 +1005,7 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     await clearPendingAuth();
     log(t('authorizationExpiredLog'));
   });
+  } // end if (__CW_CODEX_OAUTH__)
 })();
 
 document.getElementById('openDocs')!.addEventListener('click', function () {
@@ -493,3 +1014,36 @@ document.getElementById('openDocs')!.addEventListener('click', function () {
 document.getElementById('openGithub')!.addEventListener('click', function () {
   chrome.tabs.create({ url: 'https://github.com/nutstore/creatorweave' });
 });
+
+// ── Supported Sites entry → recipes management page ──
+// Shows "N/M enabled" and opens the full-page manager in a tab
+// (the manager needs space for tool chips + descriptions).
+(function () {
+  var btn = document.getElementById('supportedSitesBtn');
+  var sub = document.getElementById('sitesSubtitle');
+  if (!btn || !sub) return;
+
+  // Recipes metadata is tiny; import from the shared module.
+  import('../webmcp/recipes').then(function (mod) {
+    var total = mod.recipes.length;
+    function refresh() {
+      chrome.storage.local.get(mod.ENABLED_RECIPES_STORAGE_KEY, function (stored) {
+        var enabled = stored && stored[mod.ENABLED_RECIPES_STORAGE_KEY];
+        var count = enabled && typeof enabled === 'object' ? Object.keys(enabled).length : 0;
+        sub.textContent = chrome.i18n.getMessage('recipesCount', [String(count), String(total)])
+          || (count + ' / ' + total + ' enabled');
+      });
+    }
+    refresh();
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area === 'local' && changes[mod.ENABLED_RECIPES_STORAGE_KEY]) refresh();
+    });
+  }).catch(function () {
+    // metadata import failed — keep the entry but show a dash
+  });
+
+  btn.addEventListener('click', function () {
+    chrome.tabs.create({ url: chrome.runtime.getURL('/recipes.html') });
+    window.close();
+  });
+})();

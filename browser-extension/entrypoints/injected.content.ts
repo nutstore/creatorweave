@@ -12,6 +12,10 @@
 import { Readability } from '@mozilla/readability'
 import TurndownService from 'turndown'
 
+// Build-time Codex OAuth feature flag (see wxt.config.ts). Store builds
+// (CW_CODEX_OAUTH=0) fold the guards below and treeshake the bridge names.
+declare const __CW_CODEX_OAUTH__: boolean;
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
@@ -590,16 +594,21 @@ export default defineContentScript({
       },
 
       /**
-       * Get Codex OAuth authorization status
+       * Get Codex OAuth authorization status.
+       * Store build (CW_CODEX_OAUTH=0): the guard folds to `return` and the
+       * bridge message name is treeshaken out.
        */
       async codexGetStatus() {
+        if (!__CW_CODEX_OAUTH__) return { ok: false, errorCode: 'FEATURE_DISABLED' };
         return sendToBridge('codex_get_status', {});
       },
 
       /**
-       * Proxy a Codex API request through the extension
+       * Proxy a Codex API request through the extension.
+       * Store build: disabled (see above).
        */
       async codexProxyFetch(body: Record<string, any>) {
+        if (!__CW_CODEX_OAUTH__) return { ok: false, errorCode: 'FEATURE_DISABLED' };
         return sendToBridge('codex_proxy_fetch', { body });
       },
 
@@ -703,7 +712,12 @@ export default defineContentScript({
        * Discover WebMCP tools across tabs in current browser window.
        */
       async webMCPDiscover(options?: { force?: boolean }) {
-        return sendToBridge('webmcp_discover_tools', { options: options || {} });
+        // Only `force` is honored from pages. includeDisabled is a popup-only
+        // escape hatch — a page must never see disabled (unauthorized) tools,
+        // so it is stripped here regardless of what the caller sends.
+        return sendToBridge('webmcp_discover_tools', {
+          options: { force: options?.force === true },
+        });
       },
 
       /**
@@ -716,6 +730,17 @@ export default defineContentScript({
         preferredTabId?: number
       }) {
         return sendToBridge('webmcp_invoke_tool', payload || {});
+      },
+
+      /**
+       * Get the extension-side WebMCP authorization state.
+       * The extension storage is the single source of truth for host/group
+       * switches (enforced by the background invoke gate); the web app only
+       * renders this state. Management (toggling) lives exclusively in the
+       * extension popup — no set methods are exposed to the page.
+       */
+      async webMCPGetAuthorization() {
+        return sendToBridge('webmcp_get_host_authorization', {});
       },
 
       /**
@@ -774,6 +799,14 @@ export default defineContentScript({
        * The caller should parse SSE events from the yielded strings.
        */
       codexProxyFetchStream(body: Record<string, any>): AsyncIterable<string> & { cancel: () => void } {
+        if (!__CW_CODEX_OAUTH__) {
+          // Store build: disabled — yield nothing, cancel is a no-op.
+          const dead: AsyncIterable<string> & { cancel: () => void } = {
+            [Symbol.asyncIterator]() { return (async function* () {})(); },
+            cancel() {},
+          };
+          return dead;
+        }
         const source = sendToBridgeStream('codex_proxy_fetch_stream', { body })
         const typed: AsyncIterable<string> & { cancel: () => void } = {
           [Symbol.asyncIterator]() {
@@ -867,28 +900,59 @@ export default defineContentScript({
         return sendToBridge('cw_schedule_show_notification', { title, body });
       },
 
-      // TODO(Future Enhancement): Agent Loop Notifications via Extension
-      // ------------------------------------------------------------------
-      // Currently, agent loop notifications are handled entirely by the Web App's
-      // Service Worker (web/src/sw.ts). This works perfectly for standard web tabs.
-      //
-      // LIMITATION:
-      // If the user is running the agent inside THIS extension's Side Panel,
-      // clicking the Web SW notification will fail to focus/switch back to the
-      // host browser tab (Web SWs cannot steal tab focus).
-      //
-      // FUTURE API TO ADD HERE:
-      //   async showAgentNotification(data: {
-      //     conversationId: string; projectId: string; title: string; body: string
-      //   }): Promise<{ ok: boolean }>
-      //
-      // It should send a message to `background.ts`, which will call
-      // `chrome.notifications.create()`, and listen for
-      // `chrome.notifications.onClicked` to execute
-      // `chrome.tabs.update(senderTabId, { active: true })`.
-      //
-      // The Web App (`agent-notification.ts`) will then check for
-      // `window.__agentWeb?.showAgentNotification` and prefer it over the Web SW.
+      // ── Native Host ──────────────────────────────────────────────────
+
+      /**
+       * Call the CreatorWeave native host (Rust binary) via Chrome Native
+       * Messaging. Each call spawns a fresh host process (stateless model).
+       *
+       * Returns the host's JSON response verbatim.
+       */
+      async nativeHostCall(payload: Record<string, any>) {
+        return sendToBridge('native_host_call', payload, 60000);
+      },
+
+      /**
+       * Query the execpolicy decision for a command without executing it.
+       * Stateless — uses sendNativeMessage under the hood.
+       *
+       * Returns: { ok, decision: 'auto'|'prompt'|'forbidden', command }
+       */
+      async nativeHostCheckPolicy(command: string[]): Promise<{
+        ok: boolean
+        decision?: 'auto' | 'prompt' | 'forbidden'
+        command?: string[]
+        error?: string
+      }> {
+        return sendToBridge('native_host_call', {
+          action: 'check_policy',
+          command,
+        });
+      },
+
+      // ── Agent Notification ───────────────────────────────────────────
+
+      /**
+       * Show an agent-completion desktop notification via the extension's
+       * background script.
+       *
+       * Rationale: When the agent runs inside the Extension's Side Panel,
+       * the Web Service Worker's `registration.showNotification` cannot focus
+       * the host browser tab on click (Web SWs lack tab privileges). The
+       * extension background handles the click with
+       * `chrome.notifications.onClicked` to execute
+       * `chrome.tabs.update(senderTabId, { active: true })`.
+       *
+       * The Web App (`agent-notification.ts`) will then check for
+       * `window.__agentWeb?.showAgentNotification` and prefer it over the Web SW.
+       */
+      async showAgentNotification(payload: {
+        title: string
+        body: string
+        conversationId?: string
+      }): Promise<{ ok: boolean; error?: string }> {
+        return sendToBridge('cw_agent_show_notification', payload || {})
+      },
     };
 
     ;(window as any).__agentWebBridgeState = {

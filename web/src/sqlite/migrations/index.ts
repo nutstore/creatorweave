@@ -88,9 +88,43 @@ function verifyConversationSchema(db: any): void {
   }
 }
 
+function projectRootColumnExists(db: any, column: string): boolean {
+  try {
+    db.exec(`SELECT ${column} FROM project_roots LIMIT 0`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Repair v16 roots if a database recorded the version before its DDL landed. */
+function repairProjectRootBackendColumns(db: any): void {
+  if (!projectRootColumnExists(db, 'backend')) {
+    db.exec("ALTER TABLE project_roots ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
+  }
+  if (!projectRootColumnExists(db, 'scope_id')) {
+    db.exec('ALTER TABLE project_roots ADD COLUMN scope_id TEXT')
+  }
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_roots_project_scope
+      ON project_roots(project_id, scope_id) WHERE scope_id IS NOT NULL`
+  )
+  db.exec('PRAGMA user_version = 17')
+}
+
+function verifyProjectRootSchema(db: any): void {
+  try {
+    db.exec('SELECT backend, scope_id FROM project_roots LIMIT 0')
+  } catch (error) {
+    throw new Error(
+      `SCHEMA_INCOMPATIBLE: project_roots is missing backend identity columns. ${getErrorMessage(error)}`
+    )
+  }
+}
+
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 15
+export const BASE_SCHEMA_VERSION = 17
 
 // ============================================================================
 // Migration Registry
@@ -300,6 +334,26 @@ export const migrations: Migration[] = [
     name: 'repair_conversation_compression_columns',
     up: repairConversationCompressionColumns,
   },
+  {
+    version: 16,
+    name: 'add_project_root_backend_identity',
+    up: `
+      ALTER TABLE project_roots
+        ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess';
+      ALTER TABLE project_roots
+        ADD COLUMN scope_id TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_project_roots_project_scope
+        ON project_roots(project_id, scope_id)
+        WHERE scope_id IS NOT NULL;
+
+      PRAGMA user_version = 16;
+    `,
+  },
+  {
+    version: 17,
+    name: 'repair_project_root_backend_identity',
+    up: repairProjectRootBackendColumns,
+  },
 ]
 
 // ============================================================================
@@ -463,10 +517,16 @@ export async function initializeSchema(
   // Run any pending migrations
   await runPendingMigrations(db, onProgress)
 
+  // A database can report v17 if a prior build wrote user_version before the
+  // v16/v17 DDL completed. Repair physical root columns after pending migration
+  // scheduling so this remains safe even when there is no newer version to run.
+  repairProjectRootBackendColumns(db)
+
   // Version numbers alone are not enough: validate the physical columns after
   // migration so the app fails safely with an exportable database instead of
   // later rendering an empty conversation list.
   verifyConversationSchema(db)
+  verifyProjectRootSchema(db)
 
   // Report completion
   onProgress?.({

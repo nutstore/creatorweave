@@ -1,6 +1,6 @@
 {
   "name": "browser-extension",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "A browser extension that provides web_search and web_fetch capabilities for in-browser Agents",
   "private": true,
   "type": "module",
@@ -8,6 +8,8 @@
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
+    "build:store": "CW_CODEX_OAUTH=0 wxt build",
+    "zip:store": "CW_CODEX_OAUTH=0 wxt zip",
     "build:firefox": "wxt build -b firefox",
     "watch": "wxt build --watch",
     "zip": "wxt zip",
@@ -15,6 +17,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@mcp-b/webmcp-polyfill": "4.0.0",
     "@mozilla/readability": "^0.5.0",
     "turndown": "^7.2.0"
   },

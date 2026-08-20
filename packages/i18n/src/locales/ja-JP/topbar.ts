@@ -1,6 +1,6 @@
 // トップバー
 export const topbar = {
-    productName: "CreatorWeave",
+    productName: "EO2Weave",
     openFolder: "フォルダを開く",
     switchFolder: "プロジェクトフォルダを切り替え",
     noApiKey: "API Key が設定されていません",

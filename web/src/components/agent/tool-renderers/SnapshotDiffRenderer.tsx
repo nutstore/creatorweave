@@ -1,5 +1,5 @@
 /**
- * Renderer for `git_diff` tool — file change summary with +/- stats.
+ * Renderer for `snapshot_diff` tool — file change summary with +/- stats.
  *
  * Consumes structured GitDiffResult from ctx.result.data.diff directly,
  * instead of parsing text patches.
@@ -35,9 +35,9 @@ function parseEnvelope(ctx: ToolRenderCtx): Record<string, unknown> | null {
   if (ctx.result && typeof ctx.result === 'object') return ctx.result
   if (ctx.rawResult) {
     try { return JSON.parse(ctx.rawResult) as Record<string, unknown> } catch (e) {
-      console.error('[GitDiffRenderer] JSON.parse failed:', (e as Error).message)
-      console.error('[GitDiffRenderer] rawResult type:', typeof ctx.rawResult, 'length:', ctx.rawResult.length)
-      console.error('[GitDiffRenderer] rawResult first 200 chars:', ctx.rawResult.slice(0, 200))
+      console.error('[SnapshotDiffRenderer] JSON.parse failed:', (e as Error).message)
+      console.error('[SnapshotDiffRenderer] rawResult type:', typeof ctx.rawResult, 'length:', ctx.rawResult.length)
+      console.error('[SnapshotDiffRenderer] rawResult first 200 chars:', ctx.rawResult.slice(0, 200))
     }
   }
   return null
@@ -77,7 +77,7 @@ const MODE_LABELS: Record<string, string> = {
 // ── Renderer ──
 
 registerRenderer({
-  name: 'git_diff',
+  name: 'snapshot_diff',
   icon: <GitBranch className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     const mode = typeof ctx.args.mode === 'string' ? ctx.args.mode : 'working'
@@ -87,7 +87,7 @@ registerRenderer({
     if (!diff) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-foreground">git_diff</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_diff</code>
           {MODE_LABELS[mode] && <span className="text-xs text-neutral-400">{MODE_LABELS[mode]}</span>}
           {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
           {ctx.isExecuting && <span className="ml-auto text-xs text-blue-500 shrink-0">loading...</span>}
@@ -99,7 +99,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-foreground">git_diff</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_diff</code>
         {MODE_LABELS[mode] && <span className="text-xs text-neutral-400">{MODE_LABELS[mode]}</span>}
         {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
         <span className="ml-auto flex items-center gap-1 shrink-0">

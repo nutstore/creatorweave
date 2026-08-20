@@ -17,4 +17,13 @@ export const projectRoots = {
     setAsDefault: "Set as default",
     removeRoot: "Remove folder",
     confirmRemove: 'Are you sure you want to remove "{name}" from this project?',
+    nativeHostBadge: "Local connection",
+    nativeHostUnavailable: "Local connection is unavailable",
+    rootAlreadyExists: 'A folder named “{name}” already exists',
+    nativeRootAdded: 'Added “{name}” through local connection',
+    nativeRootAddFailed: "Failed to add local connection: {error}",
+    nativeRootMissingScope: "This local connection is missing its authorization information",
+    nativeRootRevokeFailed: "Failed to remove local connection: {error}",
+    nativeRootRemovedLocalOnly: "Removed this folder from the project (no local-connection authorization to revoke)",
+    nativeRootRevokeFailedRemovedLocally: "Removed this folder from the project, but revoking its local-connection authorization failed: {error}",
 } as const

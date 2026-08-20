@@ -1,33 +1,33 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
-import { useWebMCPStore } from '@/webmcp'
 import {
-  applyWebMCPGlobalToggle,
-  applyWebMCPHostToggle,
   isWebMCPBridgeAvailable,
   refreshWebMCPCatalog,
+  useWebMCPStore,
 } from '@/webmcp'
 import { useSettingsStore } from '@/store/settings.store'
 import { useExtensionStore } from '@/store/extension.store'
 import { WebMCPGlobalToggleCard } from './WebMCPGlobalToggleCard'
 import { WebMCPHostList } from './WebMCPHostList'
-import { WebMCPSetupGuideCard } from './WebMCPSetupGuideCard'
 
+/**
+ * WebMCP settings — connection status + read-only tool list.
+ *
+ * The list shows discovered (authorized) WebMCP tools: the extension
+ * filters unauthorized tools out of discovery responses, so whatever
+ * renders here is usable by the agent right now. Authorization
+ * management lives exclusively in the extension popup; this page never
+ * mutates authorization state.
+ */
 export function WebMCPSettings() {
   const t = useT()
   const catalogByHost = useWebMCPStore((state) => state.catalogByHost)
-  const enabledByHost = useWebMCPStore((state) => state.enabledByHost)
-  const enabledByGroup = useWebMCPStore((state) => state.enabledByGroup)
-  const setGroupEnabled = useWebMCPStore((state) => state.setGroupEnabled)
   const lastScanAt = useWebMCPStore((state) => state.lastScanAt)
   const globalEnabled = useSettingsStore((state) => state.enableWebMCP)
   const extensionStatus = useExtensionStore((state) => state.status)
   const extensionInstalled = extensionStatus === 'installed'
   const [refreshing, setRefreshing] = useState(false)
-  const [togglingGlobal, setTogglingGlobal] = useState(false)
-  const [togglingHost, setTogglingHost] = useState<string | null>(null)
-  const [togglingGroup, setTogglingGroup] = useState<string | null>(null)
 
   const bridgeAvailable = isWebMCPBridgeAvailable()
 
@@ -40,10 +40,6 @@ export function WebMCPSettings() {
   )
 
   const handleRefresh = async () => {
-    if (!globalEnabled) {
-      toast.error(t('settings.webMCPDisabled'))
-      return
-    }
     if (!bridgeAvailable) {
       toast.error(t('settings.webMCPBridgeUnavailable'))
       return
@@ -64,49 +60,6 @@ export function WebMCPSettings() {
     }
   }
 
-  const handleToggleGlobal = async (enabled: boolean) => {
-    setTogglingGlobal(true)
-    try {
-      const count = await applyWebMCPGlobalToggle(enabled)
-      if (enabled) {
-        toast.success(
-          t('settings.webMCPRefreshSuccess').replace('{count}', String(count))
-        )
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
-    } finally {
-      setTogglingGlobal(false)
-    }
-  }
-
-  const handleToggleHost = async (hostname: string, enabled: boolean) => {
-    if (!globalEnabled) return
-    setTogglingHost(hostname)
-    try {
-      await applyWebMCPHostToggle(hostname, enabled)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
-    } finally {
-      setTogglingHost(null)
-    }
-  }
-
-  const handleToggleGroup = async (groupKey: string, enabled: boolean) => {
-    if (!globalEnabled) return
-    setTogglingGroup(groupKey)
-    try {
-      setGroupEnabled(groupKey, enabled)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
-    } finally {
-      setTogglingGroup(null)
-    }
-  }
-
   const handleInstallExtension = () => {
     useExtensionStore.getState().openInstallGuide()
   }
@@ -121,35 +74,21 @@ export function WebMCPSettings() {
 
   return (
     <div className="space-y-4 py-1">
-      <p className="text-xs text-tertiary">{t('settings.webMCPDescription')}</p>
-
       <WebMCPGlobalToggleCard
         t={t}
         globalEnabled={globalEnabled}
-        togglingGlobal={togglingGlobal}
+        togglingGlobal={false}
         bridgeAvailable={bridgeAvailable}
         extensionInstalled={extensionInstalled}
         lastScanAt={lastScanAt}
         refreshing={refreshing}
-        onToggleGlobal={handleToggleGlobal}
+        onToggleGlobal={undefined}
         onRefresh={handleRefresh}
         onInstallExtension={handleInstallExtension}
         formatTime={formatTime}
       />
 
-      <WebMCPSetupGuideCard t={t} />
-
-      <WebMCPHostList
-        t={t}
-        hosts={hosts}
-        enabledByHost={enabledByHost}
-        enabledByGroup={enabledByGroup}
-        togglingHost={togglingHost}
-        togglingGroup={togglingGroup}
-        globalEnabled={globalEnabled && !togglingGlobal}
-        onToggleHost={handleToggleHost}
-        onToggleGroup={handleToggleGroup}
-      />
+      {globalEnabled && <WebMCPHostList t={t} hosts={hosts} />}
     </div>
   )
 }

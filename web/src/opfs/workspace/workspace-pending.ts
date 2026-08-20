@@ -8,6 +8,7 @@
 import type { FileContent, PendingChange, SyncResult } from '../types/opfs-types'
 import { getFileContentType } from '../utils/opfs-utils'
 import { hasConflictMarkers } from './conflict-markers'
+import type { DiskExecutor } from '../native-disk/executor'
 import {
   getFSOverlayRepository,
   type PendingOverlayOp,
@@ -17,6 +18,16 @@ const FILES_DIR = 'files'
 const BASELINE_DIR = '.baseline'
 
 type CachedContent = FileContent
+
+/**
+ * Optional disk accessor — when provided, sync/conflict-detection routes
+ * file IO through DiskExecutor instead of raw FileSystemDirectoryHandle.
+ * This enables the Native Host path (Phase 3) where no handle exists.
+ */
+interface DiskAccessor {
+  rootId: string
+  exec: DiskExecutor
+}
 
 interface CacheManager {
   readCached?: (path: string) => Promise<CachedContent | null>
@@ -129,7 +140,8 @@ export class WorkspacePendingManager {
   async detectConflicts(
     directoryHandle: FileSystemDirectoryHandle,
     onlyPaths?: string[],
-    pathTransform?: (path: string) => string
+    pathTransform?: (path: string) => string,
+    disk?: DiskAccessor
   ): Promise<SyncResult['conflicts']> {
     const conflicts: SyncResult['conflicts'] = []
     const normalizeComparePath = (p: string): string => {
@@ -152,7 +164,9 @@ export class WorkspacePendingManager {
         const hasMarkers = await this.hasUnresolvedConflictMarkers(change.path)
         if (hasMarkers) {
           const nativePath = pathTransform ? pathTransform(change.path) : change.path
-          const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, nativePath)
+          const currentFsMtime = disk
+            ? await this.safeReadNativeMtimeViaExec(disk, nativePath)
+            : await this.safeReadNativeMtime(directoryHandle, nativePath)
           conflicts.push({
             path: change.path,
             workspaceId: this.workspaceId,
@@ -164,7 +178,7 @@ export class WorkspacePendingManager {
         }
       }
 
-      const check = await this.checkNativeConflict(directoryHandle, change, pathTransform)
+      const check = await this.checkNativeConflict(directoryHandle, change, pathTransform, disk)
       if (!check.isConflict) continue
 
       conflicts.push({
@@ -279,7 +293,8 @@ export class WorkspacePendingManager {
     cacheManager: CacheManager,
     onlyPaths?: string[],
     forceOverwrite?: boolean,
-    pathTransform?: (path: string) => string
+    pathTransform?: (path: string) => string,
+    disk?: DiskAccessor
   ): Promise<SyncResult> {
     const result: SyncResult = {
       success: 0,
@@ -314,7 +329,9 @@ export class WorkspacePendingManager {
           const hasMarkers = await this.hasUnresolvedConflictMarkers(change.path, cacheManager)
           if (hasMarkers) {
             result.failed++
-            const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, nativePath)
+            const currentFsMtime = disk
+              ? await this.safeReadNativeMtimeViaExec(disk, nativePath)
+              : await this.safeReadNativeMtime(directoryHandle, nativePath)
             const message = `检测到未解决冲突标记：${change.path}，请先处理 <<<<<<< / ======= / >>>>>>> 标记后再审批。`
             await repo.keepOpPending(change.id, message)
             await repo.recordSyncItem(batchId, change.id, change.path, 'failed', message)
@@ -332,7 +349,7 @@ export class WorkspacePendingManager {
         // Skip conflict check if forceOverwrite is true
         const conflictCheck = forceOverwrite
           ? { isConflict: false, currentFsMtime: 0 }
-          : await this.checkNativeConflict(directoryHandle, change, pathTransform)
+          : await this.checkNativeConflict(directoryHandle, change, pathTransform, disk)
         if (conflictCheck.isConflict) {
           result.failed++
           const message =
@@ -351,7 +368,11 @@ export class WorkspacePendingManager {
         }
 
         if (change.type === 'delete') {
-          await this.deleteFile(directoryHandle, nativePath)
+          if (disk) {
+            await disk.exec.delete(disk.rootId, nativePath)
+          } else {
+            await this.deleteFile(directoryHandle, nativePath)
+          }
           result.success++
           await repo.markOpSynced(change.id)
           await repo.recordSyncItem(batchId, change.id, change.path, 'success')
@@ -360,7 +381,14 @@ export class WorkspacePendingManager {
           // Read from OPFS cache and write to filesystem
           const content = await this.readCacheContent(change.path, cacheManager)
           if (content) {
-            await this.writeFile(directoryHandle, nativePath, content)
+            // Normalize FileContent (may be Blob) to a type DiskExecutor accepts.
+            // FS Access handles Blob natively, but executor.write takes string|ArrayBuffer.
+            const writeContent = content instanceof Blob ? await content.arrayBuffer() : content
+            if (disk) {
+              await disk.exec.write(disk.rootId, nativePath, writeContent)
+            } else {
+              await this.writeFile(directoryHandle, nativePath, content)
+            }
             result.success++
             await repo.markOpSynced(change.id)
             await repo.recordSyncItem(batchId, change.id, change.path, 'success')
@@ -449,7 +477,8 @@ export class WorkspacePendingManager {
         // Check if directory is empty
         let isEmpty = true
         // @ts-ignore — for await on directory entries
-        for await (const _ of dir.entries()) {
+        for await (const _entry of dir.entries()) {
+          void _entry
           isEmpty = false
           break
         }
@@ -608,15 +637,24 @@ export class WorkspacePendingManager {
   private async checkNativeConflict(
     directoryHandle: FileSystemDirectoryHandle,
     change: PendingChange,
-    pathTransform?: (path: string) => string
+    pathTransform?: (path: string) => string,
+    disk?: DiskAccessor
   ): Promise<SyncConflictCheck> {
     const nativePath = pathTransform ? pathTransform(change.path) : change.path
-    const currentFsMtime = await this.readNativeMtime(directoryHandle, nativePath)
+    const currentFsMtime = disk
+      ? await this.readNativeMtimeViaExec(disk, nativePath)
+      : await this.readNativeMtime(directoryHandle, nativePath)
     const baselineFsMtime = change.fsMtime || 0
 
     if (change.type === 'create') {
       if (currentFsMtime !== null) {
         if (baselineFsMtime === 0 || currentFsMtime !== baselineFsMtime) {
+          // Check if disk content matches OPFS — if so, not a conflict
+          // (our own sync or Python write produced identical content).
+          const diskMatchesOpfs = await this.isNativeAlignedWithOpfs(directoryHandle, change.path, nativePath, disk)
+          if (diskMatchesOpfs) {
+            return { isConflict: false, currentFsMtime }
+          }
           return {
             isConflict: true,
             reason: `检测到冲突：${change.path} 在草稿创建后已存在更新的磁盘版本。`,
@@ -629,7 +667,19 @@ export class WorkspacePendingManager {
 
     if (change.type === 'modify') {
       if (baselineFsMtime > 0 && currentFsMtime !== baselineFsMtime) {
-        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath)
+        // Before declaring a conflict, check if the current disk content
+        // matches the OPFS pending content. If they match, the mtime drift
+        // was caused by our own sync (or an external write that happened to
+        // produce identical content) — NOT a real conflict.
+        // This is critical for files written via Python (run_python) or
+        // other paths that bypass WorkspaceRuntime.writeFile: they update
+        // OPFS directly, then after sync the disk mtime changes, but the
+        // content is identical to OPFS → should not be flagged as conflict.
+        const diskMatchesOpfs = await this.isNativeAlignedWithOpfs(directoryHandle, change.path, nativePath, disk)
+        if (diskMatchesOpfs) {
+          return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+        }
+        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath, disk)
         if (alignedWithBaseline) {
           return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
         }
@@ -648,7 +698,7 @@ export class WorkspacePendingManager {
         currentFsMtime !== null &&
         currentFsMtime !== baselineFsMtime
       ) {
-        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath)
+        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath, disk)
         if (alignedWithBaseline) {
           return { isConflict: false, currentFsMtime }
         }
@@ -672,16 +722,63 @@ export class WorkspacePendingManager {
   private async isNativeAlignedWithBaseline(
     directoryHandle: FileSystemDirectoryHandle,
     baselinePath: string,
-    nativePath?: string
+    nativePath?: string,
+    disk?: DiskAccessor
   ): Promise<boolean> {
     try {
       const baselineBytes = await this.readBaselineBytes(baselinePath)
       if (!baselineBytes) return false
-      const nativeBytes = await this.readNativeBytes(directoryHandle, nativePath ?? baselinePath)
+      const nativeBytes = disk
+        ? await this.readNativeBytesViaExec(disk, nativePath ?? baselinePath)
+        : await this.readNativeBytes(directoryHandle, nativePath ?? baselinePath)
       if (!nativeBytes) return false
       return this.bytesEqual(baselineBytes, nativeBytes)
     } catch {
       return false
+    }
+  }
+
+  /**
+   * Check if current disk content matches the OPFS pending (files/) content.
+   * Used to suppress false conflicts when the mtime changed due to our own
+   * sync — if disk already contains the same bytes as OPFS, it's not a
+   * conflict regardless of mtime drift.
+   */
+  private async isNativeAlignedWithOpfs(
+    directoryHandle: FileSystemDirectoryHandle,
+    opfsPath: string,
+    nativePath: string,
+    disk?: DiskAccessor
+  ): Promise<boolean> {
+    try {
+      const opfsBytes = await this.readOpfsFileBytes(opfsPath)
+      if (!opfsBytes) return false
+      const nativeBytes = disk
+        ? await this.readNativeBytesViaExec(disk, nativePath)
+        : await this.readNativeBytes(directoryHandle, nativePath)
+      if (!nativeBytes) return false
+      return this.bytesEqual(opfsBytes, nativeBytes)
+    } catch {
+      return false
+    }
+  }
+
+  /** Read OPFS files/ content as raw bytes for comparison. */
+  private async readOpfsFileBytes(path: string): Promise<Uint8Array | null> {
+    try {
+      const normalizedPath = this.normalizeComparePath(path)
+      const parts = normalizedPath.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+
+      let current = await this.workspaceDir.getDirectoryHandle(FILES_DIR, { create: true })
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      return new Uint8Array(await file.arrayBuffer())
+    } catch {
+      return null
     }
   }
 
@@ -765,6 +862,49 @@ export class WorkspacePendingManager {
       return await this.readNativeMtime(directoryHandle, path)
     } catch {
       return null
+    }
+  }
+
+  // —— DiskExecutor-backed variants (used when `disk` accessor is provided) ——
+
+  private async readNativeMtimeViaExec(
+    disk: DiskAccessor,
+    path: string
+  ): Promise<number | null> {
+    try {
+      const stat = await disk.exec.stat(disk.rootId, path)
+      return stat ? stat.mtime : null
+    } catch (err: unknown) {
+      if (this.getErrorName(err) === 'NotFoundError') return null
+      throw err
+    }
+  }
+
+  private async safeReadNativeMtimeViaExec(
+    disk: DiskAccessor,
+    path: string
+  ): Promise<number | null> {
+    try {
+      return await this.readNativeMtimeViaExec(disk, path)
+    } catch {
+      return null
+    }
+  }
+
+  private async readNativeBytesViaExec(
+    disk: DiskAccessor,
+    path: string
+  ): Promise<Uint8Array | null> {
+    try {
+      const result = await disk.exec.read(disk.rootId, path)
+      const content = result.content
+      if (typeof content === 'string') {
+        return new TextEncoder().encode(content)
+      }
+      return new Uint8Array(content)
+    } catch (err: unknown) {
+      if (this.getErrorName(err) === 'NotFoundError') return null
+      throw err
     }
   }
 
