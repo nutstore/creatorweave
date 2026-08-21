@@ -213,6 +213,54 @@ describe('importOPFSBackup', () => {
     }
   })
 
+  it('retries reading the picked file on transient NotReadableError', async () => {
+    const zipped = zipOf({ 'bfosa-unified.sqlite': SQLITE_HEADER })
+    // First read throws the standard Chrome NotReadableError text; second
+    // succeeds. The confirm-dialog delay between pick and read makes this
+    // transient failure mode real (AV scan / lock / download flush).
+    let reads = 0
+    const flakyFile = {
+      name: 'backup.zip',
+      size: zipped.byteLength,
+      arrayBuffer: async () => {
+        reads++
+        if (reads === 1) {
+          throw new DOMException(
+            'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired',
+            'NotReadableError'
+          )
+        }
+        return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength)
+      },
+    } as unknown as File
+    const { restore } = installFakeOpfs()
+    try {
+      const result = await importOPFSBackup(flakyFile)
+      expect(result.fileCount).toBeGreaterThan(0)
+      expect(reads).toBe(2)
+    } finally {
+      restore()
+    }
+  })
+
+  it('reports a clear error when the file stays unreadable', async () => {
+    const alwaysFails = {
+      name: 'backup.zip',
+      size: 100,
+      arrayBuffer: async () => {
+        throw new DOMException('unreadable', 'NotReadableError')
+      },
+    } as unknown as File
+    const { restore } = installFakeOpfs()
+    try {
+      await expect(importOPFSBackup(alwaysFails)).rejects.toThrow(
+        /Could not read "backup\.zip".*unreadable/s
+      )
+    } finally {
+      restore()
+    }
+  })
+
   it('rejects an empty file', async () => {
     const { restore } = installFakeOpfs()
     try {

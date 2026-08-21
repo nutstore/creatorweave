@@ -722,6 +722,37 @@ async function writeBackupToOPFS(
  * (e.g. quota exceeded) OPFS may be left in a partial state — the caller
  * should surface the error and advise re-running the import.
  */
+/**
+ * Read a user-picked backup File into a Uint8Array with retry. Chrome can
+ * transiently fail `arrayBuffer()` on a disk-backed File with
+ * NotReadableError ("permission problems ... after a reference to a file
+ * was acquired") — typically AV scanning, file lock, or a downloader still
+ * flushing. The file reference itself stays valid, so retrying after a
+ * short backoff is the standard remedy.
+ */
+async function readFileWithRetry(file: File, label: string): Promise<Uint8Array> {
+  const maxAttempts = 4
+  let lastError: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return new Uint8Array(await file.arrayBuffer())
+    } catch (error) {
+      lastError = error
+      const message = error instanceof Error ? error.message : String(error)
+      const retryable =
+        message.includes('could not be read') ||
+        message.toLowerCase().includes('notreadable')
+      if (!retryable || attempt === maxAttempts) break
+      console.warn(
+        `[OPFS] Restore: reading ${label} failed (attempt ${attempt}/${maxAttempts}), retrying...`
+      )
+      await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
+    }
+  }
+  const message = lastError instanceof Error ? lastError.message : String(lastError)
+  throw new Error(`Could not read "${label}" (${formatBytes(file.size)}): ${message}`)
+}
+
 export async function importOPFSBackup(file: File): Promise<{ fileCount: number }> {
   if (typeof navigator === 'undefined' || !navigator.storage?.getDirectory) {
     throw new Error('OPFS is not available in this environment')
@@ -730,9 +761,12 @@ export async function importOPFSBackup(file: File): Promise<{ fileCount: number 
     throw new Error('Backup file is empty')
   }
 
-  // fflate's async unzip runs off the main thread (worker pool), matching
-  // the export path's behaviour on large archives.
-  const zipped = new Uint8Array(await file.arrayBuffer())
+  // Read the picked file BEFORE any destructive step. Use the retry helper:
+  // between the user picking the file and clicking "confirm", arbitrary
+  // time passes — the disk-backed File can transiently throw
+  // NotReadableError on first read (AV scan / lock / download flush), which
+  // a bounded retry reliably rides out.
+  const zipped = await readFileWithRetry(file, file.name)
   const entries: Unzipped = await new Promise((resolve, reject) => {
     unzip(zipped, (err, data) => (err ? reject(err) : resolve(data)))
   })
