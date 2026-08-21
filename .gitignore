@@ -95,3 +95,7 @@ browser-extension/.wxt/
 
 # Local design prototypes (HTML exploration files, not shippable assets)
 prototypes/
+# Native host installer build artifacts (generated, not for git)
+browser-extension/native-host/installer/*.zip
+browser-extension/native-host/installer/staging-*/
+browser-extension/native-host/installer/scripts-pkg/
