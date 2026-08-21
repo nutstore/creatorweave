@@ -44,21 +44,38 @@ function makeFakeDir(map: Map<string, unknown>) {
   const dir = {
     kind: 'directory' as const,
     entries: async function* () {
-      for (const [name, entry] of map) yield [name, entry] as [string, unknown]
+      for (const [name, entry] of map) {
+        // Wrap bare Map children on iteration so directory methods (entries/
+        // removeEntry/getDirectoryHandle) always exist for consumers.
+        if (entry instanceof Map) {
+          const wrapped = makeFakeDir(entry)
+          map.set(name, wrapped)
+          yield [name, wrapped] as [string, unknown]
+        } else {
+          yield [name, entry] as [string, unknown]
+        }
+      }
     },
-    removeEntry: vi.fn(async (name: string) => {
+    removeEntry: vi.fn(async (name: string, _opts?: { recursive?: boolean }) => {
       if (!map.has(name)) throw new DOMException('not found', 'NotFoundError')
       map.delete(name)
     }),
-    getDirectoryHandle: async (name: string) => {
+    getDirectoryHandle: async (name: string, opts?: { create?: boolean }) => {
       let child = map.get(name)
-      if (!(child instanceof Map)) {
-        child = new Map()
-        map.set(name, child)
+      if (child instanceof Map) {
+        return makeFakeDir(child)
       }
+      if (child && typeof child === 'object' && 'kind' in child && (child as { kind?: string }).kind === 'directory') {
+        return child
+      }
+      if (!opts?.create) {
+        throw new DOMException('not found', 'NotFoundError')
+      }
+      child = new Map()
+      map.set(name, child)
       return makeFakeDir(child as Map<string, unknown>)
     },
-    getFileHandle: async (name: string) => {
+    getFileHandle: async (name: string, opts?: { create?: boolean }) => {
       const existing = map.get(name)
       if (
         existing &&
@@ -68,6 +85,9 @@ function makeFakeDir(map: Map<string, unknown>) {
         'getFile' in (existing as object)
       ) {
         return existing
+      }
+      if (!opts?.create) {
+        throw new DOMException('not found', 'NotFoundError')
       }
       // File handle that actually accumulates written bytes so the backup
       // spill path (createWritable → write chunks → close → getFile) works
@@ -215,14 +235,14 @@ describe('importOPFSBackup', () => {
 
   it('retries reading the picked file on transient NotReadableError', async () => {
     const zipped = zipOf({ 'bfosa-unified.sqlite': SQLITE_HEADER })
-    // First read throws the standard Chrome NotReadableError text; second
-    // succeeds. The confirm-dialog delay between pick and read makes this
-    // transient failure mode real (AV scan / lock / download flush).
+    // First stream() probe throws the standard Chrome NotReadableError
+    // text; second succeeds. The confirm-dialog delay between pick and read
+    // makes this transient failure mode real (AV scan / lock / flush).
     let reads = 0
     const flakyFile = {
       name: 'backup.zip',
       size: zipped.byteLength,
-      arrayBuffer: async () => {
+      stream: () => {
         reads++
         if (reads === 1) {
           throw new DOMException(
@@ -230,8 +250,10 @@ describe('importOPFSBackup', () => {
             'NotReadableError'
           )
         }
-        return zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength)
+        return new FakeFile('backup.zip', zipped).stream()
       },
+      arrayBuffer: async () =>
+        zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength),
     } as unknown as File
     const { restore } = installFakeOpfs()
     try {
@@ -247,6 +269,9 @@ describe('importOPFSBackup', () => {
     const alwaysFails = {
       name: 'backup.zip',
       size: 100,
+      stream: () => {
+        throw new DOMException('unreadable', 'NotReadableError')
+      },
       arrayBuffer: async () => {
         throw new DOMException('unreadable', 'NotReadableError')
       },
@@ -392,7 +417,10 @@ describe('importOPFSBackup', () => {
   it('reports locked entries as a close-other-tabs failure instead of a raw error', async () => {
     const zipped = zipOf({ 'bfosa-unified.sqlite': SQLITE_HEADER })
     const { restore } = installFakeOpfs()
-    // Re-create root whose removeEntry always reports locked
+    // Re-create root whose removeEntry always reports locked. Staging
+    // creation needs getDirectoryHandle to work, so it delegates to a real
+    // fake dir — only removeEntry is locked (the clear-root step).
+    const stagingMap = new Map<string, unknown>()
     const lockedRoot = {
       kind: 'directory' as const,
       entries: async function* () {
@@ -404,9 +432,7 @@ describe('importOPFSBackup', () => {
           'NoModificationAllowedError'
         )
       },
-      getDirectoryHandle: async () => {
-        throw new Error('unused')
-      },
+      getDirectoryHandle: async (_name: string) => makeFakeDir(stagingMap),
       getFileHandle: async () => {
         throw new Error('unused')
       },
@@ -418,6 +444,7 @@ describe('importOPFSBackup', () => {
         getDirectory: async () => lockedRoot,
       },
     })
+    void zipped
     try {
       await expect(
         importOPFSBackup(new FakeFile('backup.zip', zipped) as unknown as File)

@@ -17,8 +17,8 @@
 import {
   Zip,
   ZipDeflate,
-  unzip,
-  type Unzipped,
+  Unzip,
+  AsyncUnzipInflate,
 } from 'fflate'
 import { beginReset, endReset } from '@/storage/reset-coordinator'
 import { setStorageResetMarker } from '@/storage/reset-marker'
@@ -640,75 +640,14 @@ async function clearOPFSRoot(root: FileSystemDirectoryHandle): Promise<void> {
 }
 
 /**
- * Validate unzipped entries and normalize them into `path -> bytes`.
- *
- * - Skips directory markers (`foo/`) and macOS archive noise
- *   (`__MACOSX/`, `.DS_Store`).
- * - Skips the legacy `.bfosa-pool` SAH pool: restoring it could shadow the
- *   freshly restored database with a stale copy (the same reason
- *   `clearLegacySahPoolFromOPFSRoot` scrubs it on reset).
- * - Zip-slip guard: rejects absolute paths and `..` segments.
- * - Requires the SQLite database file and verifies its magic header — a
- *   mislabeled archive fails here, BEFORE any destructive step runs.
- */
-function validateBackupEntries(entries: Unzipped): Map<string, Uint8Array> {
-  const files = new Map<string, Uint8Array>()
-  for (const [rawPath, data] of Object.entries(entries)) {
-    if (rawPath.endsWith('/') || rawPath.startsWith('__MACOSX/')) continue
-    if (rawPath.split('/').pop() === '.DS_Store') continue
-    if (rawPath === '.bfosa-pool' || rawPath.startsWith('.bfosa-pool/')) continue
-    // Spill dir from old backups made while the disk-spill path was active;
-    // stale leftovers must not block imports (validated above) and must not
-    // be restored as data.
-    if (rawPath === BACKUP_TMP_DIR || rawPath.startsWith(BACKUP_TMP_DIR + '/')) continue
-
-    const path = rawPath.replace(/^\.\//, '')
-    if (!path || path.startsWith('/') || path.split('/').includes('..')) {
-      throw new Error(`Invalid entry in backup archive: "${rawPath}"`)
-    }
-    files.set(path, data)
-  }
-  const dbBytes = files.get(REQUIRED_DB_FILE)
-  if (!dbBytes) {
-    throw new Error(
-      `Backup archive does not contain the SQLite database (${REQUIRED_DB_FILE})`
-    )
-  }
-  const header = new TextDecoder().decode(dbBytes.subarray(0, SQLITE_DB_MAGIC.length))
-  if (header !== SQLITE_DB_MAGIC) {
-    throw new Error(
-      `"${REQUIRED_DB_FILE}" in the archive is not a valid SQLite database`
-    )
-  }
-  return files
-}
-
-/** Write `path -> bytes` back under the OPFS root, creating directories. */
-async function writeBackupToOPFS(
-  root: FileSystemDirectoryHandle,
-  files: Map<string, Uint8Array>
-): Promise<void> {
-  for (const [path, data] of files) {
-    const segments = path.split('/')
-    const filename = segments.pop()!
-    let dir = root
-    for (const segment of segments) {
-      dir = await dir.getDirectoryHandle(segment, { create: true })
-    }
-    const fileHandle = await dir.getFileHandle(filename, { create: true })
-    const writable = await fileHandle.createWritable()
-    await writable.write(data)
-    await writable.close()
-  }
-}
-
-/**
  * Replace the entire OPFS content with a backup zip produced by
  * `exportOPFSBackup` (full restore, not a merge).
  *
  * Sequence:
- * 1. Unzip the archive fully into memory and validate it — if the archive
- *    is invalid we bail out with the current data untouched.
+ * 1. Stream-unzip the archive into an OPFS staging directory and validate
+ *    it (SQLite magic included) — if the archive is invalid we bail out
+ *    with the current data untouched. Memory stays O(chunk) even for
+ *    multi-GB archives (streaming end to end).
  * 2. Enter reset mode (broadcast to other tabs + storage reset marker, so
  *    the post-reload `initStorage()` treats the next init as "after reset"
  *    and clears the marker once the restored db opens healthily — the same
@@ -723,19 +662,57 @@ async function writeBackupToOPFS(
  * should surface the error and advise re-running the import.
  */
 /**
- * Read a user-picked backup File into a Uint8Array with retry. Chrome can
- * transiently fail `arrayBuffer()` on a disk-backed File with
- * NotReadableError ("permission problems ... after a reference to a file
- * was acquired") — typically AV scanning, file lock, or a downloader still
- * flushing. The file reference itself stays valid, so retrying after a
- * short backoff is the standard remedy.
+ * Stream-unzip a backup archive from a user-picked File into an OPFS
+ * staging directory, without ever holding the whole archive (compressed or
+ * decompressed) in memory. Returns the staged `path -> { size }` map.
+ *
+ * Why streaming: large backups (multi-GB) previously died on
+ * `new Uint8Array(await file.arrayBuffer())` — a single allocation the size
+ * of the archive — and on fflate's `unzip()` materialising every entry.
+ * Peak memory here is O(chunk) (~1 MiB) regardless of archive size.
+ *
+ * Entry filtering mirrors validateBackupEntries() so noise/legacy/staging
+ * entries are skipped, and the SQLite magic check runs on the staged db
+ * file BEFORE any destructive step.
  */
-async function readFileWithRetry(file: File, label: string): Promise<Uint8Array> {
+/**
+ * Get a ReadableStream from a user-picked backup File with retry. Chrome can
+ * transiently fail reads on a disk-backed File with NotReadableError
+ * ("permission problems ... after a reference to a file was acquired") —
+ * typically AV scanning, file lock, or a downloader still flushing. The
+ * file reference stays valid, so a bounded retry rides it out. Getting the
+ * stream reads the first bytes lazily, so the retry wraps `stream()` itself.
+ */
+async function readFileStreamWithRetry(file: File): Promise<ReadableStream<Uint8Array>> {
   const maxAttempts = 4
   let lastError: unknown
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return new Uint8Array(await file.arrayBuffer())
+      const stream = file.stream()
+      // Probe the first chunk — a healthy stream yields data (or done)
+      // without throwing; a locked/scanned file rejects here.
+      const probe = stream.getReader()
+      try {
+        const first = await probe.read()
+        // Re-wrap: we can't unread into the original stream, so build a new
+        // stream that replays `first` then continues from the same reader.
+        const rest = probe
+        return new ReadableStream<Uint8Array>({
+          start(controller) {
+            if (!first.done && first.value) controller.enqueue(first.value)
+          },
+          async pull(controller) {
+            const { done, value } = await rest.read()
+            if (done) controller.close()
+            else controller.enqueue(value!)
+          },
+          cancel() {
+            void rest.cancel()
+          },
+        })
+      } catch (probeError) {
+        throw probeError
+      }
     } catch (error) {
       lastError = error
       const message = error instanceof Error ? error.message : String(error)
@@ -744,13 +721,143 @@ async function readFileWithRetry(file: File, label: string): Promise<Uint8Array>
         message.toLowerCase().includes('notreadable')
       if (!retryable || attempt === maxAttempts) break
       console.warn(
-        `[OPFS] Restore: reading ${label} failed (attempt ${attempt}/${maxAttempts}), retrying...`
+        `[OPFS] Restore: opening "${file.name}" failed (attempt ${attempt}/${maxAttempts}), retrying...`
       )
       await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
     }
   }
   const message = lastError instanceof Error ? lastError.message : String(lastError)
-  throw new Error(`Could not read "${label}" (${formatBytes(file.size)}): ${message}`)
+  throw new Error(
+    `Could not read "${file.name}" (${formatBytes(file.size)}): ${message}`
+  )
+}
+
+async function streamUnzipToStaging(
+  file: File,
+  stagingDir: FileSystemDirectoryHandle,
+): Promise<Map<string, number>> {
+  const staged = new Map<string, number>()
+  let dbMagicOk: boolean | null = null
+  let dbStaged = false
+  let fatal: Error | null = null
+  let settle!: () => void
+  const settled = new Promise<void>((r) => (settle = r))
+
+  // One serial write chain across ALL entries: entry ondata callbacks fire
+  // synchronously out of fflate while OPFS writes are async — the chain
+  // keeps ordering and lets the reader await (backpressure).
+  let writeTail: Promise<void> = Promise.resolve()
+  const enqueue = (job: () => Promise<void>): Promise<void> => {
+    writeTail = writeTail.then(job).catch((error) => {
+      if (!fatal) {
+        fatal = error instanceof Error ? error : new Error(String(error))
+        settle()
+      }
+    })
+    return writeTail
+  }
+
+  const skipEntry = (rawPath: string): boolean => {
+    if (rawPath.endsWith('/') || rawPath.startsWith('__MACOSX/')) return true
+    if (rawPath.split('/').pop() === '.DS_Store') return true
+    if (rawPath === '.bfosa-pool' || rawPath.startsWith('.bfosa-pool/')) return true
+    if (rawPath === BACKUP_TMP_DIR || rawPath.startsWith(BACKUP_TMP_DIR + '/')) return true
+    return false
+  }
+
+  const unzip = new Unzip((entry) => {
+    const rawPath = entry.name
+    if (skipEntry(rawPath)) return
+    const path = rawPath.replace(/^\.\//, '')
+    if (!path || path.startsWith('/') || path.split('/').includes('..')) {
+      fatal = new Error(`Invalid entry in backup archive: "${rawPath}"`)
+      entry.terminate?.()
+      settle()
+      return
+    }
+    let writable: FileSystemWritableFileStream | null = null
+    let bytesWritten = 0
+    let magicChecked = false
+    entry.ondata = (err, chunk, final) => {
+      if (fatal) return
+      if (err) {
+        fatal = err instanceof Error ? err : new Error(String(err))
+        settle()
+        return
+      }
+      enqueue(async () => {
+        if (fatal) return
+        if (!writable) {
+          const segments = path.split('/')
+          const filename = segments.pop()!
+          let dir: FileSystemDirectoryHandle = stagingDir
+          for (const segment of segments) {
+            dir = await dir.getDirectoryHandle(segment, { create: true })
+          }
+          const fileHandle = await dir.getFileHandle(filename, { create: true })
+          writable = await fileHandle.createWritable()
+        }
+        // Validate the SQLite header from the first bytes of the db entry.
+        if (path === REQUIRED_DB_FILE && !magicChecked) {
+          magicChecked = true
+          dbStaged = true
+          const header = new TextDecoder().decode(
+            chunk.subarray(0, SQLITE_DB_MAGIC.length)
+          )
+          dbMagicOk = chunk.length === 0 || header === SQLITE_DB_MAGIC
+          if (!dbMagicOk) {
+            fatal = new Error(
+              `"${REQUIRED_DB_FILE}" in the archive is not a valid SQLite database`
+            )
+            settle()
+            return
+          }
+        }
+        if (chunk.length) {
+          await writable.write(chunk)
+          bytesWritten += chunk.length
+        }
+        if (final) {
+          await writable.close()
+          writable = null
+          staged.set(path, bytesWritten)
+        }
+      })
+    }
+    entry.start()
+  })
+  unzip.register(AsyncUnzipInflate)
+
+  const stream = await readFileStreamWithRetry(file)
+  const reader = stream.getReader()
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      unzip.push(value, false)
+      // Backpressure: don't buffer input while staged writes lag behind.
+      await writeTail
+      if (fatal) break
+    }
+    if (!fatal) {
+      unzip.push(new Uint8Array(0), true)
+      await writeTail
+      if (!fatal && staged.size >= 0) settle()
+    }
+  } finally {
+    try {
+      reader.releaseLock()
+    } catch { /* already released */ }
+  }
+  await settled
+
+  if (fatal) throw fatal
+  if (!dbStaged || dbMagicOk !== true) {
+    throw new Error(
+      `Backup archive does not contain the SQLite database (${REQUIRED_DB_FILE})`
+    )
+  }
+  return staged
 }
 
 export async function importOPFSBackup(file: File): Promise<{ fileCount: number }> {
@@ -761,16 +868,36 @@ export async function importOPFSBackup(file: File): Promise<{ fileCount: number 
     throw new Error('Backup file is empty')
   }
 
-  // Read the picked file BEFORE any destructive step. Use the retry helper:
-  // between the user picking the file and clicking "confirm", arbitrary
-  // time passes — the disk-backed File can transiently throw
-  // NotReadableError on first read (AV scan / lock / download flush), which
-  // a bounded retry reliably rides out.
-  const zipped = await readFileWithRetry(file, file.name)
-  const entries: Unzipped = await new Promise((resolve, reject) => {
-    unzip(zipped, (err, data) => (err ? reject(err) : resolve(data)))
-  })
-  const files = validateBackupEntries(entries)
+  const opfsRoot = await navigator.storage.getDirectory()
+
+  // Phase 1 — stage & validate, BEFORE any destructive step. Streams the
+  // archive (file.stream() → fflate Unzip → OPFS files) so multi-GB backups
+  // never materialise in memory; a transient NotReadableError on the picked
+  // disk file is retried inside. The staged tree is validated (SQLite magic
+  // included) so a bad archive leaves the current data untouched.
+  //
+  // Peak disk usage: current data + staged copy (≈ backup size). The
+  // staging dir is removed in the finally below either way.
+  let stagingDir: FileSystemDirectoryHandle
+  try {
+    stagingDir = await opfsRoot.getDirectoryHandle(BACKUP_TMP_DIR, { create: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Could not create staging directory: ${message}`)
+  }
+
+  // staged is only consumed for its validation side-effects inside
+  // streamUnzipToStaging (entry guards + SQLite magic); the move phase
+  // below walks the staging dir directly.
+  try {
+    await streamUnzipToStaging(file, stagingDir)
+  } catch (error) {
+    // Best-effort cleanup so a failed import doesn't hog quota.
+    try {
+      await opfsRoot.removeEntry(BACKUP_TMP_DIR, { recursive: true })
+    } catch { /* ignore */ }
+    throw error
+  }
 
   const { token } = beginReset()
   setStorageResetMarker(token)
@@ -789,24 +916,22 @@ export async function importOPFSBackup(file: File): Promise<{ fileCount: number 
     const { resetWorkspaceManager } = await import('@/opfs')
     resetWorkspaceManager()
 
-    const opfsRoot = await navigator.storage.getDirectory()
     await clearOPFSRoot(opfsRoot)
 
-    // Pull the device-encryption key out of the write set BEFORE writing to
-    // OPFS — it belongs in IndexedDB, not OPFS, and must pair with the
-    // api_keys ciphertexts restored from this same backup. Without it,
-    // getEncryptionKey() detects the metadata/ciphertext mismatch after
-    // reload and wipes the restored api_keys table.
-    const deviceKeyBytes = files.get(DEVICE_KEY_FILE)
-    if (deviceKeyBytes) {
-      files.delete(DEVICE_KEY_FILE)
-    }
-    // Same for the localStorage map — it goes to localStorage, not OPFS.
-    const localStorageJson = files.get(LOCALSTORAGE_FILE)
-    if (localStorageJson) {
-      files.delete(LOCALSTORAGE_FILE)
-    }
-    await writeBackupToOPFS(opfsRoot, files)
+    // Side-channel entries — extracted from the staged tree (small files,
+    // safe to read into memory) BEFORE the tree is moved into place.
+    const deviceKeyBytes = await readStagedFile(stagingDir, DEVICE_KEY_FILE)
+    const localStorageBytes = await readStagedFile(stagingDir, LOCALSTORAGE_FILE)
+
+    // Phase 2 — move the staged tree into place. Directory moves via
+    // removeEntry+copy are O(files) but each file copy is chunked, so
+    // memory stays flat; OPFS has no rename-across-directories.
+    let moved = 0
+    await moveTreeIntoPlace(stagingDir, opfsRoot, '', (path) => {
+      const keep = path !== DEVICE_KEY_FILE && path !== LOCALSTORAGE_FILE
+      if (keep) moved++
+      return keep
+    })
 
     if (deviceKeyBytes) {
       const { importDeviceEncryptionKey } = await import(
@@ -825,21 +950,107 @@ export async function importOPFSBackup(file: File): Promise<{ fileCount: number 
     // immediately after import returns, so stores pick up the new values
     // on rehydration without any extra invalidation.
     let restoredLocalEntries = 0
-    if (localStorageJson) {
+    if (localStorageBytes) {
       restoredLocalEntries = restoreLocalStorage(
-        new TextDecoder().decode(localStorageJson)
+        new TextDecoder().decode(localStorageBytes)
       )
     }
 
     resetWorkspaceManager()
 
     console.log(
-      `[OPFS] Backup restored: ${files.size} files + ${restoredLocalEntries} localStorage entries from "${file.name}"`
+      `[OPFS] Backup restored: ${moved} files + ${restoredLocalEntries} localStorage entries from "${file.name}" (staged restore)`
     )
-    return { fileCount: files.size }
+    return { fileCount: moved }
   } finally {
+    // Best-effort staging cleanup — after a successful move the dir only
+    // holds the two extracted side-channel files (already deleted by the
+    // mover); after a failure it may hold partial data.
+    try {
+      await opfsRoot.removeEntry(BACKUP_TMP_DIR, { recursive: true })
+    } catch { /* ignore */ }
     // The reset marker intentionally survives until the post-reload
     // initStorage() clears it after a healthy initialization.
     endReset(token)
+  }
+}
+
+/** Read a small staged file (side-channel entries) fully into memory. */
+async function readStagedFile(
+  stagingDir: FileSystemDirectoryHandle,
+  path: string,
+): Promise<Uint8Array | null> {
+  try {
+    const segments = path.split('/')
+    const filename = segments.pop()!
+    let dir = stagingDir
+    for (const segment of segments) {
+      dir = await dir.getDirectoryHandle(segment)
+    }
+    const handle = await dir.getFileHandle(filename)
+    const f = await handle.getFile()
+    return new Uint8Array(await f.arrayBuffer())
+  } catch {
+    return null // absent — legacy backups simply lack these entries
+  }
+}
+
+/**
+ * Move every staged file/directory to the OPFS root (chunked copies).
+ * `keep(path)` returning false means the entry was already extracted and
+ * its staged copy is deleted instead of moved.
+ */
+async function moveTreeIntoPlace(
+  stagingDir: FileSystemDirectoryHandle,
+  root: FileSystemDirectoryHandle,
+  prefix: string,
+  keep: (path: string) => boolean,
+): Promise<void> {
+  for await (const [name, handle] of stagingDir.entries()) {
+    const path = prefix ? `${prefix}/${name}` : name
+    if (handle.kind === 'file') {
+      if (!keep(path)) {
+        await stagingDir.removeEntry(name).catch(() => {})
+        continue
+      }
+      const src = await (handle as FileSystemFileHandle).getFile()
+      const segments = path.split('/')
+      const filename = segments.pop()!
+      let dir = root
+      for (const segment of segments) {
+        dir = await dir.getDirectoryHandle(segment, { create: true })
+      }
+      const destHandle = await dir.getFileHandle(filename, { create: true })
+      const writable = await destHandle.createWritable()
+      // Chunked copy — bounded memory even for multi-GB staged entries.
+      const reader = src.stream().getReader()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          await writable.write(value)
+        }
+      } finally {
+        reader.releaseLock()
+      }
+      await writable.close()
+      await stagingDir.removeEntry(name)
+    } else {
+      const childRoot = await (async () => {
+        const segments = path.split('/')
+        let dir = root
+        for (const segment of segments) {
+          dir = await dir.getDirectoryHandle(segment, { create: true })
+        }
+        return dir
+      })()
+      await moveTreeIntoPlace(
+        handle as FileSystemDirectoryHandle,
+        childRoot,
+        '',
+        keep
+      )
+      await stagingDir.removeEntry(name, { recursive: true }).catch(() => {})
+    }
   }
 }
