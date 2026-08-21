@@ -20,6 +20,7 @@ order: 100
 - [CI/CD 配置](ci-cd.md) - 持续集成
 - [UI 包使用](ui-package-usage.md) - 组件库使用
 - [页面外 MCP 服务接入](mcp-page-outside-services.md) - Figma / OpenPencil / 插件 bridge 接入说明
+- [Agent Bridge（MCP）macOS 编译与测试](agent-bridge-macos-setup.md) - 扩展 + Native Host 本地编译、安装与 Codex 接入
 
 ## 技术栈
 
