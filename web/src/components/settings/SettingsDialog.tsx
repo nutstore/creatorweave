@@ -1477,7 +1477,7 @@ const SettingsDialogContent = forwardRef<
         {/* Sidebar tabs — w-52 (was w-44) so the longest tab label
             ("Browser Extension" / "浏览器扩展" + icon) fits on one line;
             nowrap guards against wrapping on narrower fallbacks. */}
-        <div className="border-subtle shrink-0 border-b p-2 md:w-52 md:border-b-0 md:border-r md:p-2">
+        <div className="border-subtle custom-scrollbar shrink-0 border-b p-2 md:max-h-full md:w-52 md:min-h-0 md:overflow-y-auto md:border-b-0 md:border-r md:p-2">
           <nav role="tablist" aria-label="Settings tabs" aria-orientation="vertical" className="flex gap-3 overflow-x-auto md:block md:space-y-3">
             {tabGroups.map((group) => (
               <div key={group.id} className="flex shrink-0 flex-col gap-1 md:gap-1">
