@@ -132,7 +132,7 @@ popup 的「发现站点」列表里应出现该域名。**没有工具页打开
 
 ### 5.3 接入 Codex（或 Claude Code）
 
-popup 里有一键复制命令；手动版（注意换成你的实际二进制路径）：
+popup 里有一键复制命令；手动版（注意换成你的实际二进制路径，**路径含空格，引号必须保留**）：
 
 ```bash
 codex mcp add eo2weave-webmcp -- "$PWD/native-host/target/release/cw-native-host" --mcp-stdio
