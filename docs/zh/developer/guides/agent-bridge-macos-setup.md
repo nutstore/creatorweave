@@ -182,7 +182,7 @@ cd browser-extension && pnpm build
 
 ```bash
 cd native-host
-./installer/build-dist-mac.sh        # 产物: installer/EO2Weave-NativeHost-<ver>-macos.zip
+bash installer/build-dist-mac.sh     # 产物: installer/EO2Weave-NativeHost-<ver>-macos.zip
 ```
 
 zip 内含 universal 二进制 + `install.sh`，对方解压后 `bash install.sh` 即可（二进制落到
