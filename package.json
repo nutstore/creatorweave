@@ -13,6 +13,13 @@
     "esbuild": "^0.21.5"
   },
   "scripts": {
-    "test": "cd web && pnpm test"
+    "test": "cd web && pnpm test",
+    "host": "cargo build --release --manifest-path browser-extension/native-host/Cargo.toml",
+    "host:mac": "cargo build --release --manifest-path browser-extension/native-host/Cargo.toml",
+    "host:win": "cargo build --release --target x86_64-pc-windows-gnu --manifest-path browser-extension/native-host/Cargo.toml",
+    "host:test": "cargo test --manifest-path browser-extension/native-host/Cargo.toml",
+    "host:check:win": "cargo check --target x86_64-pc-windows-gnu --manifest-path browser-extension/native-host/Cargo.toml",
+    "host:installer": "bash browser-extension/native-host/installer/build-installer.sh",
+    "host:install": "bash browser-extension/native-host/install.sh"
   }
 }

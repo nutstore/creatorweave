@@ -164,6 +164,25 @@ fn default_policy() -> Policy {
             PolicyRule { command: "launchctl".into(), args: vec![], decision: Forbidden },
             PolicyRule { command: "defaults".into(), args: vec![], decision: Forbidden },
             PolicyRule { command: "crontab".into(), args: vec![], decision: Forbidden },
+            // ── Windows shells & system tools: forbidden (STATUS.md §8.2 (8)) ──
+            // No shell wrapping: `cmd /c x` / `powershell -Command x` would
+            // hide the real command from the allow-list.
+            PolicyRule { command: "cmd".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "cmd.exe".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "powershell".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "powershell.exe".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "pwsh".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "wsl".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "taskkill".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "taskkill.exe".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "del".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "rd".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "format".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "shutdown".into(), args: vec!["/s".into()], decision: Forbidden },
+            PolicyRule { command: "reg".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "regedit".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "mshta".into(), args: vec![], decision: Forbidden },
+            PolicyRule { command: "rundll32".into(), args: vec![], decision: Forbidden },
             // ── Dangerous git subcommands: forbidden ──
             PolicyRule { command: "git".into(), args: vec!["reset".into(), "--hard".into()], decision: Forbidden },
             PolicyRule { command: "git".into(), args: vec!["push".into(), "--force".into()], decision: Forbidden },
@@ -180,15 +199,31 @@ fn default_rules() -> Vec<PolicyRule> {
 }
 
 /// Load the policy from disk, creating a default file if it doesn't exist.
+///
+/// Upgrades (STATUS.md §8.2 (8)): when an existing file predates a set of
+/// safety-critical default Forbidden rules (Windows shells etc.), the
+/// missing ones are appended and persisted — user edits (Auto/Prompt rules,
+/// removals of *non-safety* defaults) are preserved. A user may still
+/// explicitly loosen a forbidden rule afterwards; safety floors apply only
+/// when the file simply doesn't mention the command at all.
 pub fn load_policy() -> Policy {
     let path = policy_file_path();
     match std::fs::read_to_string(&path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|e| {
-            eprintln!(
-                "[cw-native-host] execpolicy.json parse error, using defaults: {e}"
-            );
-            default_policy()
-        }),
+        Ok(content) => {
+            let mut policy: Policy = serde_json::from_str(&content).unwrap_or_else(|e| {
+                eprintln!(
+                    "[cw-native-host] execpolicy.json parse error, using defaults: {e}"
+                );
+                default_policy()
+            });
+            let upgraded = append_missing_forbidden_defaults(&mut policy);
+            if upgraded {
+                if let Ok(json) = serde_json::to_string_pretty(&policy) {
+                    let _ = std::fs::write(&path, json);
+                }
+            }
+            policy
+        }
         Err(_) => {
             // File doesn't exist — create it with defaults
             let policy = default_policy();
@@ -199,6 +234,25 @@ pub fn load_policy() -> Policy {
             policy
         }
     }
+}
+
+/// Append any default Forbidden rule the loaded policy doesn't cover.
+/// Returns true when the policy changed (caller persists).
+/// A rule is "covered" when ANY rule with the same command name exists —
+/// deliberate user overrides (e.g. `cmd` → Prompt) are respected.
+fn append_missing_forbidden_defaults(policy: &mut Policy) -> bool {
+    let known_commands: std::collections::HashSet<String> =
+        policy.rules.iter().map(|r| r.command.clone()).collect();
+    let mut changed = false;
+    for default_rule in default_policy().rules {
+        if default_rule.decision == Decision::Forbidden
+            && !known_commands.contains(&default_rule.command)
+        {
+            policy.rules.push(default_rule);
+            changed = true;
+        }
+    }
+    changed
 }
 
 /// Check whether a rule matches the given command array.
@@ -362,5 +416,18 @@ mod tests {
     fn empty_command_is_forbidden() {
         assert_eq!(check(&[]), Decision::Forbidden);
         assert_eq!(check(&["".to_string()]), Decision::Forbidden);
+    }
+
+    #[test]
+    fn windows_shells_are_forbidden() {
+        // STATUS.md §8.2 (8): shell wrappers must never be allowed — they
+        // hide the real command from the allow-list.
+        for shell in ["cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "wsl"] {
+            assert_eq!(
+                check(&[shell.to_string(), "/c".into(), "rm".into()]),
+                Decision::Forbidden,
+                "{shell} should be forbidden"
+            );
+        }
     }
 }

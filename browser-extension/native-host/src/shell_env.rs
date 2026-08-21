@@ -21,11 +21,14 @@
 //!     but we also skip noisy vars like _ / SHLVL / PWD).
 
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
+use std::process::Command;
+#[cfg(not(windows))]
+use std::process::Stdio;
 use std::sync::OnceLock;
 
 /// Env var names we inherit from the user's login shell.
 /// PATH is the important one; the rest cover common toolchains.
+#[cfg(not(windows))]
 const INHERIT_VARS: &[&str] = &[
     "PATH",
     "MANPATH",
@@ -71,10 +74,20 @@ static SHELL_ENV: OnceLock<HashMap<String, String>> = OnceLock::new();
 ///   2. `/bin/zsh` (macOS default)
 ///   3. `/bin/bash`
 ///
+/// Windows (STATUS.md §8.2 (7)): returns an empty map immediately — Windows
+/// Chrome passes the user's full environment to NM hosts, so the macOS
+/// launchd PATH problem doesn't exist there.
+///
 /// If all attempts fail, returns an empty map (caller falls back to the
 /// host's own environment — current behaviour).
 pub fn shell_env() -> &'static HashMap<String, String> {
     SHELL_ENV.get_or_init(capture_shell_env)
+}
+
+/// Run the user's login shell once and capture selected env vars.
+#[cfg(windows)]
+fn capture_shell_env() -> HashMap<String, String> {
+    HashMap::new() // see shell_env() doc — no shell capture on Windows
 }
 
 /// Apply the inherited shell environment to a `Command`.
@@ -114,6 +127,7 @@ pub fn apply_shell_env(cmd: &mut Command) {
 }
 
 /// Run the user's login shell once and capture selected env vars.
+#[cfg(not(windows))]
 fn capture_shell_env() -> HashMap<String, String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
@@ -193,5 +207,11 @@ mod tests {
         // Simulate: set PATH in host env space is not possible in tests,
         // so just verify apply_shell_env doesn't panic and returns.
         apply_shell_env(&mut cmd);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_shell_env_is_empty() {
+        assert!(shell_env().is_empty());
     }
 }

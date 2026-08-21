@@ -66,6 +66,14 @@ pub fn handle(request: &Value) -> Value {
     }
 
     // Build the command.
+    #[cfg(windows)]
+    let command = {
+        // STATUS.md §8.2 (6): resolve bare names through PATH×PATHEXT AFTER
+        // policy/approval checks (execpolicy matched the user-facing name).
+        let mut resolved = command.clone();
+        resolved[0] = crate::win::resolve_command(&resolved[0]);
+        resolved
+    };
     let mut cmd = Command::new(&command[0]);
     cmd.args(&command[1..]);
     cmd.current_dir(&cwd);
@@ -109,11 +117,20 @@ pub fn handle(request: &Value) -> Value {
     cmd.stdout(stdout_log);
     cmd.stderr(log_file);
 
-    // ── detached spawn: new session (setsid) → own process group ──
+    // ── detached spawn ──
+    // Unix: new session (setsid) → own process group, pgid == pid.
+    // Windows: CREATE_NEW_PROCESS_GROUP + CREATE_NO_WINDOW (STATUS.md §8.2
+    // (4)); pgid unused (taskkill /T walks the tree by pid).
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0); // setsid semantics: child leads a new pgroup
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use crate::win::{CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW};
+        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
     }
 
     let mut child = match cmd.spawn() {
@@ -128,7 +145,8 @@ pub fn handle(request: &Value) -> Value {
         }
     };
     let pid = child.id();
-    // With process_group(0), pgid == pid.
+    // With process_group(0), pgid == pid (Unix). Windows tree-kill is
+    // pid-based; record pgid = pid for format compatibility.
     let pgid = pid;
     // Reap the zombie immediately; the child is fully detached now.
     std::thread::spawn(move || {
@@ -166,7 +184,8 @@ pub fn handle(request: &Value) -> Value {
     json!({ "ok": true, "process_id": process_id, "log_path": log_path_str })
 }
 
-/// SIGTERM the whole process group (best-effort).
+/// Terminate the whole process tree (best-effort rollback).
+/// Unix: SIGTERM the group (-pgid). Windows: taskkill /T (STATUS.md §8.2 (5)).
 fn kill_group(pgid: u32) {
     #[cfg(unix)]
     {
@@ -177,8 +196,8 @@ fn kill_group(pgid: u32) {
             kill(-(pgid as i32), 15); // -pgid, SIGTERM
         }
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        let _ = pgid;
+        let _ = crate::win::kill_tree(pgid, false);
     }
 }

@@ -35,9 +35,18 @@ pub fn handle(request: &Value) -> Value {
         });
     }
 
-    // ── signal the whole process group ──
-    let sig = if force { 9 } else { 15 }; // SIGKILL / SIGTERM
-    let signaled = kill_group(rec.pgid, sig);
+    // ── signal the whole process tree ──
+    // Unix: SIGTERM(15)/SIGKILL(9) the group. Windows: taskkill /T (+ /F when
+    // force) — tree kill by pid (STATUS.md §8.2 (5)).
+    #[cfg(windows)]
+    let signaled = crate::win::kill_tree(rec.pid, force);
+    #[cfg(unix)]
+    let signaled = kill_group(rec.pgid, if force { 9 } else { 15 });
+    #[cfg(not(any(unix, windows)))]
+    let signaled = {
+        let _ = (rec.pgid, force);
+        false
+    };
 
     if !signaled {
         // Group may already be gone; re-check pid directly.
@@ -76,18 +85,11 @@ pub fn handle(request: &Value) -> Value {
     json!({ "ok": true, "process_id": rec.process_id, "signaled": true, "state": "stopped" })
 }
 
-/// Signal a process group. Returns true when the signal was delivered.
+/// Signal a process group (Unix). Returns true when the signal was delivered.
+#[cfg(unix)]
 fn kill_group(pgid: u32, sig: i32) -> bool {
-    #[cfg(unix)]
-    {
-        extern "C" {
-            fn kill(pgid: i32, sig: i32) -> i32;
-        }
-        unsafe { kill(-(pgid as i32), sig) == 0 }
+    extern "C" {
+        fn kill(pgid: i32, sig: i32) -> i32;
     }
-    #[cfg(not(unix))]
-    {
-        let _ = (pgid, sig);
-        false
-    }
+    unsafe { kill(-(pgid as i32), sig) == 0 }
 }

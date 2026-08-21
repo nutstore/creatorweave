@@ -137,11 +137,23 @@ fn execute_and_stream(
     request: &Value,
 ) {
     // Build the command
+    #[cfg(windows)]
+    let command: Vec<String> = {
+        // STATUS.md §8.2 (6): PATH×PATHEXT resolution AFTER policy check.
+        let mut resolved = command.to_vec();
+        resolved[0] = crate::win::resolve_command(&resolved[0]);
+        resolved
+    };
     let mut cmd = Command::new(&command[0]);
     cmd.args(&command[1..]);
     cmd.current_dir(cwd);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use crate::win::CommandExtNoWindow;
+        cmd.creation_flags_no_window();
+    }
 
     // Inherit stdin from the host process (which is the NM pipe — typically empty).
     // For interactive commands, stdin won't work well, but that's acceptable for 档位 1.5.

@@ -72,12 +72,24 @@ pub fn handle(request: &Value) -> Value {
         .unwrap_or(120);
 
     // ── Build and spawn command ──
+    #[cfg(windows)]
+    let command = {
+        // STATUS.md §8.2 (6): PATH×PATHEXT resolution AFTER policy check.
+        let mut resolved = command.clone();
+        resolved[0] = crate::win::resolve_command(&resolved[0]);
+        resolved
+    };
     let mut cmd = Command::new(&command[0]);
     cmd.args(&command[1..]);
     cmd.current_dir(&cwd);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.stdin(Stdio::null());
+    #[cfg(windows)]
+    {
+        use crate::win::CommandExtNoWindow;
+        cmd.creation_flags_no_window();
+    }
 
     // Inherit the user's login-shell environment (PATH with nvm/mise/homebrew
     // etc.) so toolchain binaries are directly reachable. Request-provided

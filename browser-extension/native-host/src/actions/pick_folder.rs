@@ -1,17 +1,20 @@
-//! `pick_folder` — show OS folder picker (macOS NSOpenPanel), authorize a new scope.
+//! `pick_folder` — show OS folder picker, authorize a new scope.
 //!
-//! macOS-only: uses NSOpenPanel via objc2-app-kit.
+//! macOS: NSOpenPanel via objc2-app-kit (localized copy).
+//! Windows: IFileDialog via crate::win (STATUS.md §8.2 (1)).
 
 use serde_json::{json, Value};
 
 use crate::scope;
 
+#[cfg(target_os = "macos")]
 struct PickerCopy {
     title: &'static str,
     message: &'static str,
     prompt: &'static str,
 }
 
+#[cfg(target_os = "macos")]
 fn picker_copy(language: &str) -> PickerCopy {
     let language = language.replace('_', "-").to_ascii_lowercase();
     if language.starts_with("zh") {
@@ -41,7 +44,7 @@ fn picker_copy(language: &str) -> PickerCopy {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::picker_copy;
 
@@ -124,6 +127,13 @@ mod platform {
 
 #[cfg(not(target_os = "macos"))]
 mod platform {
+    #[cfg(target_os = "windows")]
+    pub fn pick_folder() -> Option<std::path::PathBuf> {
+        // STATUS.md §8.2 (1): IFileDialog COM folder picker.
+        crate::win::pick_folder_dialog()
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     pub fn pick_folder() -> Option<std::path::PathBuf> {
         None
     }

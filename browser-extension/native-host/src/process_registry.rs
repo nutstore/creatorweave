@@ -108,20 +108,34 @@ impl RegistryLock {
                 .open(&lock_path)
             {
                 Ok(file) => {
-                    use std::os::unix::fs::MetadataExt;
-                    // Stale lock (older than 30s with no writer) — break it.
-                    if let Ok(meta) = file.metadata() {
-                        let age = now_secs().saturating_sub(meta.ctime().max(0) as u64);
-                        if age > 30 {
-                            let _ = fs::remove_file(&lock_path);
-                            continue;
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::MetadataExt;
+                        // Stale lock (older than 30s with no writer) — break it.
+                        if let Ok(meta) = file.metadata() {
+                            let age = now_secs().saturating_sub(meta.ctime().max(0) as u64);
+                            if age > 30 {
+                                let _ = fs::remove_file(&lock_path);
+                                continue;
+                            }
+                        }
+                        // O_EXCL-style exclusivity: try to take a flock.
+                        use std::os::unix::io::AsRawFd;
+                        let rc = unsafe { libc_flock(file.as_raw_fd()) };
+                        if rc == 0 {
+                            return Ok(RegistryLock { _file: file });
                         }
                     }
-                    // O_EXCL-style exclusivity: try to take a flock.
-                    use std::os::unix::io::AsRawFd;
-                    let rc = unsafe { libc_flock(file.as_raw_fd()) };
-                    if rc == 0 {
-                        return Ok(RegistryLock { _file: file });
+                    #[cfg(windows)]
+                    {
+                        // STATUS.md §8.2 (3): LockFileEx exclusive + fail-fast,
+                        // same retry/timeout loop as Unix flock. No stale-lock
+                        // breaking needed: the OS releases the lock when the
+                        // owning (crashed) process's handle is closed.
+                        use std::os::windows::io::AsRawHandle;
+                        if lock_file_exclusive(file.as_raw_handle()) {
+                            return Ok(RegistryLock { _file: file });
+                        }
                     }
                 }
                 Err(e) => return Err(e),
@@ -146,9 +160,27 @@ unsafe fn libc_flock(fd: i32) -> i32 {
     flock(fd, 2 | 4) // LOCK_EX | LOCK_NB
 }
 
-#[cfg(not(unix))]
-unsafe fn libc_flock(_fd: i32) -> i32 {
-    0 // single-writer assumption on non-Unix for now
+/// STATUS.md §8.2 (3): LockFileEx(LOCKFILE_EXCLUSIVE_LOCK |
+/// LOCKFILE_FAIL_IMMEDIATELY) over the whole file (offsets 0..u32::MAX).
+#[cfg(windows)]
+fn lock_file_exclusive(handle: std::os::windows::io::RawHandle) -> bool {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::Storage::FileSystem::{
+        LockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
+    };
+
+    let handle = HANDLE(handle as _);
+    unsafe {
+        LockFileEx(
+            handle,
+            LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+            None,
+            u32::MAX,
+            u32::MAX,
+            std::ptr::null_mut(),
+        )
+        .is_ok()
+    }
 }
 
 // ── Registry operations (all take the lock for write paths) ──────────────
@@ -176,7 +208,8 @@ pub fn load() -> ProcessesFile {
     load_unlocked()
 }
 
-/// Is a pid still alive? kill(pid, 0) probe (Unix).
+/// Is a pid still alive? Unix: kill(pid, 0) probe. Windows: OpenProcess +
+/// GetExitCodeProcess (STATUS.md §8.2 (2)).
 pub fn pid_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
@@ -186,7 +219,11 @@ pub fn pid_alive(pid: u32) -> bool {
         }
         unsafe { kill(pid as i32, 0) == 0 }
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        crate::win::pid_alive(pid)
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = pid;
         false

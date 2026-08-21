@@ -107,7 +107,7 @@ for path-traversal protection.
 | ExecPolicy management UI (settings panel "执行策略" tab) | ✅ Done |
 | Background process management (`processes` tool) | ✅ Done |
 | Auto-flush pending before exec | ✅ Done |
-| Windows support | ❌ Not done (macOS only) |
+| Windows support | 🚧 Implemented (cross-compiled exe OK; real-machine e2e pending, §8) |
 | Code signing / notarization (Gatekeeper) | ❌ Not done |
 
 ---
@@ -146,7 +146,20 @@ for path-traversal protection.
 
 ### Cross-platform & hardening
 
-- [ ] Windows support (`CREATE_NEW_PROCESS_GROUP` + `taskkill /T`) — currently macOS only
+- [ ] Windows support — implemented 2026-08-20, design & decisions in §8:
+  - [x] `Cargo.toml`: objc2 gated to macOS; `windows` crate 0.62 (windows-only, needs COM interfaces)
+  - [x] `pick_folder`: IFileDialog COM (`FOS_PICKFOLDERS`) in `win.rs`
+  - [x] `process_registry`: `pid_alive` via `OpenProcess` + `GetExitCodeProcess`; registry lock via `LockFileEx`; unix imports cfg-gated (was a hard compile error)
+  - [x] `exec_start`: `CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW` + `taskkill /T` rollback
+  - [x] `exec_stop`: `kill_group` → `taskkill /PID <pid> /T` (+ `/F` when force)
+  - [x] `shell_env`: Windows short-circuit (empty map — Windows Chrome passes full env)
+  - [x] Windows command resolution: `resolve_command` PATH×PATHEXT helper applied after policy check in exec/exec_sync/exec_start
+  - [x] execpolicy: Windows shells forbidden (`cmd`/`powershell`/`pwsh`/`wsl`/`taskkill`/…); old policy files auto-upgraded with missing Forbidden defaults
+  - [x] `install.ps1` / `uninstall.ps1` (HKCU registry, no admin) + README
+  - [x] Single-file installer: `installer/build-installer.sh` → 7z GUI SFX (~460 KB), builds on ANY host OS (NSIS rejected: Homebrew arm64 makensis crashes with std::bad_alloc even on empty scripts). Installs to `%LOCALAPPDATA%\EO2Weave\`, HKCU registration, Add/Remove entry, embedded uninstaller.
+  - [x] Verified: `cargo check`/`build --release --target x86_64-pc-windows-gnu` clean (PE32+ exe produced); macOS `cargo test` 27/27 green
+  - [ ] Real Windows e2e: pick_folder → read/write → exec → exec_start/stop on an actual Windows machine
+  - [ ] CI: add windows target to the build matrix (msvc or gnu)
 - [ ] Code signing / notarization (macOS Gatekeeper)
 
 ### Conversation sharing (待追踪)
@@ -171,3 +184,51 @@ Candidate directions (evaluate, no conclusion yet):
 - PR #6: Node.js bridge daemon (task delegation, shared extension ID)
 - Extension ID: `kdnnhmagmghdhfinoipgbcddnpmffbkp`
 - Native host name: `com.creatorweave.nativehost`
+
+---
+
+## 8. Windows support — design (2026-08-20, in progress)
+
+> Scope: host-side Rust only. The web executor layer (`executor-native-host.ts`), extension relay
+> (`background.ts`), and NM protocol (`nm.rs`) are fully platform-agnostic — verified by grep, no
+> changes needed there. Everything below happens inside `browser-extension/native-host/`.
+
+### 8.1 What breaks on Windows today
+
+| Module | Problem |
+|---|---|
+| `Cargo.toml` | `objc2*` deps are unconditional — macOS-only crates fail to build for `windows-*` targets |
+| `process_registry.rs` | `use std::os::unix::fs::MetadataExt` / `AsRawFd` in `RegistryLock::acquire` have **no cfg gate** → compile error; `pid_alive` returns `false` always; `libc_flock` stub is a no-op (no locking) |
+| `pick_folder.rs` | Non-macOS stub returns `None` → action always reports `cancelled` |
+| `exec_start.rs` | `process_group(0)` is Unix-only; rollback `kill_group` is a no-op |
+| `exec_stop.rs` | `kill_group` returns `false` → stop always fails for running procs |
+| `shell_env.rs` | Tries `$SHELL`/`/bin/zsh` + `printenv` — silently fails (returns empty), acceptable but wasteful |
+| All exec paths | `Command::new("pnpm")` fails on Windows: std resolves only `.exe`, not `.cmd`/`.bat`/`.com` shims — node/pnpm/git wrappers are `.cmd` |
+| `install.sh` | Hardcodes `~/Library/.../NativeMessagingHosts`; Windows needs a registry key + `.exe` path |
+
+### 8.2 Decisions
+
+1. **Folder picker → IFileDialog COM.** Single folder pick, `FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM`, CoInitializeEx on the calling thread. Implemented via the `windows` crate (windows-sys has no COM interface definitions), behind `#[cfg(target_os = "windows")]` in the existing `mod platform`. Keeps the objc2-free dependency graph on Windows.
+2. **pid liveness → `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` + `GetExitCodeProcess` != `STILL_ACTIVE`.** Replaces `kill(pid, 0)`. Conservative on access-denied (treated as alive).
+3. **Registry lock → `LockFileEx` on the same `.lock` file** (exclusive + fail-fast, same retry/timeout loop as Unix). Replaces `flock`. Semantics equivalent: NM spawns one host process per message, races only occur between concurrent host processes.
+4. **Detached spawn → `CREATE_NEW_PROCESS_GROUP` creation flag** (Job Objects deliberately not used: a job would kill children when the host exits — the opposite of the "dev server must survive" requirement). Detachment on Windows is the default (no handle inheritance without explicit `SECURITY_ATTRIBUTES.bInheritHandle`).
+5. **Stop → `taskkill /PID <pid> /T`** (tree kill, graceful console-event first) **+ `/F` when force**. Mirrors SIGTERM→SIGKILL escalation. `std::process::Command` invoked internally; return-code based success check.
+6. **Command resolution → resolve bare names against `PATH` + `PATHEXT` before spawning.** If `command[0]` contains no path separator, probe `PATH` entries × `PATHEXT` extensions (default `.COM;.EXE;.BAT;.CMD`), use the first hit; fall through unchanged when nothing matches (preserves today's error message). Implemented once in a shared helper (`win.rs::resolve_command`), applied by `exec_sync`, `exec`, `exec_start` — always AFTER the execpolicy check, so policy keeps matching the user-facing name (`pnpm`, not `...\pnpm.cmd`). Path-absolute commands (e.g. `C:\...`) skip resolution. Rust std ≥1.77 wraps `.cmd`/`.bat` spawns with `cmd.exe` (BatBadBut mitigation), so spawning the resolved `.cmd` is safe.
+7. **shell_env → short-circuit on Windows** (`return HashMap::new()` immediately). Windows Chrome passes the user's full environment to NM hosts; the macOS launchd PATH problem doesn't exist. Also skip `.cmd`-spawned shells entirely.
+8. **Execpolicy unchanged.** `cmd.exe`/`powershell.exe` are denied like `/bin/sh` on macOS (existing rules: command-name allow-list, no shell wrapping). `taskkill` and Windows toolchains (`node.exe`, `pnpm.cmd`, …) match by name as usual.
+9. **Install → single-file setup exe via 7z GUI SFX** (`installer/build-installer.sh`; builds on any OS with cargo+7z+curl — the `7z.sfx` module is fetched once from 7-zip.org). Installs to `%LOCALAPPDATA%\EO2Weave\NativeMessagingHosts`, writes the manifest, registers `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.creatorweave.nativehost` (+ Edge), adds an Add/Remove-Programs entry with an embedded uninstaller. NSIS was the first choice but Homebrew's arm64 `makensis` crashes (`std::bad_alloc`) even on empty scripts; IExpress requires running packaging on Windows. HKCU only — no admin. `install.ps1` remains the manual/dev alternative (installs to `%LOCALAPPDATA%\CreatorWeave\`).
+10. **Exit status**: Windows has no signals; `signal` stays `null` (already the `#[cfg(not(unix))]` behavior). Exit codes propagate as-is.
+11. **`cfg` layout**: per-feature inline `#[cfg]` blocks (matches existing style — the codebase already uses `#[cfg(unix)]`/`#[cfg(not(unix))]` in place). No platform module split; a new `win.rs` helper module hosts `pid_alive`/`kill_tree`/`resolve_command`/`pick_folder` internals to keep actions readable.
+
+### 8.3 Non-goals / later
+
+- Linux support: everything in §8.2 is `#[cfg(windows)]`; Unix paths remain untouched, so Linux falls back to today's behavior (pick_folder stub, etc.). A Linux `pick_folder` (GTK/zenity) is future work.
+- Authenticode signing of the `.exe` — same tier as macOS notarization (§6).
+- ARM64 Windows (`aarch64-pc-windows-msvc`) — build target question, code is arch-agnostic.
+
+### 8.4 Verification plan
+
+- `cargo check --target x86_64-pc-windows-gnu` (done on macOS dev machine — works without a Windows toolchain; `build --release` also links via the gnu target if mingw is installed. MSVC target remains an option for CI.)
+- `cargo test` on macOS must stay green (Unix paths untouched)
+- New unit tests: `resolve_command` PATHEXT logic (pure logic, host-platform testable with a fake PATH), normalize/lock behavior where feasible
+- Real Windows e2e (pick_folder → read/write → exec → exec_start/stop) after first real machine is available

@@ -1,0 +1,6 @@
+;!@Install@!UTF-8!
+Title="EO2Weave Native Host Setup"
+BeginPrompt="Install EO2Weave Native Host for Chrome/Edge? (per-user, no admin needed)"
+RunProgram="powershell.exe -NoProfile -ExecutionPolicy Bypass -File launch.ps1"
+FinishMessage="EO2Weave Native Host installed. Fully restart Chrome to activate."
+;!@InstallEnd@!

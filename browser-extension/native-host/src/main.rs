@@ -23,6 +23,8 @@ mod nm;
 mod process_registry;
 mod scope;
 mod shell_env;
+#[cfg(target_os = "windows")]
+mod win;
 
 fn main() {
     // Read first message from stdin

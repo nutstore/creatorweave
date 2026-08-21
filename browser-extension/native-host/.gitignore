@@ -1,0 +1,8 @@
+# Native host build artifacts
+/target
+
+# Installer build artifacts (7z.sfx is fetched once from 7-zip.org;
+# staging/ and the setup exe are reproducible outputs)
+/installer/7z.sfx
+/installer/staging/
+/installer/EO2Weave-Host-Setup-*.exe

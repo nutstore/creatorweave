@@ -13,6 +13,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # macOS-only: NSOpenPanel for pick_folder
+[target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5"
 objc2-foundation = { version = "0.2", features = ["NSArray", "NSLocale", "NSString", "NSThread"] }
 objc2-app-kit = { version = "0.2", features = [
@@ -24,6 +25,19 @@ objc2-app-kit = { version = "0.2", features = [
     "NSWindow",
     "NSResponder",
     "NSView",
+] }
+
+# Windows-only: IFileDialog pick_folder, process liveness, taskkill-based stop,
+# LockFileEx registry lock. See STATUS.md §8. The `windows` crate (not
+# windows-sys) is required for COM interfaces (IFileOpenDialog).
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
 ] }
 
 [profile.release]
