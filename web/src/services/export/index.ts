@@ -41,8 +41,23 @@ export {
 
 export {
   exportConversation,
+  prepareConversationExport,
   type ConversationExportFormat,
   type ConversationExportOptions,
   type ConversationExportResult,
   type ConversationExportData,
+  type ConversationExportFiles,
 } from './conversation-export'
+
+export {
+  listConversationsForExport,
+  listProjectNames,
+  exportConversationsBatch,
+  type ConversationListItem,
+  type ConversationListFilter,
+  type BatchExportSelection,
+  type BatchExportOptions,
+  type BatchExportResult,
+  type BatchExportItemResult,
+  type BatchExportProgress,
+} from './conversation-batch-export'

@@ -85,3 +85,61 @@ describe('search_conversations', () => {
     )
   })
 })
+
+describe('search_conversations projects (multi-project filter)', () => {
+  beforeEach(() => {
+    queryAllMock.mockReset()
+    queryAllMock.mockResolvedValue([])
+  })
+
+  it('expands a projects array into an IN clause in list mode', async () => {
+    await searchConversationsExecutor(
+      { projects: ['creatorweave', 'yinghe'], updated_after: 1000 },
+      { directoryHandle: null },
+    )
+
+    const [sql, params] = queryAllMock.mock.calls[0]
+    expect(sql).toContain('p.name IN (?,?)')
+    expect(params).toEqual([1000, 'creatorweave', 'yinghe', 21])
+  })
+
+  it('applies the projects filter in keyword mode too', async () => {
+    await searchConversationsExecutor(
+      { query: 'release', projects: ['cw'] },
+      { directoryHandle: null },
+    )
+
+    const [sql] = queryAllMock.mock.calls[0]
+    expect(sql).toContain('p.name IN (?)')
+  })
+
+  it('treats projects alone as a sufficient filter (no invalid_arguments)', async () => {
+    const result = await searchConversationsExecutor(
+      { projects: ['cw'] },
+      { directoryHandle: null },
+    )
+    expect(JSON.parse(result)).toMatchObject({ ok: true })
+  })
+
+  it('prefers single project filter when both project and projects are given', async () => {
+    await searchConversationsExecutor(
+      { project: 'winner', projects: ['a', 'b'] },
+      { directoryHandle: null },
+    )
+
+    const [sql, params] = queryAllMock.mock.calls[0]
+    expect(sql).toContain('p.name = ?')
+    expect(sql).not.toContain('p.name IN')
+    expect(params).toEqual(['winner', 21])
+  })
+
+  it('skips the project breakdown when projects filter is set', async () => {
+    await searchConversationsExecutor(
+      { projects: ['cw'], updated_after: 1 },
+      { directoryHandle: null },
+    )
+
+    // Only ONE query should have run (list query) — no breakdown follow-up
+    expect(queryAllMock).toHaveBeenCalledTimes(1)
+  })
+})

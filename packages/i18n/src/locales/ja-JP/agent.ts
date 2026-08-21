@@ -63,6 +63,13 @@ export const agent = {
         moreResults: "他 {count} 件（合計 {total} 件）",
         moreAvailable: "さらに結果があります",
         untitled: "（無題）",
+        filterProjects: "プロジェクトで絞り込む",
+        filterAllProjects: "すべてのプロジェクト",
+        exportSelectAll: "すべて選択",
+        exportSelected: "{count} 件選択中",
+        exportButton: "エクスポート",
+        exportDone: "{count} 件の会話をエクスポートしました",
+        exportSkipped: "{count} 件スキップ",
     },
 
     // Mermaid ダイアグラムレンダラー

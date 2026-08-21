@@ -4,13 +4,25 @@
  *
  * Layout:
  *   Summary: icon + mode badge + filter chips + count + mini breakdown
- *   Detail:  conversation list (title + project + relative time) + breakdown table
+ *   Detail:  export toolbar (select-all + format + export button)
+ *            + conversation list (checkbox + title + project + relative time)
+ *            + breakdown table
+ *
+ * Export: checked conversations are packed into a single zip via
+ * `exportConversationsBatch` (one directory per conversation + index.md +
+ * manifest.json) and downloaded directly from the chat card.
  */
 
-import { MessageSquare, Search, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { MessageSquare, Search, Clock, Download, Loader2, CheckCircle2 } from 'lucide-react'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
 import { useT } from '@/i18n'
+import {
+  exportConversationsBatch,
+  type BatchExportResult,
+} from '@/services/export/conversation-batch-export'
+import type { ConversationExportFormat } from '@/services/export/conversation-export'
 
 /** Shorthand for the translator function (matches the i18n package's createUseT shape). */
 type Translator = (
@@ -168,6 +180,293 @@ function ProjectBadge({ name }: { name: string }) {
   )
 }
 
+/** Minimal checkbox styled to match the card's neutral palette. */
+function RowCheckbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: () => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation()
+        onChange()
+      }}
+      className={`grid h-3.5 w-3.5 shrink-0 place-content-center rounded border transition-colors ${
+        checked
+          ? 'border-primary-600 bg-primary-600 text-white'
+          : 'border-neutral-300 bg-transparent hover:border-neutral-400 dark:border-neutral-600'
+      }`}
+    >
+      {checked && (
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <path d="M2.5 6.2l2.4 2.4L9.5 3.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
+/**
+ * Results body: export toolbar + checkable conversation list.
+ *
+ * One component owns both the selection state and the rows so checkboxes,
+ * select-all and the export button share state naturally (no external hacks).
+ */
+function ResultsBody({ results }: { results: SearchResultItem[] }) {
+  const t = useT()
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [activeProject, setActiveProject] = useState<string | null>(null)
+  const [format, setFormat] = useState<ConversationExportFormat>('markdown')
+  const [isExporting, setIsExporting] = useState(false)
+  const [progress, setProgress] = useState({ percent: 0, step: '', title: '' })
+  const [result, setResult] = useState<BatchExportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // The tool result already contains the full returned result set. Keep every
+  // row selectable: truncating here made conversations beyond the first 15
+  // impossible to export even though they were included in the tool payload.
+  const projects = [...new Set(results.flatMap((r) => (r.projectName ? [r.projectName] : [])))].sort()
+  const visible = activeProject
+    ? results.filter((r) => r.projectName === activeProject)
+    : results
+
+  const allChecked = visible.length > 0 && visible.every((r) => checked.has(r.conversationId))
+  const someChecked = visible.some((r) => checked.has(r.conversationId)) && !allChecked
+
+  const toggleRow = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const toggleAll = () =>
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (visible.every((r) => next.has(r.conversationId))) {
+        for (const r of visible) next.delete(r.conversationId)
+      } else {
+        for (const r of visible) next.add(r.conversationId)
+      }
+      return next
+    })
+
+  const handleExport = async () => {
+    if (checked.size === 0 || isExporting) return
+    setIsExporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ percent: 0, step: '', title: '' })
+    try {
+      const byId = new Map(results.map((r) => [r.conversationId, r]))
+      const res = await exportConversationsBatch(
+        [...checked].map((id) => {
+          const r = byId.get(id)
+          return {
+            conversationId: id,
+            title: r?.title ?? id,
+            projectName: r?.projectName,
+            updatedAt: r?.updatedAt,
+          }
+        }),
+        { format, onProgress: setProgress },
+      )
+      setResult(res)
+      if (!res.success) setError(res.error ?? 'export failed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Export toolbar */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-neutral-200 bg-neutral-50/60 px-2 py-1.5 dark:border-neutral-700/60 dark:bg-neutral-800/40">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={allChecked ? 'true' : someChecked ? 'mixed' : 'false'}
+          onClick={toggleAll}
+          className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+        >
+          <span
+            className={`grid h-3 w-3 place-content-center rounded-[3px] border transition-colors ${
+              allChecked
+                ? 'border-primary-600 bg-primary-600'
+                : someChecked
+                  ? 'border-primary-600 bg-primary-600/60'
+                  : 'border-neutral-300 dark:border-neutral-600'
+            }`}
+          >
+            {(allChecked || someChecked) && (
+              <svg viewBox="0 0 12 12" className="h-2 w-2 text-white" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <path d="M2.5 6.2l2.4 2.4L9.5 3.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          {t('agent.searchConversations.exportSelectAll')}
+        </button>
+
+        {/* Format pills */}
+        <div className="flex rounded border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+          {(['markdown', 'json', 'html'] as ConversationExportFormat[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFormat(f)}
+              className={`px-1.5 py-0.5 text-[10px] uppercase transition-colors ${
+                format === f
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
+              }`}
+            >
+              {f === 'markdown' ? 'MD' : f.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <span className="ml-auto text-[10px] text-neutral-400">
+          {t('agent.searchConversations.exportSelected', { count: checked.size })}
+        </span>
+
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={isExporting || checked.size === 0}
+          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40 bg-primary-600 text-white hover:bg-primary-700"
+        >
+          {isExporting ? (
+            <>
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              {progress.step}
+            </>
+          ) : (
+            <>
+              <Download className="h-2.5 w-2.5" />
+              {t('agent.searchConversations.exportButton')}
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      {isExporting && (
+        <div className="space-y-1">
+          <div className="h-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+            <div
+              className="h-full rounded-full bg-primary-600 transition-all duration-300"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+          {progress.title && (
+            <div className="truncate text-[10px] text-neutral-400">{progress.title}</div>
+          )}
+        </div>
+      )}
+
+      {/* Result / error */}
+      {result?.success && !isExporting && (
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="h-3 w-3 shrink-0" />
+          {t('agent.searchConversations.exportDone', { count: result.exportedCount })}
+          {result.skippedCount > 0
+            ? ` · ${t('agent.searchConversations.exportSkipped', { count: result.skippedCount })}`
+            : ''}
+          <span className="text-neutral-400">
+            {' '}{result.filename} ({(result.size / 1024).toFixed(0)} KB)
+          </span>
+        </div>
+      )}
+      {error && !isExporting && <div className="text-[10px] text-red-500">{error}</div>}
+
+      {/* Quick project filter — selection is preserved when switching projects. */}
+      {projects.length > 1 && (
+        <div
+          className="flex items-center gap-1 overflow-x-auto pb-0.5"
+          role="group"
+          aria-label={t('agent.searchConversations.filterProjects')}
+        >
+          <button
+            type="button"
+            aria-pressed={activeProject === null}
+            onClick={() => setActiveProject(null)}
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+              activeProject === null
+                ? 'bg-neutral-700 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                : 'bg-neutral-100 text-neutral-500 hover:text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+            }`}
+          >
+            {t('agent.searchConversations.filterAllProjects')}
+          </button>
+          {projects.map((project) => (
+            <button
+              key={project}
+              type="button"
+              aria-pressed={activeProject === project}
+              onClick={() => setActiveProject(project)}
+              className={`shrink-0 rounded transition-opacity ${
+                activeProject === project
+                  ? 'border border-primary-500 opacity-100'
+                  : 'border border-transparent opacity-65 hover:opacity-100'
+              }`}
+            >
+              <ProjectBadge name={project} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Conversation list with checkboxes */}
+      <div className="space-y-1">
+        {visible.map((r, i) => (
+          <div
+            key={r.conversationId}
+            className="flex flex-col gap-0.5 text-xs"
+            style={{ animation: `tool-row-in .2s ease-out ${i * 18}ms backwards` }}
+          >
+            <div className="flex items-center gap-2">
+              <RowCheckbox
+                checked={checked.has(r.conversationId)}
+                onChange={() => toggleRow(r.conversationId)}
+                label={r.title || 'conversation'}
+              />
+              <span
+                className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate flex-1"
+                title={r.title}
+              >
+                {r.title || t('agent.searchConversations.untitled')}
+              </span>
+              {r.projectName && <ProjectBadge name={r.projectName} />}
+              <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(r.updatedAt)}</span>
+            </div>
+            {/* Last assistant message — gives the LLM status context for free */}
+            {r.lastAssistantMessage && (
+              <div
+                className="ml-5 text-[11px] text-neutral-500 dark:text-neutral-400 truncate"
+                title={r.lastAssistantMessage}
+              >
+                ↳ {truncate(r.lastAssistantMessage, 140)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 registerRenderer({
   name: 'search_conversations',
   icon: <MessageSquare className="h-3.5 w-3.5 text-neutral-400" />,
@@ -278,9 +577,7 @@ registerRenderer({
     const results = data.results ?? []
     const breakdown = data.projects_breakdown ?? []
     const filters = data.filters ?? {}
-    const total = data.totalMatches ?? 0
     const mode = data.mode ?? 'list'
-    const maxShow = 15
     const timeRange = formatTimeRange(filters.updated_after, filters.updated_before, t)
 
     if (results.length === 0) {
@@ -330,45 +627,11 @@ registerRenderer({
           </div>
         )}
 
-        {/* Conversation list */}
-        <div className="space-y-1">
-          {results.slice(0, maxShow).map((r, i) => (
-            <div
-              key={r.conversationId}
-              className="flex flex-col gap-0.5 text-xs"
-              style={{ animation: `tool-row-in .2s ease-out ${i * 18}ms backwards` }}
-            >
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-3 w-3 text-neutral-400 shrink-0" />
-                <span
-                  className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate flex-1"
-                  title={r.title}
-                >
-                  {r.title || t('agent.searchConversations.untitled')}
-                </span>
-                {r.projectName && <ProjectBadge name={r.projectName} />}
-                <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(r.updatedAt)}</span>
-              </div>
-              {/* Last assistant message — gives the LLM status context for free */}
-              {r.lastAssistantMessage && (
-                <div
-                  className="ml-5 text-[11px] text-neutral-500 dark:text-neutral-400 truncate"
-                  title={r.lastAssistantMessage}
-                >
-                  ↳ {truncate(r.lastAssistantMessage, 140)}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        {/* Conversation list + export toolbar (selection & export state live inside) */}
+        <ResultsBody results={results} />
 
-        {/* Overflow indicator */}
-        {results.length > maxShow && (
-          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
-            {t('agent.searchConversations.moreResults', { count: results.length - maxShow, total })}
-          </div>
-        )}
-        {data.hasMore && results.length <= maxShow && (
+        {/* The backend may still have more results than this tool response returned. */}
+        {data.hasMore && (
           <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
             {t('agent.searchConversations.moreAvailable')}
           </div>

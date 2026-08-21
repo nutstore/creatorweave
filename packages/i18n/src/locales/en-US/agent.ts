@@ -93,6 +93,13 @@ export const agent = {
         moreResults: "+{count} more ({total} total)",
         moreAvailable: "more results available",
         untitled: "(untitled)",
+        filterProjects: "Filter by project",
+        filterAllProjects: "All projects",
+        exportSelectAll: "Select all",
+        exportSelected: "{count} selected",
+        exportButton: "Export",
+        exportDone: "Exported {count} conversations",
+        exportSkipped: "{count} skipped",
     },
 
     // Mermaid diagram renderer

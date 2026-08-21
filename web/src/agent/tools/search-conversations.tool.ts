@@ -57,6 +57,14 @@ export const searchConversationsDefinition: ToolDefinition = {
           description:
             'Optional project name filter (exact match against `projects.name`).',
         },
+        projects: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Optional multi-project filter (exact match, OR semantics). ' +
+            'Equivalent to `project` but for several projects at once — use this to ' +
+            'include a known set of projects (which implicitly excludes all others).',
+        },
         sort_by: {
           type: 'string',
           enum: ['updated_desc', 'updated_asc'],
@@ -66,7 +74,7 @@ export const searchConversationsDefinition: ToolDefinition = {
         },
       },
       // All parameters are optional. The executor enforces that at least one
-      // of {query, updated_after, updated_before, project} is provided.
+      // of {query, updated_after, updated_before, project, projects} is provided.
       required: [],
     },
   },
@@ -208,14 +216,20 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
       : null
   const projectFilter =
     typeof args.project === 'string' && args.project.trim().length > 0 ? args.project.trim() : ''
+  // Multi-project filter (OR semantics). Mutually exclusive with `project` —
+  // when both are given, `project` wins (single filter is the stricter intent).
+  const projectsFilter: string[] = Array.isArray(args.projects)
+    ? args.projects.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0).map((p: string) => p.trim())
+    : []
+  const hasProjectScope = !!projectFilter || projectsFilter.length > 0
   const sortBy = args.sort_by === 'updated_asc' ? 'updated_asc' : 'updated_desc'
 
-  // At least one filter is required: keyword OR time OR project.
-  if (!hasQuery && updatedAfter === null && updatedBefore === null && !projectFilter) {
+  // At least one filter is required: keyword OR time OR project(s).
+  if (!hasQuery && updatedAfter === null && updatedBefore === null && !hasProjectScope) {
     return toolErrorJson(
       'search_conversations',
       'invalid_arguments',
-      'at least one of query, updated_after, updated_before, project is required'
+      'at least one of query, updated_after, updated_before, project, projects is required'
     )
   }
 
@@ -245,6 +259,9 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
       if (projectFilter) {
         conversationConditions.push('p.name = ?')
         conversationParams.push(projectFilter)
+      } else if (projectsFilter.length > 0) {
+        conversationConditions.push(`p.name IN (${projectsFilter.map(() => '?').join(',')})`)
+        conversationParams.push(...projectsFilter)
       }
       const conversationWhere =
         conversationConditions.length > 0 ? `WHERE ${conversationConditions.join(' AND ')}` : ''
@@ -298,6 +315,9 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
       if (projectFilter) {
         conditions.push('p.name = ?')
         params.push(projectFilter)
+      } else if (projectsFilter.length > 0) {
+        conditions.push(`p.name IN (${projectsFilter.map(() => '?').join(',')})`)
+        params.push(...projectsFilter)
       }
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
@@ -321,10 +341,11 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
       `
       rows = await db.queryAll<SearchResultRow>(conversationsSql, [...params, limit + 1])
 
-      // ── Project breakdown (only meaningful when no `project` filter is set) ─
+      // ── Project breakdown (only meaningful when no project filter is set) ─
       // Reuses the same WHERE so the breakdown reflects the same time window as the results.
-      // Skipped when caller already passed `project=` (breakdown would be 1 row = trivial).
-      if (!projectFilter) {
+      // Skipped when caller already passed `project=`/`projects=` (breakdown would
+      // mirror the filter and add no information).
+      if (!hasProjectScope) {
         const breakdownSql = `
           SELECT
             COALESCE(p.name, '(未命名项目)') AS projectName,
@@ -365,6 +386,7 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
         updated_after: updatedAfter,
         updated_before: updatedBefore,
         project: projectFilter || null,
+        projects: projectsFilter.length > 0 ? projectsFilter : null,
         sort_by: sortBy,
       },
       mode: hasQuery ? 'keyword' : 'list',
@@ -391,5 +413,6 @@ export const searchConversationsPromptDoc: ToolPromptDoc = {
     '- `search_conversations(query, limit?)` - Keyword search across all workspaces chat history.',
     '- `search_conversations("", updated_after=<ms>, updated_before=<ms>)` - List conversations in a time window (Unix epoch ms). Useful for "最近 3 天" / "今天" / "本周" briefings.',
     '- `search_conversations(query, project="<name>", updated_after=<ms>)` - Combine keyword + project + time filters.',
+    '- `search_conversations("", projects=["A", "B"], updated_after=<ms>)` - Multi-project include filter (OR semantics) — selects a known set of projects, implicitly excluding all others.',
   ],
 }

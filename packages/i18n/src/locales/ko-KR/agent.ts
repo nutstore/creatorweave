@@ -63,6 +63,13 @@ export const agent = {
         moreResults: "+{count}개 더 (총 {total}개)",
         moreAvailable: "더 많은 결과 사용 가능",
         untitled: "(제목 없음)",
+        filterProjects: "프로젝트별 필터",
+        filterAllProjects: "모든 프로젝트",
+        exportSelectAll: "모두 선택",
+        exportSelected: "{count}개 선택됨",
+        exportButton: "내보내기",
+        exportDone: "{count}개 대화를 내보냈습니다",
+        exportSkipped: "{count}개 건너뜀",
     },
 
     // Mermaid 다이어그램 렌더러

@@ -127,12 +127,37 @@ export interface ExportArtifact {
 // ============================================================================
 
 /**
- * Export a conversation to the specified format and trigger download.
+ * In-memory representation of one conversation's export output:
+ * a set of bundle-relative file paths → bytes, ready to be zipped.
  */
-export async function exportConversation(
+export interface ConversationExportFiles {
+  /** conversation record used to produce the files */
+  conversation: Conversation
+  /** format that was rendered */
+  format: ConversationExportFormat
+  /** bundle-relative path → file bytes (already prefixed with the conversation's directory when dirPrefix was given) */
+  files: Map<string, Uint8Array>
+  /** number of filtered messages included */
+  messageCount: number
+  /** number of image/attachment files that were readable (and thus bundled/inlined) */
+  bundledFileCount: number
+}
+
+/**
+ * Render a conversation's export output into an in-memory file set.
+ *
+ * This is the core of the export pipeline with NO download side effect —
+ * `exportConversation` (single download) and `exportConversationsBatch`
+ * (multi-conversation zip) both build on it.
+ *
+ * @param dirPrefix optional sub-directory prefix for every file path (e.g. `01-My Talk`).
+ *                  Used by batch export; single export passes none.
+ */
+export async function prepareConversationExport(
   conversation: Conversation,
   options: ConversationExportOptions,
-): Promise<ConversationExportResult> {
+  dirPrefix?: string,
+): Promise<ConversationExportFiles | { error: string }> {
   const {
     format,
     includeToolCalls = true,
@@ -140,88 +165,132 @@ export async function exportConversation(
     includeUsage = false,
     includeSystemMessages = false,
     includeImages = true,
-    filename,
-    addTimestamp = true,
-    onProgress,
   } = options
+
+  // Filter and normalize messages
+  const messages = filterMessages(conversation.messages, {
+    includeToolCalls,
+    includeSystemMessages,
+  })
+
+  if (messages.length === 0) {
+    return { error: 'No messages to export' }
+  }
+
+  // Collect images & attachments (shared across formats)
+  let artifactsByMessage = new Map<string, ExportArtifact[]>()
+  if (includeImages) {
+    artifactsByMessage = await collectArtifacts(messages, conversation.id)
+  }
+  const allArtifacts = [...artifactsByMessage.values()].flat()
+  const bundledCount = allArtifacts.filter((a) => !a.missing).length
+
+  const files = new Map<string, Uint8Array>()
+  const prefix = dirPrefix ? `${dirPrefix}/` : ''
+
+  switch (format) {
+    case 'json': {
+      const json = buildJSONString(conversation, messages, {
+        includeToolCalls,
+        includeReasoning,
+        includeUsage,
+        includeImages,
+      })
+      files.set(`${prefix}conversation.json`, strToU8(json))
+      break
+    }
+    case 'markdown': {
+      const md = buildMarkdown(conversation, messages, {
+        includeToolCalls,
+        includeReasoning,
+      }, artifactsByMessage)
+      files.set(`${prefix}conversation.md`, strToU8(md))
+      // Bundle media files next to the document.
+      for (const artifact of allArtifacts) {
+        if (artifact.missing || !artifact.bytes) continue
+        files.set(`${prefix}${artifact.bundlePath}`, artifact.bytes)
+      }
+      break
+    }
+    case 'html': {
+      const html = buildHTML(conversation, messages, {
+        includeToolCalls,
+        includeReasoning,
+      }, artifactsByMessage)
+      files.set(`${prefix}conversation.html`, strToU8(html))
+      break
+    }
+    default:
+      throw new Error(`Unsupported format: ${format}`)
+  }
+
+  return {
+    conversation,
+    format,
+    files,
+    messageCount: messages.length,
+    bundledFileCount: bundledCount,
+  }
+}
+
+/**
+ * Export a conversation to the specified format and trigger download.
+ */
+export async function exportConversation(
+  conversation: Conversation,
+  options: ConversationExportOptions,
+): Promise<ConversationExportResult> {
+  const { format, filename, addTimestamp = true, onProgress } = options
 
   try {
     onProgress?.(10, 'Preparing messages...')
 
-    // Filter and normalize messages
-    const messages = filterMessages(conversation.messages, {
-      includeToolCalls,
-      includeSystemMessages,
-    })
+    const prepared = await prepareConversationExport(conversation, options)
 
-    if (messages.length === 0) {
+    if ('error' in prepared) {
       return {
         success: false,
         filename: '',
         size: 0,
         format,
         messageCount: 0,
-        error: 'No messages to export',
+        error: prepared.error,
       }
     }
 
-    // Collect images & attachments (shared across formats)
-    let artifactsByMessage = new Map<string, ExportArtifact[]>()
-    if (includeImages) {
-      onProgress?.(40, 'Collecting attachments...')
-      artifactsByMessage = await collectArtifacts(messages, conversation.id)
-    }
-    const allArtifacts = [...artifactsByMessage.values()].flat()
-    const bundledCount = allArtifacts.filter((a) => !a.missing).length
-
-    onProgress?.(60, `Generating ${format.toUpperCase()}...`)
+    onProgress?.(80, 'Saving file...')
 
     const baseName =
       filename || conversation.title.replace(/[/\\?%*:|"<>]/g, '-').trim() || 'conversation'
 
+    // Single-file download. The prepared file set is either a single document
+    // (md/json/html) or a markdown doc + bundled media — the latter becomes a zip.
     let blob: Blob
     let extension: string
-
-    switch (format) {
-      case 'json': {
-        const json = buildJSONString(conversation, messages, {
-          includeToolCalls,
-          includeReasoning,
-          includeUsage,
-          includeImages,
-        })
-        blob = new Blob([json], { type: 'application/json;charset=utf-8' })
-        extension = 'json'
-        break
-      }
-      case 'markdown': {
-        const md = buildMarkdown(conversation, messages, {
-          includeToolCalls,
-          includeReasoning,
-        }, artifactsByMessage)
-        if (bundledCount > 0) {
-          blob = zipBundle('conversation.md', strToU8(md), allArtifacts)
-          extension = 'zip'
-        } else {
-          blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-          extension = 'md'
-        }
-        break
-      }
-      case 'html': {
-        const html = buildHTML(conversation, messages, {
-          includeToolCalls,
-          includeReasoning,
-        }, artifactsByMessage)
-        blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-        extension = 'html'
-        break
-      }
-      default:
-        throw new Error(`Unsupported format: ${format}`)
+    if (prepared.files.size > 1) {
+      // Markdown + artifacts → zip bundle (same behavior as before this refactor)
+      const mediaArtifacts: ExportArtifact[] = [...prepared.files.entries()]
+        .filter(([p]) => p !== 'conversation.md')
+        .map(([p, bytes]) => ({
+          bundlePath: p,
+          displayName: p,
+          mimeType: 'application/octet-stream',
+          isImage: false,
+          base64: '',
+          bytes,
+          missing: false,
+        }))
+      blob = zipBundle('conversation.md', prepared.files.get('conversation.md')!, mediaArtifacts)
+      extension = 'zip'
+    } else {
+      const [path, bytes] = [...prepared.files.entries()][0]
+      const type =
+        path.endsWith('.md') ? 'text/markdown;charset=utf-8' :
+        path.endsWith('.json') ? 'application/json;charset=utf-8' :
+        'text/html;charset=utf-8'
+      blob = new Blob([bytes], { type })
+      extension = path.split('.').pop() || format
     }
-
-    onProgress?.(80, 'Saving file...')
 
     const finalFilename = buildFilename(baseName, extension, addTimestamp)
     saveAs(blob, finalFilename)
@@ -233,8 +302,8 @@ export async function exportConversation(
       filename: finalFilename,
       size: blob.size,
       format,
-      messageCount: messages.length,
-      bundledFileCount: bundledCount,
+      messageCount: prepared.messageCount,
+      bundledFileCount: prepared.bundledFileCount,
     }
   } catch (error) {
     return {

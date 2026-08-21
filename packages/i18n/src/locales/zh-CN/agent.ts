@@ -92,6 +92,13 @@ export const agent = {
         moreResults: "还有 {count} 条（共 {total} 条）",
         moreAvailable: "还有更多结果",
         untitled: "（未命名）",
+        filterProjects: "按项目筛选",
+        filterAllProjects: "全部项目",
+        exportSelectAll: "全选",
+        exportSelected: "已选 {count}",
+        exportButton: "导出",
+        exportDone: "已导出 {count} 个对话",
+        exportSkipped: "跳过 {count} 条",
     },
 
     // Mermaid 流程图渲染器
