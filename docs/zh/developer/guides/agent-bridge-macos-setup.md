@@ -5,7 +5,7 @@ order: 108
 
 # Agent Bridge（MCP）macOS 编译与测试
 
-> 面向：想在本地从源码编译、安装并测试 Agent Bridge（MCP）的同事。
+> 面向：需要在本地从源码编译、安装并测试 Agent Bridge（MCP）的开发者。
 > 机器要求：macOS（Apple Silicon 或 Intel 均可）。全程无需 sudo。
 
 ## 0. 你将得到什么
