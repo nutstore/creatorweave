@@ -1068,8 +1068,12 @@ document.getElementById('openGithub')!.addEventListener('click', function () {
     // binary Chrome launched via the NM manifest. Same binary for both
     // roles is a protocol requirement. The bare-name fallback only covers
     // a theoretical missing-hello window.
+    // Always double-quote: installed paths contain spaces
+    // ("EO2Weave NativeHost", "Application Support") — an unquoted path
+    // makes `codex mcp add` split it into command + bogus args, and the
+    // server fails to start with "connection closed".
     var bin = binaryPath && binaryPath.indexOf('cw-native-host') !== -1
-      ? binaryPath
+      ? '"' + binaryPath + '"'
       : 'cw-native-host';
     return bin + ' --mcp-stdio';
   }
