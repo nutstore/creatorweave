@@ -59,15 +59,46 @@ function makeFakeDir(map: Map<string, unknown>) {
       return makeFakeDir(child as Map<string, unknown>)
     },
     getFileHandle: async (name: string) => {
-      const file = {
-        kind: 'file' as const,
-        createWritable: async () => ({
-          write: async () => {},
-          close: async () => {},
-        }),
+      const existing = map.get(name)
+      if (
+        existing &&
+        typeof existing === 'object' &&
+        'kind' in existing &&
+        (existing as { kind?: string }).kind === 'file' &&
+        'getFile' in (existing as object)
+      ) {
+        return existing
       }
-      map.set(name, file)
-      return file
+      // File handle that actually accumulates written bytes so the backup
+      // spill path (createWritable → write chunks → close → getFile) works
+      // end-to-end and the produced zip can be read back.
+      const handle = {
+        kind: 'file' as const,
+        bytes: new Uint8Array(0),
+        createWritable: async () => {
+          const chunks: Uint8Array[] = []
+          return {
+            write: async (data: Uint8Array) => {
+              chunks.push(
+                data instanceof Uint8Array ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer)
+              )
+            },
+            close: async () => {
+              const total = chunks.reduce((s, c) => s + c.byteLength, 0)
+              const out = new Uint8Array(total)
+              let off = 0
+              for (const c of chunks) {
+                out.set(c, off)
+                off += c.byteLength
+              }
+              handle.bytes = out
+            },
+          }
+        },
+        getFile: async () => new FakeFile(name, handle.bytes),
+      }
+      map.set(name, handle)
+      return handle
     },
   }
   return dir
@@ -445,6 +476,39 @@ describe('exportOPFSBackup', () => {
       expect(entries['bfosa-unified.sqlite']).toBeTruthy()
       expect(entries['notes.md']).toBeTruthy()
       expect(entries['projects/inner.txt']).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+
+  it('re-slices oversized stream chunks (no single huge push() allocation)', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    // ~2.5 MiB of semi-random data — larger than the 1 MiB PUSH_SLICE cap,
+    // so the fake's single-chunk stream() forces the re-slicing path.
+    // Compressible on purpose: level-6 deflate produces a tiny output,
+    // proving the data actually flowed through the compressor.
+    const big = new Uint8Array(2.5 * 1024 * 1024)
+    for (let i = 0; i < big.length; i++) big[i] = i % 251
+    const { restore } = installFakeOpfs({
+      'bfosa-unified.sqlite': {
+        kind: 'file',
+        getFile: async () => new FakeFile('bfosa-unified.sqlite', SQLITE_HEADER),
+      },
+      'blob.bin': {
+        kind: 'file',
+        getFile: async () => new FakeFile('blob.bin', big),
+      },
+    })
+    try {
+      const { exportOPFSBackup } = await import('../backup')
+      const { blob } = await exportOPFSBackup()
+      const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+      const round = entries['blob.bin']
+      expect(round?.length).toBe(big.length)
+      // Content integrity through the slice/reassemble boundary.
+      for (let i = 0; i < big.length; i += 997) {
+        expect(round[i]).toBe(big[i])
+      }
     } finally {
       restore()
     }

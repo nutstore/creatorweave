@@ -25,6 +25,16 @@ import { setStorageResetMarker } from '@/storage/reset-marker'
 import { formatBytes } from '@/lib/utils'
 
 /**
+ * OPFS directory used to spill the in-progress backup zip to disk. The
+ * download then uses the disk-backed File — memory stays O(chunk) instead
+ * of O(total backup size). Cleaned up after download; also skipped by the
+ * walker (an export must not zip its own output) and tolerated by the
+ * restore validator (stale leftovers from a crashed export must not brick
+ * imports).
+ */
+const BACKUP_TMP_DIR = '.eo2weave-backup-tmp'
+
+/**
  * Final-chunk terminator for `ZipDeflate.push()`. fflate expects a
  * zero-length Uint8Array with `final=true` to flush the compressor.
  */
@@ -153,6 +163,43 @@ const RESET_REQUIRES_TAB_CLOSURE = 'RESET_REQUIRES_TAB_CLOSURE'
 const PASS_THROUGH_THRESHOLD = 64 * 1024 * 1024 // 64 MiB
 
 /**
+ * Upper bound for a single `deflate.push()` call. fflate's synchronous
+ * `Deflate` grows its internal window buffer to fit the pushed chunk
+ * (`new u8(endLen & -32768)` in Deflate.push) and `dflt()` pre-allocates
+ * the output buffer for the whole pending window — so one oversized
+ * browser stream chunk (File.stream() can hand out multi-MB chunks for
+ * large files) becomes one oversized allocation. Re-slicing into ≤1 MiB
+ * pieces pins the per-call allocation ceiling regardless of what chunk
+ * size the browser hands us.
+ */
+const PUSH_SLICE = 1024 * 1024 // 1 MiB
+
+/**
+ * File extensions whose contents are already DEFLATE-compressed (or
+ * compressed by a stronger codec). Deflating them again burns CPU for
+ * near-zero size savings and — worse — guarantees a ~1:1 output buffer
+ * for the input window, the worst case for allocation pressure. These
+ * entries are stored (level 0) instead.
+ */
+const ALREADY_COMPRESSED_EXTENSIONS = new Set([
+  'zip', 'gz', 'bz2', 'xz', 'zst', '7z', 'rar',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'heic',
+  'mp3', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wav',
+  'mp4', 'mkv', 'mov', 'avi', 'webm',
+  'pdf', 'docx', 'xlsx', 'pptx', 'epub', 'jar', 'woff2',
+])
+
+/** Decide the compression level for a zip entry from name + size. */
+function levelFor(path: string, size: number): 0 | 6 {
+  if (size > PASS_THROUGH_THRESHOLD) return 0
+  const dot = path.lastIndexOf('.')
+  if (dot > 0 && ALREADY_COMPRESSED_EXTENSIONS.has(path.slice(dot + 1).toLowerCase())) {
+    return 0
+  }
+  return 6
+}
+
+/**
  * Push a `File`'s contents into a `ZipDeflate` chunk-by-chunk via
  * `File.stream()`. Each chunk is fed into the synchronous deflate
  * pipeline as it arrives from the OPFS reader — the resident buffer
@@ -182,7 +229,16 @@ async function streamFileIntoDeflate(
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      deflate.push(value, false)
+      // Re-slice oversized browser chunks: one push() = one output-buffer
+      // allocation inside fflate, so cap the per-call size at PUSH_SLICE.
+      for (let off = 0; off < value.length; off += PUSH_SLICE) {
+        deflate.push(
+          off === 0 && value.length <= PUSH_SLICE
+            ? value
+            : value.subarray(off, Math.min(off + PUSH_SLICE, value.length)),
+          false
+        )
+      }
     }
   } finally {
     reader.releaseLock()
@@ -196,6 +252,9 @@ async function streamOPFSToZip(
   stats: { fileCount: number; totalBytes: number },
 ): Promise<void> {
   for await (const [name, handle] of dir.entries()) {
+    // Skip the backup temp directory (spill target for large exports) —
+    // otherwise an export would zip its own in-progress output.
+    if (!prefix && name === BACKUP_TMP_DIR) continue
     const path = prefix ? `${prefix}/${name}` : name
     if (handle.kind === 'file') {
       let file: File
@@ -205,13 +264,10 @@ async function streamOPFSToZip(
         const message = error instanceof Error ? error.message : String(error)
         throw new Error(`Backup failed while opening "${path}": ${message}`)
       }
-      // Pass-through (no deflate) for already-large files — deflate on
-      // a multi-hundred-MB blob just burns CPU for near-zero size
-      // savings, and the small overhead is negligible compared to the
-      // file size.
-      const opts = file.size > PASS_THROUGH_THRESHOLD
-        ? ({ level: 0 } as const)
-        : ({ level: 6 } as const)
+      // Level 0 (store) for already-compressed payloads and very large
+      // files — see levelFor(). Deflate output for such inputs is ~1:1,
+      // so compressing just burns CPU and maximises allocation pressure.
+      const opts = { level: levelFor(path, file.size) } as const
       try {
         const deflate = new ZipDeflate(path, opts)
         zip.add(deflate)
@@ -254,13 +310,73 @@ export async function exportOPFSBackup(): Promise<{
 
   const opfsRoot = await navigator.storage.getDirectory()
 
-  // fflate's `Zip` class streams output through a callback. We accumulate
-  // chunks into a plain array and assemble the final Blob — Blob references
-  // its parts, so we never pre-allocate a Uint8Array the size of the
-  // whole zip (which is what made the old `new Blob([zipped])` path fail
-  // for large backups: the intermediate Uint8Array hit the ArrayBuffer
-  // ceiling before the Blob was even constructed).
-  const chunks: Uint8Array[] = []
+  // Sink strategy: spill the zip to an OPFS temp file so memory stays
+  // O(chunk) regardless of total backup size, then hand the caller a
+  // disk-backed File. If OPFS writes fail (quota / transient), fall back
+  // to accumulating chunks in memory — same behaviour as before the spill
+  // existed, and small backups fit there easily.
+  //
+  // Why not always memory: accumulating every output chunk kept the whole
+  // zip (often GBs with workspace attachments) resident until
+  // `new Blob(chunks)` — the "Array buffer allocation failed" crash.
+  // A Blob references its parts, so even the final assembly used to
+  // double-count that memory.
+  interface Sink {
+    write(chunk: Uint8Array): Promise<void> | void
+    finish(): Promise<{ blob: Blob; byteLength: number; spillFile?: File; spillDir?: FileSystemDirectoryHandle }>
+  }
+
+  const memoryChunks: Uint8Array[] = []
+  let spillWritable: FileSystemWritableFileStream | null = null
+  let spillFileHandle: FileSystemFileHandle | null = null
+  let spillDirHandle: FileSystemDirectoryHandle | null = null
+  let spilled = false
+
+  const openSpill: () => Promise<boolean> = async () => {
+    if (spilled || spillWritable) return true
+    try {
+      spillDirHandle = await opfsRoot.getDirectoryHandle(BACKUP_TMP_DIR, { create: true })
+      spillFileHandle = await spillDirHandle.getFileHandle('backup.zip', { create: true })
+      spillWritable = await spillFileHandle.createWritable()
+      return true
+    } catch (error) {
+      console.warn('[OPFS] Backup: spill-to-disk unavailable, falling back to memory:', error)
+      spillWritable = null
+      spillFileHandle = null
+      spillDirHandle = null
+      spilled = true // stop retrying; keep using memory
+      return false
+    }
+  }
+
+  const sink: Sink = {
+    async write(chunk: Uint8Array) {
+      if (spillWritable || (await openSpill())) {
+        try {
+          await spillWritable!.write(chunk)
+          return
+        } catch (error) {
+          console.warn('[OPFS] Backup: spill write failed, finishing in memory:', error)
+          spillWritable = null
+          spilled = true
+        }
+      }
+      memoryChunks.push(chunk)
+    },
+    async finish() {
+      if (spillWritable) {
+        await spillWritable.close()
+        spillWritable = null
+        const file = await spillFileHandle!.getFile()
+        return { blob: file, byteLength: file.size, spillFile: file, spillDir: spillDirHandle! }
+      }
+      return {
+        blob: new Blob(memoryChunks, { type: 'application/zip' }),
+        byteLength: memoryChunks.reduce((sum, c) => sum + c.byteLength, 0),
+      }
+    },
+  }
+
   let resolveFinal!: () => void
   let rejectFinal!: (err: Error) => void
   const finalPromise = new Promise<void>((resolve, reject) => {
@@ -273,12 +389,24 @@ export async function exportOPFSBackup(): Promise<{
   // still sees the rejection.)
   finalPromise.catch(() => {})
 
+  // The Zip callback fires synchronously during push()/end(), but sink
+  // writes are async (OPFS). Chain them so writes land in order and so the
+  // producer can wait for the queue to drain before finish().
+  let writeChain: Promise<void> = Promise.resolve()
+  const enqueueWrite = (chunk: Uint8Array) => {
+    writeChain = writeChain.then(() => sink.write(chunk)).catch((error) => {
+      console.error('[OPFS] Backup: sink write failed:', error)
+      throw error
+    })
+  }
+  const sinkDrained = () => writeChain
+
   const zip = new Zip((err, data, final) => {
     if (err) {
       rejectFinal(err)
       return
     }
-    if (data) chunks.push(data)
+    if (data) enqueueWrite(data)
     if (final) resolveFinal()
   })
 
@@ -335,10 +463,24 @@ export async function exportOPFSBackup(): Promise<{
     // resolves finalPromise. Without it the promise hangs forever.
     zip.end()
     await finalPromise
+    // The Zip emits its final chunks synchronously from end(), but the sink
+    // writes them asynchronously — drain pending writes before finish().
+    // A cheap microtask-yield loop suffices: writes are issued in order and
+    // each sink.write() call site awaits the previous one via the chain.
+    await sinkDrained()
   } catch (error) {
     // Make sure the Zip worker doesn't hang waiting for finalize when
     // we re-throw.
     rejectFinal(error instanceof Error ? error : new Error(String(error)))
+    // Best-effort cleanup of the spill file — a crashed export must not
+    // leave a multi-GB temp file hogging the user's OPFS quota.
+    try {
+      // Cast: TS cannot see the closure assignments to spillWritable, so its
+      // narrowed type here is `null`; the runtime value may be a live stream.
+      const writable = spillWritable as FileSystemWritableFileStream | null
+      if (writable) await writable.close().catch(() => {})
+      if (spillDirHandle) await opfsRoot.removeEntry(BACKUP_TMP_DIR, { recursive: true })
+    } catch { /* best-effort */ }
     throw error instanceof Error ? error : new Error(String(error))
   }
 
@@ -348,16 +490,16 @@ export async function exportOPFSBackup(): Promise<{
     .slice(0, 19) // YYYY-MM-DD_HH-MM-SS
   const filename = `eo2weave-backup_${ts}.zip`
 
-  const zippedByteLength = chunks.reduce((sum, c) => sum + c.byteLength, 0)
+  const { blob, byteLength, spillDir } = await sink.finish()
   console.log(
-    `[OPFS] Backup created: ${stats.fileCount} files (${formatBytes(stats.totalBytes)} raw) → ${formatBytes(zippedByteLength)} zip → ${filename}` +
+    `[OPFS] Backup created: ${stats.fileCount} files (${formatBytes(stats.totalBytes)} raw) → ${formatBytes(byteLength)} zip${spillDir ? ' (disk-spilled)' : ''} → ${filename}` +
       (includesDeviceKey
         ? ' (includes device encryption key — API keys restorable)'
         : ' (NO device encryption key — API keys will NOT survive restore)')
   )
 
   return {
-    blob: new Blob(chunks, { type: 'application/zip' }),
+    blob,
     filename,
     includesDeviceKey,
     includesLocalStorage: localStorageJson !== null,
@@ -412,6 +554,16 @@ export async function downloadOPFSBackup(): Promise<{
     }
     return { filename, includesDeviceKey, includesLocalStorage }
   } finally {
+    // Best-effort: remove the spill directory (whether the export succeeded
+    // or failed) — the backup bytes are already on their way to the user's
+    // Downloads folder, the temp copy is pure quota waste. Stale leftovers
+    // from a crashed run are also tolerated by the walker/validator.
+    try {
+      const opfsRoot = await navigator.storage.getDirectory()
+      await opfsRoot.removeEntry(BACKUP_TMP_DIR, { recursive: true })
+    } catch {
+      // absent or locked — harmless either way
+    }
     // Re-open the worker so subsequent SQL operations work without a page
     // reload. initialize() is idempotent and no-ops when someone else has
     // already re-initialized. Best-effort: an app that never touches SQLite
@@ -505,6 +657,10 @@ function validateBackupEntries(entries: Unzipped): Map<string, Uint8Array> {
     if (rawPath.endsWith('/') || rawPath.startsWith('__MACOSX/')) continue
     if (rawPath.split('/').pop() === '.DS_Store') continue
     if (rawPath === '.bfosa-pool' || rawPath.startsWith('.bfosa-pool/')) continue
+    // Spill dir from old backups made while the disk-spill path was active;
+    // stale leftovers must not block imports (validated above) and must not
+    // be restored as data.
+    if (rawPath === BACKUP_TMP_DIR || rawPath.startsWith(BACKUP_TMP_DIR + '/')) continue
 
     const path = rawPath.replace(/^\.\//, '')
     if (!path || path.startsWith('/') || path.split('/').includes('..')) {
