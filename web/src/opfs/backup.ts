@@ -757,6 +757,20 @@ async function streamUnzipToStaging(
     return writeTail
   }
 
+  // Completion tracking. Entries ≥320 KB decode through AsyncUnzipInflate's
+  // WORKER, whose final output chunk arrives asynchronously — AFTER the
+  // last unzip.push() returns. Settling on "writeTail drained after the
+  // final push" races those late chunks (entries silently lost/truncated).
+  // Instead: settle only when every started entry has reported final.
+  let startedEntries = 0
+  let finishedEntries = 0
+  let inputFinished = false
+  const maybeSettle = () => {
+    if (inputFinished && startedEntries > 0 && startedEntries === finishedEntries) {
+      settle()
+    }
+  }
+
   const skipEntry = (rawPath: string): boolean => {
     if (rawPath.endsWith('/') || rawPath.startsWith('__MACOSX/')) return true
     if (rawPath.split('/').pop() === '.DS_Store') return true
@@ -775,6 +789,7 @@ async function streamUnzipToStaging(
       settle()
       return
     }
+    startedEntries++
     let writable: FileSystemWritableFileStream | null = null
     let bytesWritten = 0
     let magicChecked = false
@@ -821,6 +836,8 @@ async function streamUnzipToStaging(
           await writable.close()
           writable = null
           staged.set(path, bytesWritten)
+          finishedEntries++
+          maybeSettle()
         }
       })
     }
@@ -841,8 +858,14 @@ async function streamUnzipToStaging(
     }
     if (!fatal) {
       unzip.push(new Uint8Array(0), true)
+      // onfile for tail entries fires synchronously inside that push, but
+      // worker-decoded entries deliver their final chunks later — they drive
+      // maybeSettle from their write jobs. Mark input complete, drain the
+      // queued writes, and let maybeSettle close things out (this also
+      // covers the all-synchronous case immediately).
+      inputFinished = true
       await writeTail
-      if (!fatal && staged.size >= 0) settle()
+      maybeSettle()
     }
   } finally {
     try {
