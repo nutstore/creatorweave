@@ -1055,13 +1055,35 @@ document.getElementById('openGithub')!.addEventListener('click', function () {
 // When running, shows ready-to-paste setup commands built from the daemon's
 // hello (binaryPath comes from the native host itself).
 (function () {
+  var box = document.getElementById('webmcpBridgeBox');
   var toggle = document.getElementById('bridgeToggle') as HTMLInputElement | null;
   var statusText = document.getElementById('bridgeStatusText');
   var cmdBox = document.getElementById('bridgeCmdBox');
   var cmdCodex = document.getElementById('bridgeCmdCodex');
   var cmdClaude = document.getElementById('bridgeCmdClaude');
   var infoRow = document.getElementById('bridgeInfoRow');
-  if (!toggle || !statusText || !cmdBox || !cmdCodex || !cmdClaude || !infoRow) return;
+  if (!box || !toggle || !statusText || !cmdBox || !cmdCodex || !cmdClaude || !infoRow) return;
+
+  // The bridge is useless without the native host binary — probe it first
+  // (sendNativeMessage ping via the background's native_host_call relay)
+  // and keep the whole card hidden when the host isn't installed. This
+  // mirrors the web app's capability detection: features that can't work
+  // on this machine simply don't appear.
+  function probeNativeHost(done: (ok: boolean) => void): void {
+    chrome.runtime.sendMessage(
+      { type: 'native_host_call', action: 'ping' },
+      function (resp: any) {
+        void chrome.runtime.lastError;
+        done(!!(resp && resp.ok));
+      }
+    );
+  }
+
+  probeNativeHost(function (hostAvailable) {
+    if (!hostAvailable) return; // stay hidden — no native host installed
+    box.style.display = '';
+    query();
+  });
 
   function buildMcpCommandTail(binaryPath: string | undefined): string {
     // binaryPath comes from the daemon hello (current_exe) — the exact
@@ -1158,5 +1180,7 @@ document.getElementById('openGithub')!.addEventListener('click', function () {
     }
   });
 
-  query();
+  // NOTE: initial query() runs inside the probeNativeHost callback above —
+  // the card stays hidden (and no status request is made) until the native
+  // host answers ping.
 })();
