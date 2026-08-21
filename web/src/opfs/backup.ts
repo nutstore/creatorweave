@@ -14,9 +14,21 @@
  * running this are usually not in the middle of a write-heavy task.
  */
 
-import { unzip, zip, type AsyncZippable, type Unzipped } from 'fflate'
+import {
+  Zip,
+  ZipDeflate,
+  unzip,
+  type Unzipped,
+} from 'fflate'
 import { beginReset, endReset } from '@/storage/reset-coordinator'
 import { setStorageResetMarker } from '@/storage/reset-marker'
+import { formatBytes } from '@/lib/utils'
+
+/**
+ * Final-chunk terminator for `ZipDeflate.push()`. fflate expects a
+ * zero-length Uint8Array with `final=true` to flush the compressor.
+ */
+const EMPTY_CHUNK = new Uint8Array(0)
 
 /**
  * Marker file every full backup must contain: the SQLite database at the
@@ -122,21 +134,104 @@ function restoreLocalStorage(json: string): number {
 const RESET_REQUIRES_TAB_CLOSURE = 'RESET_REQUIRES_TAB_CLOSURE'
 
 /**
- * Recursively walk an OPFS directory and collect every file into a flat
- * map of `path -> bytes`, shaped for fflate's `zip()`.
+ * Recursively walk an OPFS directory tree and stream every file into an
+ * in-flight `Zip`. Uses `File.stream()` (a ReadableStream<Uint8Array>) so
+ * fflate reads each entry in fixed-size chunks rather than materialising
+ * the whole thing as a single ArrayBuffer.
+ *
+ * This is the change that lets the backup handle large files / large OPFS
+ * volumes: the previous `await file.arrayBuffer()` path tripped
+ * `Array buffer allocation failed` whenever a single file exceeded the
+ * browser's ArrayBuffer ceiling (typically ~2 GiB in Chrome, but earlier
+ * failures from GC / page-budget pressure are common).
+ *
+ * Per-file failures are wrapped with the entry path (and size, if known)
+ * so the user sees e.g. "Backup failed while reading
+ * projects/abc/big.mp4 (1.4 GiB)…" instead of a generic "allocation
+ * failed" surfacing out of the fflate worker.
  */
-async function collectOPFSFiles(
+const PASS_THROUGH_THRESHOLD = 64 * 1024 * 1024 // 64 MiB
+
+/**
+ * Push a `File`'s contents into a `ZipDeflate` chunk-by-chunk via
+ * `File.stream()`. Each chunk is fed into the synchronous deflate
+ * pipeline as it arrives from the OPFS reader — the resident buffer
+ * is bounded by a single chunk (~64 KiB – 1 MiB from the browser's
+ * default ReadableStream chunk size) rather than the whole file,
+ * which is what lets the export path survive multi-GB attachments
+ * without tripping `Array buffer allocation failed`.
+ *
+ * `ZipDeflate.push()` is synchronous: each chunk is compressed
+ * immediately on the main thread. This trades main-thread CPU time
+ * for not having to round-trip through a Web Worker (which matters
+ * in test environments where happy-dom ships a no-op Worker polyfill,
+ * but is also acceptable in production because the user's only goal
+ * here is to download a backup — the UI freeze is the lesser evil
+ * compared to the OOM crash that the previous code triggered on
+ * large OPFS roots).
+ *
+ * Caller is responsible for `deflate.push(EMPTY_CHUNK, true)` after
+ * this resolves so the deflate stream is finalised.
+ */
+async function streamFileIntoDeflate(
+  deflate: ZipDeflate,
+  file: File,
+): Promise<void> {
+  const reader = file.stream().getReader()
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      deflate.push(value, false)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+async function streamOPFSToZip(
+  zip: Zip,
   dir: FileSystemDirectoryHandle,
   prefix: string,
-  out: Record<string, Uint8Array>,
+  stats: { fileCount: number; totalBytes: number },
 ): Promise<void> {
   for await (const [name, handle] of dir.entries()) {
     const path = prefix ? `${prefix}/${name}` : name
     if (handle.kind === 'file') {
-      const file = await (handle as FileSystemFileHandle).getFile()
-      out[path] = new Uint8Array(await file.arrayBuffer())
+      let file: File
+      try {
+        file = await (handle as FileSystemFileHandle).getFile()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        throw new Error(`Backup failed while opening "${path}": ${message}`)
+      }
+      // Pass-through (no deflate) for already-large files — deflate on
+      // a multi-hundred-MB blob just burns CPU for near-zero size
+      // savings, and the small overhead is negligible compared to the
+      // file size.
+      const opts = file.size > PASS_THROUGH_THRESHOLD
+        ? ({ level: 0 } as const)
+        : ({ level: 6 } as const)
+      try {
+        const deflate = new ZipDeflate(path, opts)
+        zip.add(deflate)
+        await streamFileIntoDeflate(deflate, file)
+        deflate.push(EMPTY_CHUNK, true) // signal end-of-stream
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        throw new Error(
+          `Backup failed while streaming "${path}" (${formatBytes(file.size)}): ${message}`
+        )
+      }
+      stats.fileCount++
+      stats.totalBytes += file.size
     } else {
-      await collectOPFSFiles(handle as FileSystemDirectoryHandle, path, out)
+      await streamOPFSToZip(
+        zip,
+        handle as FileSystemDirectoryHandle,
+        path,
+        stats
+      )
     }
   }
 }
@@ -158,47 +253,94 @@ export async function exportOPFSBackup(): Promise<{
   }
 
   const opfsRoot = await navigator.storage.getDirectory()
-  const files: Record<string, Uint8Array> = {}
-  await collectOPFSFiles(opfsRoot, '', files)
 
-  if (Object.keys(files).length === 0) {
-    throw new Error('OPFS is empty')
-  }
-
-  // Include the raw device-encryption key (lives in IndexedDB, not OPFS) so
-  // the backup can fully restore API keys / secrets on another device.
-  // Absent key (never created / read failure) is not fatal — the backup is
-  // then credential-less, same as pre-portability backups.
-  let includesDeviceKey = false
-  try {
-    const { exportDeviceEncryptionKey } = await import(
-      '@/sqlite/repositories/api-key.repository'
-    )
-    const rawKey = await exportDeviceEncryptionKey()
-    if (rawKey) {
-      files[DEVICE_KEY_FILE] = new Uint8Array(rawKey)
-      includesDeviceKey = true
-    }
-  } catch (error) {
-    console.warn('[OPFS] Backup: could not include device encryption key:', error)
-  }
-
-  // Include portable localStorage state (settings, tokens, input history,
-  // …) so a restored device feels like the original. Device-local keys
-  // (pane ratios, preview caches) are excluded — see the exclude list.
-  const localStorageJson = collectLocalStorage()
-  if (localStorageJson !== null) {
-    files[LOCALSTORAGE_FILE] = new TextEncoder().encode(localStorageJson)
-  }
-
-  // fflate's zip() is async (yields to the event loop between entries) so
-  // it won't fully freeze the UI on large backups the way zipSync would.
-  const zipped = await new Promise<Uint8Array>((resolve, reject) => {
-    zip(files as AsyncZippable, { level: 6 }, (err, data) => {
-      if (err) reject(err)
-      else resolve(data)
-    })
+  // fflate's `Zip` class streams output through a callback. We accumulate
+  // chunks into a plain array and assemble the final Blob — Blob references
+  // its parts, so we never pre-allocate a Uint8Array the size of the
+  // whole zip (which is what made the old `new Blob([zipped])` path fail
+  // for large backups: the intermediate Uint8Array hit the ArrayBuffer
+  // ceiling before the Blob was even constructed).
+  const chunks: Uint8Array[] = []
+  let resolveFinal!: () => void
+  let rejectFinal!: (err: Error) => void
+  const finalPromise = new Promise<void>((resolve, reject) => {
+    resolveFinal = resolve
+    rejectFinal = reject
   })
+  // Error paths reject this promise via rejectFinal() AFTER the outward
+  // throw — nothing awaits it there, so attach a no-op catch to keep Node
+  // from reporting an unhandled rejection. (Awaiting it on the happy path
+  // still sees the rejection.)
+  finalPromise.catch(() => {})
+
+  const zip = new Zip((err, data, final) => {
+    if (err) {
+      rejectFinal(err)
+      return
+    }
+    if (data) chunks.push(data)
+    if (final) resolveFinal()
+  })
+
+  // Stream the OPFS tree into the in-flight Zip. Per-file failures throw
+  // a path-tagged error caught by the surrounding try/catch; we still
+  // await finalPromise so the Zip worker's internal state is settled
+  // before we surface the error.
+  const stats = { fileCount: 0, totalBytes: 0 }
+  let includesDeviceKey = false
+  let localStorageJson: string | null = null
+
+  try {
+    await streamOPFSToZip(zip, opfsRoot, '', stats)
+
+    if (stats.fileCount === 0) {
+      throw new Error('OPFS is empty')
+    }
+
+    // Include the raw device-encryption key (lives in IndexedDB, not OPFS)
+    // so the backup can fully restore API keys / secrets on another
+    // device. Absent key (never created / read failure) is not fatal —
+    // the backup is then credential-less, same as pre-portability backups.
+    try {
+      const { exportDeviceEncryptionKey } = await import(
+        '@/sqlite/repositories/api-key.repository'
+      )
+      const rawKey = await exportDeviceEncryptionKey()
+      if (rawKey) {
+        // Small (32 bytes), push as a single chunk. Pass-through
+        // (level 0) since AES key bytes don't compress.
+        const deflate = new ZipDeflate(DEVICE_KEY_FILE, { level: 0 })
+        zip.add(deflate)
+        deflate.push(new Uint8Array(rawKey), false)
+        deflate.push(EMPTY_CHUNK, true)
+        includesDeviceKey = true
+      }
+    } catch (error) {
+      console.warn('[OPFS] Backup: could not include device encryption key:', error)
+    }
+
+    // Include portable localStorage state (settings, tokens, input history,
+    // …) so a restored device feels like the original. Device-local keys
+    // (pane ratios, preview caches) are excluded — see the exclude list.
+    localStorageJson = collectLocalStorage()
+    if (localStorageJson !== null) {
+      const deflate = new ZipDeflate(LOCALSTORAGE_FILE, { level: 6 })
+      zip.add(deflate)
+      deflate.push(new TextEncoder().encode(localStorageJson), false)
+      deflate.push(EMPTY_CHUNK, true)
+    }
+
+    // fflate's Zip requires an explicit end() once all entries are queued
+    // — it emits the central directory (the `final=true` callback) that
+    // resolves finalPromise. Without it the promise hangs forever.
+    zip.end()
+    await finalPromise
+  } catch (error) {
+    // Make sure the Zip worker doesn't hang waiting for finalize when
+    // we re-throw.
+    rejectFinal(error instanceof Error ? error : new Error(String(error)))
+    throw error instanceof Error ? error : new Error(String(error))
+  }
 
   const ts = new Date().toISOString()
     .replace(/[:.]/g, '-')
@@ -206,16 +348,16 @@ export async function exportOPFSBackup(): Promise<{
     .slice(0, 19) // YYYY-MM-DD_HH-MM-SS
   const filename = `eo2weave-backup_${ts}.zip`
 
-  const fileCount = Object.keys(files).length
+  const zippedByteLength = chunks.reduce((sum, c) => sum + c.byteLength, 0)
   console.log(
-    `[OPFS] Backup created: ${fileCount} files, ${zipped.byteLength} bytes → ${filename}` +
+    `[OPFS] Backup created: ${stats.fileCount} files (${formatBytes(stats.totalBytes)} raw) → ${formatBytes(zippedByteLength)} zip → ${filename}` +
       (includesDeviceKey
         ? ' (includes device encryption key — API keys restorable)'
         : ' (NO device encryption key — API keys will NOT survive restore)')
   )
 
   return {
-    blob: new Blob([zipped], { type: 'application/zip' }),
+    blob: new Blob(chunks, { type: 'application/zip' }),
     filename,
     includesDeviceKey,
     includesLocalStorage: localStorageJson !== null,
@@ -232,21 +374,58 @@ export async function downloadOPFSBackup(): Promise<{
   includesDeviceKey: boolean
   includesLocalStorage: boolean
 }> {
-  const { blob, filename, includesDeviceKey, includesLocalStorage } = await exportOPFSBackup()
-  const url = URL.createObjectURL(blob)
+  // Release the SQLite worker's OPFS sync-access handles before reading OPFS
+  // from the main thread. While the worker holds a sync access handle on
+  // bfosa-unified.sqlite, main-thread getFile()/stream() on that same file is
+  // rejected with NotReadableError ("permission problems ... after a
+  // reference to a file was acquired") — the bare DOMException that used to
+  // surface in the failure toast. Closing also flushes pending WAL frames so
+  // the backup contains a fully committed database. The manager re-opens the
+  // worker lazily on the next SQL call, so the app keeps working without a
+  // reload (importOPFSBackup relies on the same close() contract).
+  let dbClosed = false
   try {
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    // Append + click + remove is the most reliable cross-browser pattern
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-  } finally {
-    // Defer revoke so the download has time to start in all browsers
-    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    const { getSQLiteDB } = await import('@/sqlite')
+    await getSQLiteDB().close()
+    dbClosed = true
+  } catch (error) {
+    // Worker already dead / never initialized — the export can still run,
+    // it just races the (nonexistent) holder of any lock.
+    console.warn('[OPFS] Backup: closing SQLite worker failed (continuing):', error)
   }
-  return { filename, includesDeviceKey, includesLocalStorage }
+
+  try {
+    const { blob, filename, includesDeviceKey, includesLocalStorage } =
+      await exportOPFSBackup()
+    const url = URL.createObjectURL(blob)
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      // Append + click + remove is the most reliable cross-browser pattern
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } finally {
+      // Defer revoke so the download has time to start in all browsers
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+    return { filename, includesDeviceKey, includesLocalStorage }
+  } finally {
+    // Re-open the worker so subsequent SQL operations work without a page
+    // reload. initialize() is idempotent and no-ops when someone else has
+    // already re-initialized. Best-effort: an app that never touches SQLite
+    // again doesn't care, and the next explicit use retries init anyway
+    // (SQLiteDBManager.initialize has its own retry/backoff).
+    if (dbClosed) {
+      try {
+        const { getSQLiteDB } = await import('@/sqlite')
+        await getSQLiteDB().initialize()
+      } catch (error) {
+        console.warn('[OPFS] Backup: re-initializing SQLite worker failed:', error)
+      }
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------

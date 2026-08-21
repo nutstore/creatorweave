@@ -11,6 +11,7 @@ import { unzipSync, zipSync, strToU8 } from 'fflate'
 
 const mocks = vi.hoisted(() => ({
   close: vi.fn(async () => {}),
+  initialize: vi.fn(async () => {}),
   exportDeviceEncryptionKey: vi.fn(async () => null as ArrayBuffer | null),
   importDeviceEncryptionKey: vi.fn(async (_rawKey: ArrayBuffer) => {}),
 }))
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/sqlite', () => ({
   getSQLiteDB: () => ({
     close: mocks.close,
+    initialize: mocks.initialize,
   }),
 }))
 
@@ -32,7 +34,7 @@ vi.mock('@/opfs', () => ({
 
 // Import AFTER mocks so dynamic import('@/sqlite') inside importOPFSBackup
 // resolves to the mock.
-const { importOPFSBackup } = await import('../backup')
+const { importOPFSBackup, downloadOPFSBackup } = await import('../backup')
 
 /** Real SQLite database header (16-byte magic string). */
 const SQLITE_HEADER = strToU8('SQLite format 3\0')
@@ -100,6 +102,32 @@ class FakeFile {
       this.bytes.byteOffset,
       this.bytes.byteOffset + this.bytes.byteLength
     )
+  }
+  /**
+   * ReadableStream stand-in for `File.stream()`. The export path consumes
+   * it through `getReader()` + `read()` (pull-based, like the real browser
+   * ReadableStream), so the fake exposes exactly that surface.
+   *
+   * IMPORTANT: each call returns a fresh copy of the bytes. fflate's async
+   * streams transfer the underlying ArrayBuffer to a worker, detaching it —
+   * sharing one buffer across tests would fail with DataCloneError after
+   * the first transfer.
+   */
+  stream(): { getReader(): { read(): Promise<{ done: boolean; value?: Uint8Array }>; releaseLock(): void } } {
+    const bytes = new Uint8Array(this.bytes) // fresh, exclusive buffer
+    return {
+      getReader() {
+        let done = false
+        return {
+          async read() {
+            if (done) return { done: true, value: undefined }
+            done = true
+            return { done: false, value: bytes }
+          },
+          releaseLock() {},
+        }
+      },
+    }
   }
 }
 
@@ -322,13 +350,49 @@ describe('importOPFSBackup', () => {
 })
 
 describe('exportOPFSBackup', () => {
-  /** Fake OPFS root holding one real-looking SQLite file. */
+  /**
+   * Fake OPFS root holding one real-looking SQLite file. The fake's
+   * getFile() returns a FakeFile (with stream()) — the export path now
+   * reads every entry through `file.stream()`, so the legacy bare object
+   * with only arrayBuffer() no longer works.
+   */
   function installFakeOpfsWithDb() {
     return installFakeOpfs({
       'bfosa-unified.sqlite': {
         kind: 'file',
-        getFile: async () => ({ arrayBuffer: async () => SQLITE_HEADER.buffer }),
+        getFile: async () => new FakeFile('bfosa-unified.sqlite', SQLITE_HEADER),
       },
+    })
+  }
+
+  /**
+   * Fake OPFS root with a few files of varying sizes plus a nested
+   * subdirectory, exercising the recursive walker.
+   */
+  function installFakeOpfsWithMixedFiles() {
+    // Build the inner directory through `makeFakeDir` so it has the same
+    // entries/removeEntry/getDirectoryHandle/getFileHandle API as the root.
+    const nested = makeFakeDir(
+      new Map<string, unknown>([
+        [
+          'inner.txt',
+          {
+            kind: 'file',
+            getFile: async () => new FakeFile('inner.txt', strToU8('inner content')),
+          },
+        ],
+      ])
+    )
+    return installFakeOpfs({
+      'bfosa-unified.sqlite': {
+        kind: 'file',
+        getFile: async () => new FakeFile('bfosa-unified.sqlite', SQLITE_HEADER),
+      },
+      'notes.md': {
+        kind: 'file',
+        getFile: async () => new FakeFile('notes.md', strToU8('# hello')),
+      },
+      projects: nested,
     })
   }
 
@@ -363,6 +427,142 @@ describe('exportOPFSBackup', () => {
       expect(includesDeviceKey).toBe(false)
       const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()))
       expect(entries['bfosa-device-key.bin']).toBeUndefined()
+    } finally {
+      restore()
+    }
+  })
+
+  it('streams every file through fflate (recursive walker, no single ArrayBuffer allocation)', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    const { restore } = installFakeOpfsWithMixedFiles()
+    try {
+      const { exportOPFSBackup } = await import('../backup')
+      const { blob, filename } = await exportOPFSBackup()
+      expect(filename).toMatch(/^eo2weave-backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.zip$/)
+      // Every OPFS entry round-trips into the produced zip — including the
+      // nested one. If any entry were silently dropped, this fails.
+      const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+      expect(entries['bfosa-unified.sqlite']).toBeTruthy()
+      expect(entries['notes.md']).toBeTruthy()
+      expect(entries['projects/inner.txt']).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+
+  it('reports the failing path when an OPFS entry cannot be opened', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    const { restore } = installFakeOpfs({
+      'bfosa-unified.sqlite': {
+        kind: 'file',
+        getFile: async () => new FakeFile('bfosa-unified.sqlite', SQLITE_HEADER),
+      },
+      'projects/huge.bin': {
+        kind: 'file',
+        getFile: async () => {
+          throw new DOMException('NotReadableError', 'NotReadableError')
+        },
+      },
+    })
+    try {
+      const { exportOPFSBackup } = await import('../backup')
+      await expect(exportOPFSBackup()).rejects.toThrow(
+        /Backup failed while opening "projects\/huge\.bin"/
+      )
+    } finally {
+      restore()
+    }
+  })
+
+  it('reports an empty OPFS as a clear error', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    const { restore } = installFakeOpfs({}) // no entries
+    try {
+      const { exportOPFSBackup } = await import('../backup')
+      await expect(exportOPFSBackup()).rejects.toThrow(/OPFS is empty/)
+    } finally {
+      restore()
+    }
+  })
+
+  it('exports localStorage entries alongside OPFS when present', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    localStorage.setItem('bfosa-theme', 'dark')
+    const { restore } = installFakeOpfsWithDb()
+    try {
+      const { exportOPFSBackup } = await import('../backup')
+      const { blob, includesLocalStorage } = await exportOPFSBackup()
+      expect(includesLocalStorage).toBe(true)
+      const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+      const lsJson = JSON.parse(
+        new TextDecoder().decode(entries['bfosa-localstorage.json'])
+      )
+      expect(lsJson['bfosa-theme']).toBe('dark')
+    } finally {
+      restore()
+      localStorage.clear()
+    }
+  })
+})
+
+describe('downloadOPFSBackup', () => {
+  /** Minimal fake OPFS root with just the SQLite db (module-level helpers). */
+  function installFakeOpfsWithDb() {
+    return installFakeOpfs({
+      'bfosa-unified.sqlite': {
+        kind: 'file',
+        getFile: async () => new FakeFile('bfosa-unified.sqlite', SQLITE_HEADER),
+      },
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('closes the SQLite worker before exporting and re-initializes it afterwards', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    const { restore } = installFakeOpfsWithDb()
+    const order: string[] = []
+    mocks.close.mockImplementation(async () => {
+      order.push('close')
+    })
+    mocks.initialize.mockImplementation(async () => {
+      order.push('initialize')
+    })
+    try {
+      const result = await downloadOPFSBackup()
+      expect(result.filename).toMatch(/^eo2weave-backup_/)
+      expect(mocks.close).toHaveBeenCalledTimes(1)
+      expect(mocks.initialize).toHaveBeenCalledTimes(1)
+      // close() must happen before the OPFS read (export), initialize() after
+      expect(order).toEqual(['close', 'initialize'])
+    } finally {
+      restore()
+    }
+  })
+
+  it('re-initializes the worker even when the export itself fails', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    // Empty OPFS makes exportOPFSBackup throw "OPFS is empty" after close().
+    const { restore } = installFakeOpfs({})
+    try {
+      await expect(downloadOPFSBackup()).rejects.toThrow(/OPFS is empty/)
+      expect(mocks.close).toHaveBeenCalledTimes(1)
+      expect(mocks.initialize).toHaveBeenCalledTimes(1)
+    } finally {
+      restore()
+    }
+  })
+
+  it('still exports when closing the worker fails (worker already dead)', async () => {
+    mocks.exportDeviceEncryptionKey.mockResolvedValue(null)
+    mocks.close.mockRejectedValueOnce(new Error('worker already terminated'))
+    const { restore } = installFakeOpfsWithDb()
+    try {
+      const result = await downloadOPFSBackup()
+      expect(result.filename).toMatch(/^eo2weave-backup_/)
+      expect(mocks.initialize).not.toHaveBeenCalled() // close failed → no reopen
     } finally {
       restore()
     }
