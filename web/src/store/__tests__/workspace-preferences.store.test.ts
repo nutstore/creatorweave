@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getCurrentWorkspaceAgentMode,
   useWorkspacePreferencesStore,
@@ -50,5 +50,51 @@ describe('workspace-preferences.store agent mode isolation', () => {
       'ws-a': true,
       'ws-b': true,
     })
+  })
+})
+
+describe('workspace-preferences.store panel sizes rounding', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useWorkspacePreferencesStore.setState({
+      panelSizes: { sidebarWidth: 260, conversationRatio: 50, previewRatio: 38 },
+    })
+  })
+
+  it('rounds conversation ratio to integer when drag commits a float', () => {
+    useWorkspacePreferencesStore.getState().setConversationRatio(52.71828)
+    expect(useWorkspacePreferencesStore.getState().panelSizes.conversationRatio).toBe(53)
+  })
+
+  it('rounds preview ratio to integer when drag commits a float', () => {
+    useWorkspacePreferencesStore.getState().setPreviewRatio(41.3)
+    expect(useWorkspacePreferencesStore.getState().panelSizes.previewRatio).toBe(41)
+  })
+
+  it('rounds sidebar width to integer and clamps to bounds', () => {
+    useWorkspacePreferencesStore.getState().setSidebarWidth(313.6)
+    expect(useWorkspacePreferencesStore.getState().panelSizes.sidebarWidth).toBe(314)
+
+    useWorkspacePreferencesStore.getState().setSidebarWidth(999.9)
+    expect(useWorkspacePreferencesStore.getState().panelSizes.sidebarWidth).toBe(400)
+  })
+
+  it('rounds fractional panel sizes persisted by legacy versions on rehydrate', async () => {
+    localStorage.setItem(
+      'bfosa-workspace-preferences',
+      JSON.stringify({
+        state: {
+          panelSizes: { sidebarWidth: 277.4, conversationRatio: 51.6, previewRatio: 39.5 },
+        },
+        version: 6,
+      })
+    )
+    // Re-import a fresh module instance to trigger persist rehydration + migrate
+    vi.resetModules()
+    const { useWorkspacePreferencesStore: fresh } = await import('../workspace-preferences.store')
+    const { panelSizes } = fresh.getState()
+    expect(panelSizes.sidebarWidth).toBe(277)
+    expect(panelSizes.conversationRatio).toBe(52)
+    expect(panelSizes.previewRatio).toBe(40)
   })
 })

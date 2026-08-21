@@ -163,20 +163,20 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     immer((set) => ({
       ...DEFAULT_PREFERENCES,
 
-      // Panel sizes actions
+      // Panel sizes actions (rounded to integers — drag gestures produce floats)
       setSidebarWidth: (width) =>
         set((state) => {
-          state.panelSizes.sidebarWidth = Math.max(200, Math.min(400, width))
+          state.panelSizes.sidebarWidth = Math.round(Math.max(200, Math.min(400, width)))
         }),
 
       setConversationRatio: (ratio) =>
         set((state) => {
-          state.panelSizes.conversationRatio = Math.max(20, Math.min(80, ratio))
+          state.panelSizes.conversationRatio = Math.round(Math.max(20, Math.min(80, ratio)))
         }),
 
       setPreviewRatio: (ratio) =>
         set((state) => {
-          state.panelSizes.previewRatio = Math.max(30, Math.min(80, ratio))
+          state.panelSizes.previewRatio = Math.round(Math.max(30, Math.min(80, ratio)))
         }),
 
       resetPanelSizes: () =>
@@ -331,7 +331,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     })),
     {
       name: 'bfosa-workspace-preferences',
-      version: 6, // Bump version for completion auto-apply policy
+      version: 7, // Bump version for completion auto-apply policy; v7: round panel sizes to integers
       partialize: (state) => ({
         panelSizes: state.panelSizes,
         panelState: state.panelState,
@@ -347,9 +347,18 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
       }),
       migrate: (persistedState) => {
         const state = (persistedState || {}) as Partial<WorkspacePreferences>
+        // v7: legacy drag gestures may have persisted fractional panel sizes — normalize to integers
+        const panelSizes = state.panelSizes
+          ? {
+              sidebarWidth: Math.round(state.panelSizes.sidebarWidth),
+              conversationRatio: Math.round(state.panelSizes.conversationRatio),
+              previewRatio: Math.round(state.panelSizes.previewRatio),
+            }
+          : DEFAULT_PREFERENCES.panelSizes
         return {
           ...DEFAULT_PREFERENCES,
           ...state,
+          panelSizes,
           agentModeByWorkspace: state.agentModeByWorkspace || {},
           autoApplyOnRunCompleteByWorkspace: state.autoApplyOnRunCompleteByWorkspace || {},
           autoApplyOnRunComplete: state.autoApplyOnRunComplete ?? DEFAULT_PREFERENCES.autoApplyOnRunComplete,
