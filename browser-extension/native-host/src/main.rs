@@ -27,6 +27,15 @@ mod shell_env;
 mod win;
 
 fn main() {
+    // Helper mode: `cw-native-host --mcp-stdio` — MCP stdio server for
+    // external CLI agents (Codex). Does NOT use the NM protocol on stdio;
+    // instead speaks line-delimited JSON-RPC and relays to the loopback
+    // bridge daemon started by the extension (see webmcp_bridge.rs).
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--mcp-stdio") {
+        std::process::exit(actions::mcp_stdio::run());
+    }
+
     // Read first message from stdin
     let first_bytes = match nm::read_message(&mut io::stdin()) {
         Ok(bytes) => bytes,
@@ -122,6 +131,11 @@ fn process_stream_message(request: &serde_json::Value, stdout: &mut impl io::Wri
     match action {
         "exec" => {
             actions::exec::handle_stream(request, stdout);
+        }
+        "webmcp_bridge" => {
+            // Takes over the process: runs the loopback TCP daemon until
+            // the NM port disconnects (stdin EOF).
+            actions::webmcp_bridge::run(request);
         }
         _ => {
             let _ = nm::write_message(stdout, &serde_json::json!({

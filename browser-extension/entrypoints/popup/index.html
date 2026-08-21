@@ -483,6 +483,23 @@
       <div id="webmcpSummary" class="webmcp-summary">Scanning tabs…</div>
       <div id="webmcpList" class="webmcp-list-scroll"></div>
     </div>
+    <!-- External agent MCP bridge — exposes WebMCP tools to out-of-browser
+         MCP clients (Codex, Claude Code, Cursor, …) via the native host daemon
+         (loopback TCP + --mcp-stdio helper). -->
+    <div id="webmcpBridgeBox" class="webmcp-box">
+      <div class="webmcp-host-head">
+        <div class="webmcp-host-left" id="bridgeInfoRow" role="button" tabindex="0">
+          <span class="webmcp-host-name" data-i18n="bridgeTitle">Agent 桥接（MCP）</span>
+        </div>
+        <input type="checkbox" class="webmcp-toggle" id="bridgeToggle" aria-label="Toggle external agent MCP bridge" />
+      </div>
+      <div id="bridgeStatusText" style="font-size:10.5px;color:#737373;margin-top:4px;">…</div>
+      <div id="bridgeCmdBox" style="display:none;margin-top:8px;">
+        <div style="font-size:10px;color:#737373;margin-bottom:3px;" data-i18n="bridgeMcpCmdTitle">MCP 客户端接入命令（点击复制）</div>
+        <code id="bridgeCmdCodex" title="Codex CLI" style="display:block;white-space:nowrap;overflow-x:auto;padding:5px 7px;cursor:pointer;font-size:10px;margin-bottom:4px;">…</code>
+        <code id="bridgeCmdClaude" title="Claude Code" style="display:block;white-space:nowrap;overflow-x:auto;padding:5px 7px;cursor:pointer;font-size:10px;">…</code>
+      </div>
+    </div>
     <div class="codex-box">
       <div id="codexStatus" style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">
         <span id="codexStatusDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#d1d5db;vertical-align:middle;margin-right:6px;"></span>

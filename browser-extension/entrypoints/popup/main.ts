@@ -1047,3 +1047,112 @@ document.getElementById('openGithub')!.addEventListener('click', function () {
     window.close();
   });
 })();
+
+// ── External agent MCP bridge (WebMCP tools for out-of-browser MCP clients) ──
+// Any MCP stdio client works: Codex, Claude Code, Cursor, …
+// Toggle sends webmcp_bridge_set_enabled to the background, which owns the
+// connectNative port + daemon lifecycle (see entrypoints/webmcp/native-bridge.ts).
+// When running, shows ready-to-paste setup commands built from the daemon's
+// hello (binaryPath comes from the native host itself).
+(function () {
+  var toggle = document.getElementById('bridgeToggle') as HTMLInputElement | null;
+  var statusText = document.getElementById('bridgeStatusText');
+  var cmdBox = document.getElementById('bridgeCmdBox');
+  var cmdCodex = document.getElementById('bridgeCmdCodex');
+  var cmdClaude = document.getElementById('bridgeCmdClaude');
+  var infoRow = document.getElementById('bridgeInfoRow');
+  if (!toggle || !statusText || !cmdBox || !cmdCodex || !cmdClaude || !infoRow) return;
+
+  function buildMcpCommandTail(binaryPath: string | undefined): string {
+    // binaryPath comes from the daemon hello (current_exe) — the exact
+    // binary Chrome launched via the NM manifest. Same binary for both
+    // roles is a protocol requirement. The bare-name fallback only covers
+    // a theoretical missing-hello window.
+    var bin = binaryPath && binaryPath.indexOf('cw-native-host') !== -1
+      ? binaryPath
+      : 'cw-native-host';
+    return bin + ' --mcp-stdio';
+  }
+
+  function render(resp: any): void {
+    var enabled = resp && resp.ok && resp.enabled === true;
+    var status = (resp && resp.status) || {};
+    var running = status.running === true;
+    toggle.checked = enabled;
+    toggle.disabled = false;
+    if (running) {
+      statusText.textContent = chrome.i18n.getMessage('bridgeRunning', [String(status.port || '?')])
+        || ('Running on 127.0.0.1:' + String(status.port || '?'));
+      statusText.style.color = '#0f766e';
+      var cmdTail = buildMcpCommandTail(status.binaryPath);
+      cmdCodex.textContent = 'codex mcp add eo2weave-webmcp -- ' + cmdTail;
+      cmdClaude.textContent = 'claude mcp add eo2weave-webmcp -- ' + cmdTail;
+      cmdBox.style.display = '';
+    } else if (enabled) {
+      statusText.textContent = status.lastError
+        ? t('bridgeError') + ': ' + String(status.lastError).slice(0, 120)
+        : t('bridgeStarting');
+      statusText.style.color = '#b86e0d';
+      cmdBox.style.display = 'none';
+    } else {
+      statusText.textContent = t('bridgeOff');
+      statusText.style.color = '#737373';
+      cmdBox.style.display = 'none';
+    }
+  }
+
+  function query(): void {
+    chrome.runtime.sendMessage({ type: 'webmcp_bridge_get_status' }, function (resp: any) {
+      void chrome.runtime.lastError;
+      render(resp);
+    });
+  }
+
+  toggle.addEventListener('change', function () {
+    var enabled = toggle.checked;
+    toggle.disabled = true;
+    statusText.textContent = enabled ? t('bridgeStarting') : t('bridgeStopping');
+    chrome.runtime.sendMessage({ type: 'webmcp_bridge_set_enabled', enabled: enabled }, function (resp: any) {
+      void chrome.runtime.lastError;
+      render(resp && resp.ok ? resp : null);
+      if (!resp || !resp.ok) {
+        // failed — reflect actual state on next query
+        query();
+      }
+    });
+  });
+
+  function bindCopy(el: HTMLElement): void {
+    el.addEventListener('click', function () {
+      var text = el.textContent || '';
+      function done(ok: boolean) {
+        var old = el.textContent;
+        el.textContent = ok ? t('bridgeCopied') : t('bridgeCopyFailed');
+        window.setTimeout(function () { el.textContent = old; }, 1200);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      } else {
+        done(false);
+      }
+    });
+  }
+  bindCopy(cmdCodex);
+  bindCopy(cmdClaude);
+
+  // The info row toggles the switch too (bigger hit target, matches the
+  // host-card interaction pattern above).
+  infoRow.addEventListener('click', function () {
+    toggle.checked = !toggle.checked;
+    toggle.dispatchEvent(new Event('change'));
+  });
+  infoRow.addEventListener('keydown', function (e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggle.checked = !toggle.checked;
+      toggle.dispatchEvent(new Event('change'));
+    }
+  });
+
+  query();
+})();

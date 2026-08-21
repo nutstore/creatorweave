@@ -75,6 +75,15 @@
   "authorizationPendingLog": { "message": "Authorization pending: $CODE$", "placeholders": { "code": { "content": "$1" } } },
   "authorizationExpiredLog": { "message": "Authorization expired. Please try again." },
   "supportedSites": { "message": "Supported Sites" },
+  "bridgeTitle": { "message": "Agent bridge (MCP)" },
+  "bridgeOff": { "message": "Off — expose WebMCP tools to MCP clients (Codex, Claude Code, Cursor, …) on this machine" },
+  "bridgeStarting": { "message": "Starting bridge daemon…" },
+  "bridgeStopping": { "message": "Stopping…" },
+  "bridgeRunning": { "message": "Running on 127.0.0.1:$PORT$ — MCP clients can use these tools", "placeholders": { "port": { "content": "$1" } } },
+  "bridgeError": { "message": "Bridge error" },
+  "bridgeMcpCmdTitle": { "message": "MCP client setup command (click to copy)" },
+  "bridgeCopied": { "message": "Copied!" },
+  "bridgeCopyFailed": { "message": "Copy failed — select manually" },
   "recipesCount": {
     "message": "$COUNT$ of $TOTAL$ enabled",
     "placeholders": {

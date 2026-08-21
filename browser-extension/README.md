@@ -245,6 +245,27 @@ for await (const chunk of stream) {
 stream.cancel(); // Abort early if needed
 ```
 
+## Agent Bridge (MCP) — WebMCP tools for Codex / Claude Code / Cursor
+
+Expose the browser's discovered WebMCP tools to **out-of-browser MCP clients** (Codex CLI, Claude Code, Cursor, …) over standard **MCP stdio**. The extension popup has an **Agent bridge (MCP)** switch (default off); when on, it spawns the Rust native host as a loopback daemon, and the same `cw-native-host` binary doubles as the MCP stdio server your CLI spawns.
+
+```
+Codex CLI ──MCP stdio── cw-native-host --mcp-stdio ──TCP 127.0.0.1── daemon ──NM── extension background ── relay ── WebMCP page tools
+```
+
+**Setup (macOS):**
+
+1. Install the native host (per-user, no sudo): unzip `EO2Weave-NativeHost-<ver>-macos.zip`, run `bash install.sh` — binary lands in `~/Library/Application Support/EO2Weave NativeHost/…`, manifests registered for Chrome/Edge, quarantine stripped
+2. Restart the browser, open the EO2Weave popup, turn on **Agent bridge (MCP)**
+3. Copy the ready-made command from the popup (or):
+
+```bash
+codex mcp add eo2weave-webmcp -- "$HOME/Library/Application Support/EO2Weave NativeHost/NativeMessagingHosts/cw-native-host" --mcp-stdio
+claude mcp add eo2weave-webmcp -- "$HOME/Library/Application Support/EO2Weave NativeHost/NativeMessagingHosts/cw-native-host" --mcp-stdio
+```
+
+Tool names follow the provider-safe `host__tool` convention; the per-host/per-group authorization switches apply to external agents exactly as they do in-app (disabled sites simply don't exist in `tools/list`). Bridge state file: `~/.eo2weave/webmcp-bridge.json` (port + pid). Build the distribution zip with `native-host/installer/build-dist-mac.sh` (Windows: `build-installer.sh` SFX).
+
 ## Codex OAuth Proxy (Open-Source Community Version)
 
 > **Distribution note:** this feature ships with the **open-source community version** (build from source or grab the release from GitHub). The **Chrome Web Store version does not include it** — the store build (`build:store` / `zip:store`) strips the Codex OAuth feature entirely at build time (popup box, background handlers, i18n keys).

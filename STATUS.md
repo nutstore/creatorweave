@@ -161,6 +161,7 @@ for path-traversal protection.
   - [ ] Real Windows e2e: pick_folder → read/write → exec → exec_start/stop on an actual Windows machine
   - [ ] CI: add windows target to the build matrix (msvc or gnu)
 - [ ] Code signing / notarization (macOS Gatekeeper)
+- [x] **macOS pkg installer** (2026-08-21): `installer/build-installer-pkg.sh` → system-level `.pkg` (universal aarch64+x86_64, ~650 KB). Double-click + admin once. Installs binary to `/Library/Application Support/EO2Weave NativeHost/NativeMessagingHosts/`, static NM manifests for Chrome (`/Library/Google/Chrome/NativeMessagingHosts/`) + Edge, embedded `uninstall.sh`. Strips `com.apple.quarantine` pre-pkgbuild (Gatekeeper would kill the NM child); residual `._` AppleDouble entries come from system-protected `com.apple.provenance` only — harmless, Chrome ignores it. `install.sh` remains the dev alternative (manifest → `target/release`). Test: `sudo installer -pkg … -target /`; the pkg exists at `installer/EO2Weave-Host-Setup-1.2.0-macos.pkg` (verified payload tree + universal binary + 0 quarantine entries).
 
 ### Conversation sharing (待追踪)
 
@@ -232,3 +233,62 @@ Candidate directions (evaluate, no conclusion yet):
 - `cargo test` on macOS must stay green (Unix paths untouched)
 - New unit tests: `resolve_command` PATHEXT logic (pure logic, host-platform testable with a fake PATH), normalize/lock behavior where feasible
 - Real Windows e2e (pick_folder → read/write → exec → exec_start/stop) after first real machine is available
+
+---
+
+## 19. Agent Bridge (MCP) — WebMCP tools for external CLI agents (2026-08-21, shipped)
+
+> One binary, two roles. Chrome can only launch the native host via NM; external CLIs (Codex,
+> Claude Code, Cursor) can't reach the browser directly. The bridge closes that gap.
+
+### 19.1 Architecture
+
+```
+CLI (codex) ──MCP stdio (line-JSON JSON-RPC 2.0)── cw-native-host --mcp-stdio (helper role)
+    helper ──TCP 127.0.0.1:<random>, line-JSON── daemon (cw-native-host, NM-spawned)
+    daemon ──NM streaming── extension background (native-bridge.ts) ── invokeWebMCPTool / discovery
+```
+
+- Daemon: `actions/webmcp_bridge.rs` — first NM message `{action:"webmcp_bridge",stream:true}`
+  starts it; binds 127.0.0.1:0, writes `~/.eo2weave/webmcp-bridge.json` (port/pid/binaryPath),
+  relays per-line JSON between TCP clients and NM. Client ids are rewritten to unique reqIds
+  (multiple helpers may share the daemon); NM stdin EOF → state file removed.
+- Helper: `actions/mcp_stdio.rs` — `cw-native-host --mcp-stdio`. Reads the state file, connects,
+  translates MCP `initialize`/`tools/list`/`tools/call`/`ping`. Daemon down → tools/list returns
+  EMPTY list + `_meta.eo2weaveHint` (Codex still boots; user gets a hint instead of an error).
+- Extension: `entrypoints/webmcp/native-bridge.ts` — connectNative port lifecycle, 60s keepalive
+  ping, crash reconnect (only if it was running once), storage.local `webmcp_bridge_enabled`.
+  tools/list = all-window discovery incl. registry-silent-tab fallback + per-host/group
+  authorization filter (disabled sites don't exist externally either). tools/call resolves
+  groupKey from the registry (invokeWebMCPTool routes by groupKey+fullToolName), then reuses the
+  in-app invoke path — authorization gates identical to in-app calls.
+- Popup: "Agent bridge (MCP)" switch + ready-to-copy `codex mcp add` / `claude mcp add`
+  commands (binaryPath from daemon hello = current_exe).
+
+### 19.2 Bugs found on the way (all fixed)
+
+1. **Toggle wouldn't turn on (silent)**: start() connected the port but never sent the first NM
+   message — main.rs dispatches on the FIRST message, so the host blocked in read_message and
+   the JS startup timeout fired. Fix: postMessage({action,stream:true}) after listeners attach.
+2. **Toggle flip-flopped with no error**: background has two onMessage listeners; the main one
+   answered bridge types with `Unknown message type` and closed the channel before the bridge
+   listener's async sendResponse. Fix: main listener returns false for bridge types.
+3. **tools/call would always fail INVALID_TOOL_NAME**: bridge invokeTool passed only
+   fullToolName; invokeWebMCPTool routes by (groupKey, fullToolName). Fix: resolve groupKey via
+   registry scan first.
+4. **Codex saw empty tools with pages open**: bridge listTools read only the event registry;
+   tabs opened before extension load never report (registry-silent). Fix: reuse
+   discoverWebMCPToolsInCurrentWindow(undefined) (all windows + silent-tab probe).
+
+### 19.3 Distribution (macOS — per-user, deliberately NOT pkg)
+
+- `installer/build-dist-mac.sh` → `EO2Weave-NativeHost-<ver>-macos.zip` = universal binary +
+  `install.sh` + README. Recipient: unzip anywhere, `bash install.sh` (no sudo), restart
+  browser. Binary → `~/Library/Application Support/EO2Weave NativeHost/…`, quarantine stripped,
+  user-level NM manifests for Chrome/Edge, per-user uninstaller installed alongside.
+- Pkg route was built and dropped: unsigned pkg triggers "installing to system volume"
+  Gatekeeper nag for recipients, and the per-user-via-root-postinstall dance isn't worth it
+  vs a two-line shell install. Windows keeps its per-user SFX installer (`build-installer.sh`).
+- Known-benign: pkg/zip staging on new macOS carries `com.apple.provenance` xattrs → `._*`
+  AppleDouble entries in archives; system-protected, cannot be stripped, harmless.
+

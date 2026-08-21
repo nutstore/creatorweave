@@ -12,8 +12,11 @@ import {
   annotateToolsWithHostAuthorization,
 } from './webmcp/authorization'
 import { streamPluginDownload } from './webmcp/plugin-download-transfer'
-import type { WebMCPPluginDownloadPlan } from './webmcp/types'
+import type { WebMCPPluginDownloadPlan, WebMCPDiscoveredTool } from './webmcp/types'
 import { registerTab, unregisterTab } from './webmcp/registry'
+import { getRegistryEntries, entriesToDiscoveredTools } from './webmcp/registry'
+import { buildSafeFullName } from './webmcp/tool-name'
+import { getWebMCPNativeBridge } from './webmcp/native-bridge'
 import { WEBMCP_TAB_REPORT_TYPE } from './webmcp/relay-protocol'
 import {
   isSidePanelBindingId,
@@ -1004,6 +1007,88 @@ export default defineBackground(() => {
     }
   }
 
+  // ── WebMCP native bridge (Codex / external agents) ──────────────────────
+  // Long-lived connectNative port keeping the cw-native-host daemon alive.
+  // Relay requests are answered via invokeWebMCPTool + registry (per-host /
+  // per-group authorization enforced there, same as in-app invocations).
+  const webmcpNativeBridge = getWebMCPNativeBridge({
+    invokeTool: async (request) => {
+      // fullToolName alone cannot route — invokeWebMCPTool matches the
+      // registry / route cache by (groupKey, fullToolName). Resolve the
+      // groupKey from the live registry before invoking.
+      const entries = await getRegistryEntries()
+      for (const entry of entries) {
+        for (const tool of entry.tools) {
+          if (buildSafeFullName(entry.hostname, tool.name) === request.fullToolName) {
+            return invokeWebMCPTool({
+              groupKey: entry.groupKey,
+              fullToolName: request.fullToolName,
+              args: request.args,
+            })
+          }
+        }
+      }
+      return {
+        ok: false,
+        errorCode: 'INVALID_TOOL_NAME',
+        error: `No open tab exposes tool: ${request.fullToolName}`,
+      }
+    },
+    listTools: async (): Promise<WebMCPDiscoveredTool[]> => {
+      // Bridge has no window context — list tools from ALL windows.
+      // Fallback scan: tabs opened BEFORE the extension (re)loaded have no
+      // content script and never report to the registry (registry-silent).
+      // The popup's discover path probes them; the bridge must too, or a
+      // freshly-enabled bridge shows an empty tool list until every page is
+      // manually refreshed. discoverWebMCPToolsInCurrentWindow(undefined)
+      // merges registry data + probes silent tabs across ALL windows.
+      const discovery = await discoverWebMCPToolsInCurrentWindow(undefined)
+      const tools: WebMCPDiscoveredTool[] = discovery.ok ? discovery.tools : entriesToDiscoveredTools(await getRegistryEntries())
+      // Authorization filter: disabled hosts/groups must not exist for
+      // external agents either (mirrors webmcp_discover_tools policy).
+      const [hostMap, groupMap] = await Promise.all([
+        getHostAuthorizationMap(),
+        getGroupAuthorizationMap(),
+      ])
+      const annotated = annotateToolsWithHostAuthorization(tools, hostMap, groupMap)
+      return annotated.filter(
+        (tool: WebMCPDiscoveredTool & { hostEnabled?: boolean; groupEnabled?: boolean }) =>
+          tool.hostEnabled !== false && tool.groupEnabled !== false,
+      )
+    },
+  })
+  // MV3 SW restart: re-launch the daemon if the user had it enabled.
+  void webmcpNativeBridge.resumeIfEnabled()
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    // Only claim OUR message types — an unconditional `return true` would
+    // keep the sendResponse channel open for unrelated messages and race
+    // the main listener above.
+    if (message?.type !== 'webmcp_bridge_get_status' && message?.type !== 'webmcp_bridge_set_enabled') {
+      return false
+    }
+    (async () => {
+      if (message?.type === 'webmcp_bridge_get_status') {
+        const enabled = await webmcpNativeBridge.isEnabled()
+        sendResponse({ ok: true, enabled, status: webmcpNativeBridge.getStatus() })
+        return
+      }
+      if (message?.type === 'webmcp_bridge_set_enabled') {
+        try {
+          await webmcpNativeBridge.setEnabled(message.enabled === true)
+          const enabled = await webmcpNativeBridge.isEnabled()
+          sendResponse({ ok: true, enabled, status: webmcpNativeBridge.getStatus() })
+        } catch (err: any) {
+          sendResponse({ ok: false, error: String(err?.message || err) })
+        }
+        return
+      }
+    })().catch(() => {
+      sendResponse({ ok: false, error: 'webmcp bridge handler failed' })
+    })
+    return true // async sendResponse
+  })
+
   chrome.notifications.onClicked.addListener((notifId) => {
     const tabId = _agentNotifTabs.get(notifId)
     if (tabId === undefined) return // not an agent notification
@@ -1069,6 +1154,12 @@ export default defineBackground(() => {
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    // The dedicated bridge listener (registered above) owns these types —
+    // answering here would race it and close the channel early.
+    if (message?.type === 'webmcp_bridge_get_status' || message?.type === 'webmcp_bridge_set_enabled') {
+      return false
+    }
+
     // ── Side Panel: toggle open/close on user click ──
     // Per Chrome's official sample, chrome.sidePanel.open() can be called
     // from background's onMessage when triggered by a content script click.
@@ -1420,6 +1511,14 @@ export default defineBackground(() => {
         }
 
         // ── WebMCP registry feed (static content scripts) ──
+        // Handled by the dedicated webmcp_bridge listener registered below —
+        // returning here would synchronously sendResponse("Unknown message
+        // type") and close the channel before the async handler can reply
+        // (symptom: bridge toggle won't turn on, no visible error).
+        if (message.type === 'webmcp_bridge_get_status' || message.type === 'webmcp_bridge_set_enabled') {
+          return;
+        }
+
         // Tab reports arrive from webmcp.content.ts (ISOLATED relay) with
         // the browser-verified sender.tab. Identity (tabId/hostname/title/
         // url/windowId) comes ONLY from _sender — the page payload carries

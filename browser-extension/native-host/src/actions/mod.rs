@@ -27,6 +27,8 @@ mod stat_file;
 mod write_file;
 mod write_file_at;
 pub mod base64;
+pub mod mcp_stdio;
+pub mod webmcp_bridge;
 
 /// Dispatch a parsed JSON request to the appropriate action handler.
 ///

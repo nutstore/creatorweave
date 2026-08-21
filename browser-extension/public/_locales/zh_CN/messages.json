@@ -75,6 +75,15 @@
   "authorizationPendingLog": { "message": "等待授权：$CODE$", "placeholders": { "code": { "content": "$1" } } },
   "authorizationExpiredLog": { "message": "授权已过期，请重试。" },
   "supportedSites": { "message": "支持的站点" },
+  "bridgeTitle": { "message": "Agent 桥接（MCP）" },
+  "bridgeOff": { "message": "未开启 — 向本机 MCP 客户端（Codex、Claude Code、Cursor 等）暴露网页 WebMCP 工具" },
+  "bridgeStarting": { "message": "正在启动桥接守护进程…" },
+  "bridgeStopping": { "message": "正在停止…" },
+  "bridgeRunning": { "message": "运行中（127.0.0.1:$PORT$）— MCP 客户端可使用这些工具", "placeholders": { "port": { "content": "$1" } } },
+  "bridgeError": { "message": "桥接错误" },
+  "bridgeMcpCmdTitle": { "message": "MCP 客户端接入命令（点击复制）" },
+  "bridgeCopied": { "message": "已复制！" },
+  "bridgeCopyFailed": { "message": "复制失败，请手动选择" },
   "recipesCount": {
     "message": "已启用 $COUNT$ / $TOTAL$",
     "placeholders": {
