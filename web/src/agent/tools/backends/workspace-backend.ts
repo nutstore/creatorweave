@@ -225,14 +225,23 @@ export class WorkspaceBackend implements VfsBackend {
     // fall back to the legacy single-root resolveDirHandle().
     let nativeDirHandle: FileSystemDirectoryHandle | null = null
     let nativeRelativePath = path
+    let workspace: any = null // hoisted for Phase 1b (native-host disk scan)
+    let resolved: any = null
     try {
-      const { workspace } = await this.getWorkspaceForBackend()
+      const wsResult = await this.getWorkspaceForBackend()
+      workspace = wsResult.workspace
       if (workspace) {
-        const resolved = await workspace.resolvePath(path)
+        resolved = await workspace.resolvePath(path)
+        // Always derive nativeRelativePath from resolved, even when no FS Access
+        // handle is available — Phase 1b (native-host diskExec.listDir) needs
+        // the root-relative path, not the original path with rootName prefix.
+        // Previously this assignment was guarded behind `if (rootHandle)`, which
+        // left nativeRelativePath = path for native-host roots and broke
+        // diskExec.listDir calls.
+        nativeRelativePath = resolved.relativePath || ''
         const rootHandle = await workspace.getNativeDirectoryHandleForPath(path)
         if (rootHandle) {
           nativeDirHandle = rootHandle
-          nativeRelativePath = resolved.relativePath || ''
         }
       }
     } catch {
@@ -282,6 +291,39 @@ export class WorkspaceBackend implements VfsBackend {
         }
       } catch {
         // Directory doesn't exist on native filesystem — OPFS-only, that's OK
+      }
+    }
+
+    // Phase 1b: Native-host disk scan. For native-host-backed roots, the
+    // FileSystemDirectoryHandle from Phase 1a is null (no FS Access API
+    // handle exists) — diskExec.listDir is the only way to enumerate files
+    // that live only on disk via the Rust native host. Without this, `ls`,
+    // `find`, and tree traversal all miss native-host-only directories.
+    if (workspace && resolved && resolved.backend === 'native-host' && resolved.rootId) {
+      try {
+        if (!recursive || maxDepth <= 1) {
+          const diskEntries = await workspace.diskExec.listDir(resolved.rootId, nativeRelativePath)
+          for (const e of diskEntries) {
+            const entryPath = path ? `${path}/${e.name}` : e.name
+            if (!nativePathSet.has(entryPath)) {
+              nativeEntries.push({ name: e.name, path: entryPath, kind: e.kind })
+              nativePathSet.add(entryPath)
+            }
+          }
+        } else {
+          await this._listDirDiskRecursive(
+            workspace.diskExec,
+            resolved.rootId,
+            nativeRelativePath,
+            path,
+            nativeEntries,
+            maxDepth,
+            1,
+            nativePathSet,
+          )
+        }
+      } catch {
+        // Disk dir not accessible (no permission, ENOENT, etc.) — skip
       }
     }
 
@@ -412,6 +454,52 @@ export class WorkspaceBackend implements VfsBackend {
         } catch {
           // Skip directories we can't access
         }
+      }
+    }
+  }
+
+  /**
+   * Recursive scanner for native-host disk directories — mirrors
+   * `_listDirRecursive` but uses `diskExec.listDir(rootId, relativePath)`
+   * instead of `FileSystemDirectoryHandle.entries()`. Native-host scopes
+   * have no FS Access API handle, so the FS Access API path is unreachable.
+   *
+   * Both `currentRelativePath` (root-relative) and `currentFullPath` (with
+   * rootName prefix) are tracked so returned entries match the caller's
+   * original path namespace — same convention as the FS Access API scanner.
+   */
+  private async _listDirDiskRecursive(
+    diskExec: { listDir(rootId: string, relativePath: string): Promise<Array<{ name: string; kind: 'file' | 'directory' }>> },
+    rootId: string,
+    currentRelativePath: string,
+    currentFullPath: string,
+    acc: VfsDirEntry[],
+    maxDepth: number,
+    currentDepth: number,
+    pathSet: Set<string>,
+  ): Promise<void> {
+    let entries: Array<{ name: string; kind: 'file' | 'directory' }>
+    try {
+      entries = await diskExec.listDir(rootId, currentRelativePath)
+    } catch {
+      return // dir not accessible
+    }
+    for (const e of entries) {
+      const childRelativePath = currentRelativePath ? `${currentRelativePath}/${e.name}` : e.name
+      const childFullPath = currentFullPath ? `${currentFullPath}/${e.name}` : e.name
+      acc.push({ name: e.name, path: childFullPath, kind: e.kind })
+      pathSet.add(childFullPath)
+      if (e.kind === 'directory' && currentDepth < maxDepth) {
+        await this._listDirDiskRecursive(
+          diskExec,
+          rootId,
+          childRelativePath,
+          childFullPath,
+          acc,
+          maxDepth,
+          currentDepth + 1,
+          pathSet,
+        )
       }
     }
   }
