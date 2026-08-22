@@ -168,7 +168,12 @@ fn lock_file_exclusive(handle: std::os::windows::io::RawHandle) -> bool {
     use windows::Win32::Storage::FileSystem::{
         LockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
     };
+    use windows::Win32::System::IO::OVERLAPPED;
 
+    // LockFileEx REQUIRES a valid OVERLAPPED pointer -- it reads Offset/OffsetHigh
+    // unconditionally. Passing NULL crashes with STATUS_ACCESS_VIOLATION (0xC0000005).
+    // The lock range starts at offset 0, so a zeroed OVERLAPPED is correct.
+    let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
     let handle = HANDLE(handle as _);
     unsafe {
         LockFileEx(
@@ -177,7 +182,7 @@ fn lock_file_exclusive(handle: std::os::windows::io::RawHandle) -> bool {
             None,
             u32::MAX,
             u32::MAX,
-            std::ptr::null_mut(),
+            &mut overlapped,
         )
         .is_ok()
     }

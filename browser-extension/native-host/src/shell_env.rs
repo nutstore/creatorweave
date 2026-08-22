@@ -193,12 +193,14 @@ fn capture_shell_env() -> HashMap<String, String> {
 mod tests {
     use super::*;
 
+    #[cfg(not(windows))]
     #[test]
     fn inherit_vars_are_unique_and_sorted_for_docs() {
         // Sanity: PATH must be in the inherit list.
         assert!(INHERIT_VARS.contains(&"PATH"));
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn apply_shell_env_extends_path() {
         // We can't easily force OnceLock to re-init in a test, but we can
