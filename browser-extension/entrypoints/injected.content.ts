@@ -183,8 +183,58 @@ export default defineContentScript({
       let streamFinished = false;
       let streamError: Error | null = null;
 
+      // Codex can legitimately spend several minutes thinking. Its bridge
+      // uses a 10-minute idle timeout (refreshed by every chunk) plus a
+      // 31-minute page-side watchdog, slightly longer than the background's
+      // 30-minute hard limit. Other bridge streams retain the existing
+      // two-minute safety window, but it is now correctly treated as idle.
+      const isCodexStream = type === 'codex_proxy_fetch_stream';
+      // Give the background a small grace period to deliver its authoritative
+      // 10-minute idle error instead of racing it in the page context.
+      const idleTimeoutMs = isCodexStream ? 10 * 60 * 1000 + 5_000 : 2 * 60 * 1000;
+      const totalTimeoutMs = isCodexStream ? 31 * 60 * 1000 : null;
+      let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+      let totalTimeout: ReturnType<typeof setTimeout> | null = null;
+      let cancelSent = false;
+
+      function requestStreamCancel() {
+        if (!isCodexStream || cancelSent) return;
+        cancelSent = true;
+        window.postMessage({
+          __agentWebBridge: true,
+          __agentWebStreamCancel: true,
+          id,
+        }, '*');
+      }
+
+      function clearStreamTimeouts() {
+        if (idleTimeout !== null) {
+          clearTimeout(idleTimeout);
+          idleTimeout = null;
+        }
+        if (totalTimeout !== null) {
+          clearTimeout(totalTimeout);
+          totalTimeout = null;
+        }
+      }
+
+      function armIdleTimeout() {
+        if (idleTimeout !== null) clearTimeout(idleTimeout);
+        idleTimeout = setTimeout(() => {
+          if (!streamFinished && !streamError && !cancelled) {
+            _streaming.delete(id);
+            requestStreamCancel();
+            const message = isCodexStream
+              ? 'Codex stream received no data for 10 minutes'
+              : `Stream received no data for ${Math.round(idleTimeoutMs / 1000)}s`;
+            failStream(new Error(message));
+          }
+        }, idleTimeoutMs);
+      }
+
       function enqueueChunk(data: unknown) {
         if (cancelled) return;
+        armIdleTimeout();
         if (resolveChunk) {
           const r = resolveChunk;
           resolveChunk = null;
@@ -196,7 +246,7 @@ export default defineContentScript({
 
       function finishStream() {
         streamFinished = true;
-        clearTimeout(timeout);
+        clearStreamTimeouts();
         if (resolveChunk) {
           const r = resolveChunk;
           resolveChunk = null;
@@ -206,7 +256,7 @@ export default defineContentScript({
 
       function failStream(err: Error) {
         streamError = err;
-        clearTimeout(timeout);
+        clearStreamTimeouts();
         if (rejectChunk) {
           const r = rejectChunk;
           rejectChunk = null;
@@ -232,13 +282,19 @@ export default defineContentScript({
         payload,
       }, '*');
 
-      // Timeout safety
-      const timeout = setTimeout(() => {
-        if (!streamFinished && !streamError) {
-          _streaming.delete(id);
-          failStream(new Error('Stream timeout (35s)'));
-        }
-      }, 120000); // 2 min for streaming
+      // Start the idle watchdog after dispatch. Active streams keep it alive
+      // by rearming it in enqueueChunk(). Codex additionally has a hard page-
+      // side ceiling so a lost background port cannot wait forever.
+      armIdleTimeout();
+      if (totalTimeoutMs !== null) {
+        totalTimeout = setTimeout(() => {
+          if (!streamFinished && !streamError && !cancelled) {
+            _streaming.delete(id);
+            requestStreamCancel();
+            failStream(new Error('Codex stream exceeded the 31-minute page watchdog'));
+          }
+        }, totalTimeoutMs);
+      }
 
       const asyncIterator: AsyncIterable<unknown> & { cancel: () => void } = {
         [Symbol.asyncIterator]() {
@@ -257,16 +313,18 @@ export default defineContentScript({
             },
             return() {
               cancelled = true;
-              clearTimeout(timeout);
+              clearStreamTimeouts();
               _streaming.delete(id);
+              requestStreamCancel();
               return Promise.resolve({ value: undefined, done: true });
             },
           };
         },
         cancel() {
           cancelled = true;
-          clearTimeout(timeout);
+          clearStreamTimeouts();
           _streaming.delete(id);
+          requestStreamCancel();
           finishStream();
         },
       };

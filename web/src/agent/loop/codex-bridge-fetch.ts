@@ -76,9 +76,18 @@ async function handleCodexRequest(
   if (bridge.codexProxyFetchStream && body.stream !== false) {
     const sseIterable = bridge.codexProxyFetchStream(body)
     const encoder = new TextEncoder()
+    const requestSignal = init?.signal
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        const abortStream = () => sseIterable.cancel()
+        if (requestSignal?.aborted) {
+          abortStream()
+          controller.error(requestSignal.reason ?? new DOMException('Request aborted', 'AbortError'))
+          return
+        }
+        requestSignal?.addEventListener('abort', abortStream, { once: true })
+
         try {
           for await (const chunk of sseIterable) {
             controller.enqueue(encoder.encode(chunk))
@@ -86,7 +95,12 @@ async function handleCodexRequest(
           controller.close()
         } catch (err) {
           controller.error(err)
+        } finally {
+          requestSignal?.removeEventListener('abort', abortStream)
         }
+      },
+      cancel() {
+        sseIterable.cancel()
       },
     })
 

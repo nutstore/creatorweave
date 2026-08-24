@@ -2146,57 +2146,142 @@ export default defineBackground(() => {
       if (!CODEX_OAUTH_ENABLED || message.type !== 'codex_proxy_fetch_stream') return;
 
       (async () => {
-        // Per-request timeout: 5 minutes for streaming (long-running requests)
-        const STREAM_TIMEOUT_MS = 5 * 60 * 1000;
-        let timeoutId = setTimeout(() => {
-          port.postMessage({ type: 'error', errorCode: 'NETWORK_ERROR', message: 'Stream request timed out (5 min)' });
-          try { port.disconnect(); } catch {}
-        }, STREAM_TIMEOUT_MS);
+        const CODEX_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+        const CODEX_HARD_TIMEOUT_MS = 30 * 60 * 1000;
+        const abortController = new AbortController();
+        let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+        let idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        let hardTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        let settled = false;
+        let disconnected = false;
+
+        const clearStreamTimeouts = () => {
+          if (idleTimeoutId !== null) {
+            clearTimeout(idleTimeoutId);
+            idleTimeoutId = null;
+          }
+          if (hardTimeoutId !== null) {
+            clearTimeout(hardTimeoutId);
+            hardTimeoutId = null;
+          }
+        };
+
+        const abortUpstream = (reason: Error) => {
+          if (!abortController.signal.aborted) abortController.abort(reason);
+          if (reader) void reader.cancel(reason).catch(() => {});
+        };
+
+        const safePost = (payload: Record<string, unknown>): boolean => {
+          if (disconnected) return false;
+          try {
+            port.postMessage(payload);
+            return true;
+          } catch {
+            disconnected = true;
+            return false;
+          }
+        };
+
+        const disconnectPort = () => {
+          if (disconnected) return;
+          try {
+            port.disconnect();
+          } catch {}
+        };
+
+        const stopWithoutReply = (reason: Error) => {
+          if (settled) return;
+          settled = true;
+          clearStreamTimeouts();
+          abortUpstream(reason);
+          disconnectPort();
+        };
+
+        const failStream = (errorCode: string, message: string, status?: number) => {
+          if (settled) return;
+          settled = true;
+          clearStreamTimeouts();
+          abortUpstream(new Error(message));
+          safePost({ type: 'error', errorCode, ...(status === undefined ? {} : { status }), message });
+          disconnectPort();
+        };
+
+        const finishStream = () => {
+          if (settled) return;
+          settled = true;
+          clearStreamTimeouts();
+          safePost({ type: 'done' });
+          disconnectPort();
+        };
+
+        const armIdleTimeout = () => {
+          if (settled) return;
+          if (idleTimeoutId !== null) clearTimeout(idleTimeoutId);
+          idleTimeoutId = setTimeout(() => {
+            failStream('STREAM_IDLE_TIMEOUT', 'Codex stream received no data for 10 minutes');
+          }, CODEX_IDLE_TIMEOUT_MS);
+        };
+
+        port.onDisconnect.addListener(() => {
+          disconnected = true;
+          stopWithoutReply(new Error('Codex stream client disconnected'));
+        });
+        port.onMessage.addListener((controlMessage: { type?: string }) => {
+          if (controlMessage?.type === 'cancel') {
+            stopWithoutReply(new Error('Codex stream cancelled'));
+          }
+        });
+
+        // The hard deadline is immutable; only the idle timeout is refreshed.
+        armIdleTimeout();
+        hardTimeoutId = setTimeout(() => {
+          failStream('STREAM_HARD_TIMEOUT', 'Codex stream exceeded the 30-minute hard timeout');
+        }, CODEX_HARD_TIMEOUT_MS);
 
         try {
           let tokens = await CODEX!.getCodexTokens();
           if (!tokens?.access_token) {
-            clearTimeout(timeoutId);
-            port.postMessage({ type: 'error', errorCode: 'NOT_AUTHORIZED', message: 'Not authorized. Please complete device code login first.' });
-            port.disconnect();
+            failStream('NOT_AUTHORIZED', 'Not authorized. Please complete device code login first.');
             return;
           }
 
           const requestUrl = message.url || CODEX!.CODEX_RESPONSES_URL;
           const body = { ...(message.body || {}), stream: true };
-
-          let resp = await fetch(requestUrl, {
+          const fetchOptions = (accessToken: string): RequestInit => ({
             method: 'POST',
             body: JSON.stringify(body),
-            headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
+            headers: CODEX!.codexHeaders(accessToken, message.headers || {}),
+            signal: abortController.signal,
           });
+
+          let resp = await fetch(requestUrl, fetchOptions(tokens.access_token));
 
           // Auto-refresh on 401
           if (resp.status === 401 && tokens?.refresh_token) {
             try {
+              await resp.body?.cancel();
               tokens = await CODEX!.refreshCodexAccessToken(tokens);
-              resp = await fetch(requestUrl, {
-                method: 'POST',
-                body: JSON.stringify(body),
-                headers: CODEX!.codexHeaders(tokens.access_token, message.headers || {}),
-              });
+              if (settled) return;
+              if (!tokens.access_token) {
+                failStream('REAUTH_REQUIRED', 'Token refresh returned no access token. Please re-authorize in the extension popup.', 401);
+                return;
+              }
+              resp = await fetch(requestUrl, fetchOptions(tokens.access_token));
             } catch (refreshErr) {
-              clearTimeout(timeoutId);
-              port.postMessage({ type: 'error', errorCode: 'REAUTH_REQUIRED', status: 401, message: 'Token refresh failed. Please re-authorize in the extension popup.' });
-              port.disconnect();
+              if (!settled) {
+                failStream('REAUTH_REQUIRED', 'Token refresh failed. Please re-authorize in the extension popup.', 401);
+              }
               return;
             }
           }
 
           if (!resp.ok) {
-            clearTimeout(timeoutId);
             const errText = await resp.text();
             let errorCode = 'UPSTREAM_ERROR';
             if (resp.status === 400) errorCode = 'UPSTREAM_BAD_REQUEST';
             else if (resp.status === 429) errorCode = 'UPSTREAM_RATE_LIMITED';
             else if (resp.status >= 500) errorCode = 'UPSTREAM_SERVER_ERROR';
-            port.postMessage({ type: 'error', errorCode, status: resp.status, message: errText });
-            port.disconnect();
+            failStream(errorCode, errText || resp.statusText, resp.status);
             return;
           }
 
@@ -2219,30 +2304,39 @@ export default defineBackground(() => {
             });
           }
 
-          // Stream SSE chunks through the port
-          const reader = resp.body.getReader();
+          // Stream SSE chunks through the port. Every upstream chunk refreshes
+          // the 10-minute idle timer; the 30-minute hard timer never moves.
+          if (!resp.body) {
+            failStream('NO_RESPONSE_BODY', 'No response body for Codex stream');
+            return;
+          }
+          reader = resp.body.getReader();
           const decoder = new TextDecoder();
 
-          while (true) {
+          while (!settled) {
             const { done, value } = await reader.read();
             if (done) break;
+            armIdleTimeout();
             const chunk = decoder.decode(value, { stream: true });
-            port.postMessage({ type: 'chunk', data: chunk });
+            if (chunk && !safePost({ type: 'chunk', data: chunk })) {
+              stopWithoutReply(new Error('Codex stream client disconnected'));
+              return;
+            }
           }
+
+          if (settled) return;
 
           // Flush remaining bytes
           const remaining = decoder.decode();
-          if (remaining) {
-            port.postMessage({ type: 'chunk', data: remaining });
+          if (remaining && !safePost({ type: 'chunk', data: remaining })) {
+            stopWithoutReply(new Error('Codex stream client disconnected'));
+            return;
           }
 
-          port.postMessage({ type: 'done' });
-          clearTimeout(timeoutId);
-          port.disconnect();
+          finishStream();
         } catch (err: any) {
-          clearTimeout(timeoutId);
-          port.postMessage({ type: 'error', errorCode: 'NETWORK_ERROR', message: String(err?.message || err) });
-          port.disconnect();
+          if (settled || abortController.signal.aborted) return;
+          failStream('NETWORK_ERROR', String(err?.message || err));
         }
       })();
     });

@@ -29,12 +29,28 @@ export default defineContentScript({
 
     // ── Request/Response relay (existing) ──
 
+    // Streaming ports are keyed by the page request id so page-side timeout,
+    // iterator return(), or ReadableStream cancellation can abort upstream.
+    const streamingPorts = new Map<string, chrome.runtime.Port>()
+
     window.addEventListener('message', (event) => {
       // Only accept messages from same window, with our bridge marker
       if (event.source !== window || event.data?.__agentWebBridge !== true) return;
 
       const { id, type, payload } = event.data;
-      if (!id || !type) return;
+      if (!id) return;
+
+      if (event.data.__agentWebStreamCancel === true) {
+        const streamPort = streamingPorts.get(id)
+        if (streamPort) {
+          streamingPorts.delete(id)
+          try { streamPort.postMessage({ type: 'cancel' }) } catch {}
+          try { streamPort.disconnect() } catch {}
+        }
+        return
+      }
+
+      if (!type) return;
 
       // ── Streaming request: use port-based messaging ──
       if (
@@ -44,6 +60,7 @@ export default defineContentScript({
       ) {
         try {
           const port = chrome.runtime.connect({ name: 'agent_bridge_stream' });
+          streamingPorts.set(id, port)
 
           // Relay port messages back to page as window.postMessage chunks
           port.onMessage.addListener((msg) => {
@@ -56,6 +73,7 @@ export default defineContentScript({
           });
 
           port.onDisconnect.addListener(() => {
+            streamingPorts.delete(id)
             // Ensure stream end is signaled even on unexpected disconnect
             window.postMessage({
               __agentWebBridge: true,
