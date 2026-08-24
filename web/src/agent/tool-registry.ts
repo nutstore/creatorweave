@@ -239,8 +239,9 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
 ]
 
 /**
- * All prompt docs for built-in + skill tools.
- * Used by buildAvailableToolsPrompt() to inject compact tool summaries.
+ * Prompt metadata for tool categorization and UI grouping.
+ * Tool descriptions and parameters are sent to the model only through the
+ * structured tool schemas, not duplicated in the system prompt.
  */
 const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   readPromptDoc,
@@ -268,7 +269,6 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   unifiedExternalToolsPromptDoc,
   getPageToolsPromptDoc,
   imageGenPromptDoc,
-  // Page action tools (only rendered when available — see getAvailableToolsDoc)
   pageReadPromptDoc,
   pageWritePromptDoc,
   execPromptDoc,
@@ -320,42 +320,6 @@ export class ToolRegistry {
 
     // Plan mode: filter to read-only tools only
     return definitions.filter(tool => isToolAllowedInMode(tool.function.name, mode))
-  }
-
-  /**
-   * Build compact tool summary for system prompt injection.
-   * Groups prompt docs by category/section, returns a single Markdown string.
-   */
-  getAvailableToolsDoc(): string {
-    const sections = new Map<string, string[]>()
-
-    for (const doc of ALL_PROMPT_DOCS) {
-      // Skip web bridge tools if not available
-      if (doc.category === 'web' && !isWebBridgeAvailable()) continue
-      // Skip page action tools if not available (extension + side panel)
-      if (doc.category === 'page' && !isPageActionAvailable()) continue
-      // Skip get_page_tools doc outside side-panel mode — the tool is not
-      // registered there (see registerPageToolsFastPath) and its doc would
-      // advertise a capability that does not exist in this session.
-      if (doc === getPageToolsPromptDoc && !isSidePanelMode()) continue
-      // External tools doc always shown — search_tools is always useful even with 0 external tools connected
-      // Skip image gen tools if image gen model is not available
-      if (doc.category === 'file-ops' && doc === imageGenPromptDoc && !isImageGenAvailable()) continue
-
-      const section = doc.section ?? `### ${doc.category.charAt(0).toUpperCase() + doc.category.slice(1)}`
-      if (!sections.has(section)) {
-        sections.set(section, [])
-      }
-      sections.get(section)!.push(...doc.lines)
-    }
-
-    const parts: string[] = []
-    for (const [section, lines] of sections) {
-      parts.push(section)
-      parts.push(...lines)
-      parts.push('')
-    }
-    return parts.join('\n').trim()
   }
 
   /** Filter out tools disabled by feature flags (e.g. batch_spawn) */
@@ -830,16 +794,6 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerImageGenTool()
   }
   return instance
-}
-
-/**
- * Build compact tool summary for system prompt injection.
- * Standalone function — does not require a ToolRegistry instance.
- */
-export function buildAvailableToolsPrompt(): string {
-  // Ensure registry is initialized (which also checks web bridge)
-  const registry = getToolRegistry()
-  return registry.getAvailableToolsDoc()
 }
 
 /**

@@ -215,11 +215,9 @@ In Python code, paths follow a different convention:
 
 If Python reports "file not found", call \`sync()\` to copy the file from disk to OPFS first.
 
-## Available Tools
-
-{{AVAILABLE_TOOLS}}
-
 ## Tool Usage Notes
+
+Tool names, descriptions, and parameters are provided by the structured tool schemas. Do not duplicate or infer parameter documentation from this prompt; use the schemas as the source of truth.
 
 ### File Operations — Tool Selection Rules
 - Modifying part of an existing file → **MUST use \`edit()\`**

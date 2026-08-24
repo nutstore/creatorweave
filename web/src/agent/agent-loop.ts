@@ -365,7 +365,7 @@ export class AgentLoop {
     const signal = this.abortController.signal
 
     if (this.skipEnhancements) {
-      // Use the base system prompt as-is (no skills, MCP summaries, tool docs)
+      // Use the base system prompt as-is (no skills, memory, or MCP summaries).
       this.contextManager.setSystemPrompt(this.baseSystemPrompt)
     } else {
       // Phase 2 P1: Trigger predictive file loading before processing
@@ -376,7 +376,6 @@ export class AgentLoop {
         baseSystemPrompt: this.baseSystemPrompt,
         messages,
         mode: this.mode,
-        toolRegistry: this.toolRegistry,
         toolContext: this.toolContext,
         sessionId: this.sessionId,
       })
