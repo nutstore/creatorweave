@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { unzipSync, zipSync, strToU8 } from 'fflate'
+import { Zip, ZipDeflate, unzipSync, zipSync, strToU8 } from 'fflate'
 
 const mocks = vi.hoisted(() => ({
   close: vi.fn(async () => {}),
@@ -154,6 +154,9 @@ class FakeFile {
       this.bytes.byteOffset + this.bytes.byteLength
     )
   }
+  slice(start = 0, end = this.size) {
+    return new FakeFile(this.name, this.bytes.slice(start, end))
+  }
   /**
    * ReadableStream stand-in for `File.stream()`. The export path consumes
    * it through `getReader()` + `read()` (pull-based, like the real browser
@@ -184,6 +187,30 @@ class FakeFile {
 
 function zipOf(entries: Record<string, Uint8Array>): Uint8Array {
   return zipSync(entries)
+}
+
+/** Build the same descriptor-based streaming ZIP shape as exportOPFSBackup. */
+function streamingZipOf(entries: Record<string, Uint8Array>): Uint8Array {
+  const chunks: Uint8Array[] = []
+  const zip = new Zip((error, chunk) => {
+    if (error) throw error
+    if (chunk) chunks.push(new Uint8Array(chunk))
+  })
+  for (const [path, bytes] of Object.entries(entries)) {
+    const deflate = new ZipDeflate(path, { level: 0 })
+    zip.add(deflate)
+    deflate.push(bytes, false)
+    deflate.push(new Uint8Array(0), true)
+  }
+  zip.end()
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.length
+  }
+  return out
 }
 
 describe('importOPFSBackup', () => {
@@ -235,31 +262,37 @@ describe('importOPFSBackup', () => {
 
   it('retries reading the picked file on transient NotReadableError', async () => {
     const zipped = zipOf({ 'bfosa-unified.sqlite': SQLITE_HEADER })
-    // First stream() probe throws the standard Chrome NotReadableError
-    // text; second succeeds. The confirm-dialog delay between pick and read
-    // makes this transient failure mode real (AV scan / lock / flush).
+    // First slice().arrayBuffer() read throws Chrome's NotReadableError;
+    // the next succeeds. The archive is now range-read so large backups stay
+    // bounded in memory while retaining the transient-file retry behavior.
     let reads = 0
+    const backing = new FakeFile('backup.zip', zipped)
     const flakyFile = {
       name: 'backup.zip',
       size: zipped.byteLength,
-      stream: () => {
-        reads++
-        if (reads === 1) {
-          throw new DOMException(
-            'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired',
-            'NotReadableError'
-          )
+      slice: (start?: number, end?: number) => {
+        const slice = backing.slice(start, end)
+        return {
+          arrayBuffer: async () => {
+            reads++
+            if (reads === 1) {
+              throw new DOMException(
+                'The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired',
+                'NotReadableError'
+              )
+            }
+            return slice.arrayBuffer()
+          },
         }
-        return new FakeFile('backup.zip', zipped).stream()
       },
-      arrayBuffer: async () =>
-        zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength),
     } as unknown as File
     const { restore } = installFakeOpfs()
     try {
       const result = await importOPFSBackup(flakyFile)
       expect(result.fileCount).toBeGreaterThan(0)
-      expect(reads).toBe(2)
+      // One failed attempt plus bounded range reads for the directory,
+      // local header, and entry payload.
+      expect(reads).toBeGreaterThan(1)
     } finally {
       restore()
     }
@@ -269,12 +302,11 @@ describe('importOPFSBackup', () => {
     const alwaysFails = {
       name: 'backup.zip',
       size: 100,
-      stream: () => {
-        throw new DOMException('unreadable', 'NotReadableError')
-      },
-      arrayBuffer: async () => {
-        throw new DOMException('unreadable', 'NotReadableError')
-      },
+      slice: () => ({
+        arrayBuffer: async () => {
+          throw new DOMException('unreadable', 'NotReadableError')
+        },
+      }),
     } as unknown as File
     const { restore } = installFakeOpfs()
     try {
@@ -292,6 +324,46 @@ describe('importOPFSBackup', () => {
       await expect(
         importOPFSBackup(new FakeFile('empty.zip', new Uint8Array(0)) as unknown as File)
       ).rejects.toThrow(/empty/)
+    } finally {
+      restore()
+    }
+  })
+
+  it('restores a descriptor-based stream ZIP even when payload contains the descriptor signature', async () => {
+    const db = new Uint8Array(400_000)
+    db.set(SQLITE_HEADER)
+    db.fill(0x41, SQLITE_HEADER.length)
+    // fflate Unzip used to mistake this payload sequence for the entry's
+    // data descriptor and terminate the deflate stream with unexpected EOF.
+    db.set(new Uint8Array([0x50, 0x4b, 0x07, 0x08]), 200_000)
+    const zipped = streamingZipOf({ 'bfosa-unified.sqlite': db })
+    const { map, restore } = installFakeOpfs()
+    try {
+      const result = await importOPFSBackup(
+        new FakeFile('backup.zip', zipped) as unknown as File
+      )
+      expect(result.fileCount).toBe(1)
+      const restored = map.get('bfosa-unified.sqlite') as { bytes: Uint8Array }
+      expect(restored.bytes).toEqual(db)
+    } finally {
+      restore()
+    }
+  })
+
+  it('preserves staging while clearing old OPFS data', async () => {
+    const zipped = zipOf({ 'bfosa-unified.sqlite': SQLITE_HEADER })
+    const { root, map, restore } = installFakeOpfs({ 'old-file.txt': { kind: 'file' } })
+    try {
+      await importOPFSBackup(new FakeFile('backup.zip', zipped) as unknown as File)
+      const removedNames = root.removeEntry.mock.calls.map(([name]) => name)
+      // First occurrence is stale-temp cleanup and the last is final cleanup;
+      // there must be no staging deletion between creation and the move.
+      expect(removedNames).toEqual([
+        '.eo2weave-backup-tmp',
+        'old-file.txt',
+        '.eo2weave-backup-tmp',
+      ])
+      expect(map.has('bfosa-unified.sqlite')).toBe(true)
     } finally {
       restore()
     }
@@ -425,8 +497,12 @@ describe('importOPFSBackup', () => {
       kind: 'directory' as const,
       entries: async function* () {
         yield ['bfosa-unified.sqlite', { kind: 'file' }] as [string, unknown]
+        yield ['.eo2weave-backup-tmp', makeFakeDir(stagingMap)] as [string, unknown]
       },
-      removeEntry: async () => {
+      removeEntry: async (name: string) => {
+        if (name === '.eo2weave-backup-tmp') {
+          throw new DOMException('not found', 'NotFoundError')
+        }
         throw new DOMException(
           'An attempt was made to modify an object where modifications are not allowed',
           'NoModificationAllowedError'

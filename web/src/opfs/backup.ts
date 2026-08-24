@@ -17,8 +17,8 @@
 import {
   Zip,
   ZipDeflate,
-  Unzip,
-  AsyncUnzipInflate,
+  Inflate,
+  strFromU8,
 } from 'fflate'
 import { beginReset, endReset } from '@/storage/reset-coordinator'
 import { setStorageResetMarker } from '@/storage/reset-marker'
@@ -612,10 +612,13 @@ function isImportLockError(error: unknown): boolean {
  * `clearSQLiteAndProjectsDirectory`, so the UI can tell the user to close
  * other tabs instead of showing a cryptic failure.
  */
-async function clearOPFSRoot(root: FileSystemDirectoryHandle): Promise<void> {
+async function clearOPFSRoot(
+  root: FileSystemDirectoryHandle,
+  preserve: ReadonlySet<string> = new Set(),
+): Promise<void> {
   const names: string[] = []
   for await (const [name] of root.entries()) {
-    names.push(name)
+    if (!preserve.has(name)) names.push(name)
   }
   const locked: string[] = []
   for (const name of names) {
@@ -662,74 +665,300 @@ async function clearOPFSRoot(root: FileSystemDirectoryHandle): Promise<void> {
  * should surface the error and advise re-running the import.
  */
 /**
- * Stream-unzip a backup archive from a user-picked File into an OPFS
- * staging directory, without ever holding the whole archive (compressed or
- * decompressed) in memory. Returns the staged `path -> { size }` map.
- *
- * Why streaming: large backups (multi-GB) previously died on
- * `new Uint8Array(await file.arrayBuffer())` — a single allocation the size
- * of the archive — and on fflate's `unzip()` materialising every entry.
- * Peak memory here is O(chunk) (~1 MiB) regardless of archive size.
- *
- * Entry filtering mirrors validateBackupEntries() so noise/legacy/staging
- * entries are skipped, and the SQLite magic check runs on the staged db
- * file BEFORE any destructive step.
+ * Read a byte range from the selected archive with bounded retry. File.slice()
+ * keeps memory proportional to the requested range and lets the restore read
+ * the ZIP central directory before touching entry payloads.
  */
-/**
- * Get a ReadableStream from a user-picked backup File with retry. Chrome can
- * transiently fail reads on a disk-backed File with NotReadableError
- * ("permission problems ... after a reference to a file was acquired") —
- * typically AV scanning, file lock, or a downloader still flushing. The
- * file reference stays valid, so a bounded retry rides it out. Getting the
- * stream reads the first bytes lazily, so the retry wraps `stream()` itself.
- */
-async function readFileStreamWithRetry(file: File): Promise<ReadableStream<Uint8Array>> {
+async function readFileSliceWithRetry(
+  file: File,
+  start: number,
+  end: number,
+): Promise<Uint8Array> {
   const maxAttempts = 4
   let lastError: unknown
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const stream = file.stream()
-      // Probe the first chunk — a healthy stream yields data (or done)
-      // without throwing; a locked/scanned file rejects here.
-      const probe = stream.getReader()
-      try {
-        const first = await probe.read()
-        // Re-wrap: we can't unread into the original stream, so build a new
-        // stream that replays `first` then continues from the same reader.
-        const rest = probe
-        return new ReadableStream<Uint8Array>({
-          start(controller) {
-            if (!first.done && first.value) controller.enqueue(first.value)
-          },
-          async pull(controller) {
-            const { done, value } = await rest.read()
-            if (done) controller.close()
-            else controller.enqueue(value!)
-          },
-          cancel() {
-            void rest.cancel()
-          },
-        })
-      } catch (probeError) {
-        throw probeError
-      }
+      return new Uint8Array(await file.slice(start, end).arrayBuffer())
     } catch (error) {
       lastError = error
-      const message = error instanceof Error ? error.message : String(error)
-      const retryable =
-        message.includes('could not be read') ||
-        message.toLowerCase().includes('notreadable')
+      const message = toImportErrorMessage(error).toLowerCase()
+      const retryable = message.includes('could not be read') || message.includes('notreadable')
       if (!retryable || attempt === maxAttempts) break
       console.warn(
-        `[OPFS] Restore: opening "${file.name}" failed (attempt ${attempt}/${maxAttempts}), retrying...`
+        `[OPFS] Restore: reading "${file.name}" failed (attempt ${attempt}/${maxAttempts}), retrying...`
       )
       await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
     }
   }
-  const message = lastError instanceof Error ? lastError.message : String(lastError)
   throw new Error(
-    `Could not read "${file.name}" (${formatBytes(file.size)}): ${message}`
+    `Could not read "${file.name}" (${formatBytes(file.size)}): ${toImportErrorMessage(lastError)}`
   )
+}
+
+function readU16(data: Uint8Array, offset: number): number {
+  return data[offset] | (data[offset + 1] << 8)
+}
+
+function readU32(data: Uint8Array, offset: number): number {
+  return (
+    data[offset] |
+    (data[offset + 1] << 8) |
+    (data[offset + 2] << 16) |
+    (data[offset + 3] << 24)
+  ) >>> 0
+}
+
+function readU64(data: Uint8Array, offset: number): number {
+  const value = readU32(data, offset) + readU32(data, offset + 4) * 0x1_0000_0000
+  if (!Number.isSafeInteger(value)) {
+    throw new Error('ZIP64 value exceeds JavaScript safe integer range')
+  }
+  return value
+}
+
+interface ZipEntryLocation {
+  path: string
+  compression: number
+  compressedSize: number
+  uncompressedSize: number
+  localHeaderOffset: number
+}
+
+function zip64Values(
+  extra: Uint8Array,
+  needs: { uncompressed: boolean; compressed: boolean; offset: boolean },
+): Partial<Pick<ZipEntryLocation, 'uncompressedSize' | 'compressedSize' | 'localHeaderOffset'>> {
+  let cursor = 0
+  while (cursor + 4 <= extra.length) {
+    const id = readU16(extra, cursor)
+    const size = readU16(extra, cursor + 2)
+    const end = cursor + 4 + size
+    if (end > extra.length) throw new Error('Invalid ZIP extra field')
+    if (id === 0x0001) {
+      let valueOffset = cursor + 4
+      const out: Partial<Pick<ZipEntryLocation, 'uncompressedSize' | 'compressedSize' | 'localHeaderOffset'>> = {}
+      if (needs.uncompressed) {
+        if (valueOffset + 8 > end) throw new Error('Invalid ZIP64 uncompressed size')
+        out.uncompressedSize = readU64(extra, valueOffset)
+        valueOffset += 8
+      }
+      if (needs.compressed) {
+        if (valueOffset + 8 > end) throw new Error('Invalid ZIP64 compressed size')
+        out.compressedSize = readU64(extra, valueOffset)
+        valueOffset += 8
+      }
+      if (needs.offset) {
+        if (valueOffset + 8 > end) throw new Error('Invalid ZIP64 local-header offset')
+        out.localHeaderOffset = readU64(extra, valueOffset)
+      }
+      return out
+    }
+    cursor = end
+  }
+  throw new Error('ZIP64 entry is missing its ZIP64 extra field')
+}
+
+/**
+ * Locate entries from the ZIP central directory. Unlike fflate's streaming
+ * Unzip parser, this gives each entry an exact compressed byte range, so a
+ * `PK\x07\x08` sequence inside database/deflate data cannot be mistaken for
+ * the data descriptor and truncate the stream with `unexpected EOF`.
+ */
+async function readZipDirectory(file: File): Promise<ZipEntryLocation[]> {
+  const tailSize = Math.min(file.size, 65_557)
+  const tailStart = file.size - tailSize
+  const tail = await readFileSliceWithRetry(file, tailStart, file.size)
+  let eocd = -1
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (readU32(tail, i) === 0x06054b50 && i + 22 + readU16(tail, i + 20) <= tail.length) {
+      eocd = i
+      break
+    }
+  }
+  if (eocd < 0) throw new Error('Invalid ZIP archive: end-of-central-directory record not found')
+
+  let entryCount = readU16(tail, eocd + 10)
+  let directorySize = readU32(tail, eocd + 12)
+  let directoryOffset = readU32(tail, eocd + 16)
+  if (entryCount === 0xffff || directorySize === 0xffffffff || directoryOffset === 0xffffffff) {
+    const eocdAbsolute = tailStart + eocd
+    if (eocdAbsolute < 20) throw new Error('Invalid ZIP64 archive: locator is missing')
+    const locator = await readFileSliceWithRetry(file, eocdAbsolute - 20, eocdAbsolute)
+    if (readU32(locator, 0) !== 0x07064b50) {
+      throw new Error('Invalid ZIP64 archive: locator signature not found')
+    }
+    const zip64Offset = readU64(locator, 8)
+    const zip64 = await readFileSliceWithRetry(file, zip64Offset, zip64Offset + 56)
+    if (readU32(zip64, 0) !== 0x06064b50) {
+      throw new Error('Invalid ZIP64 archive: directory record not found')
+    }
+    entryCount = readU64(zip64, 32)
+    directorySize = readU64(zip64, 40)
+    directoryOffset = readU64(zip64, 48)
+  }
+  if (directoryOffset + directorySize > file.size) {
+    throw new Error('Invalid ZIP archive: central directory lies outside the file')
+  }
+
+  const directory = await readFileSliceWithRetry(
+    file,
+    directoryOffset,
+    directoryOffset + directorySize,
+  )
+  const entries: ZipEntryLocation[] = []
+  let cursor = 0
+  for (let index = 0; index < entryCount; index++) {
+    if (cursor + 46 > directory.length || readU32(directory, cursor) !== 0x02014b50) {
+      throw new Error('Invalid ZIP archive: corrupt central directory entry')
+    }
+    const flags = readU16(directory, cursor + 8)
+    const compression = readU16(directory, cursor + 10)
+    let compressedSize = readU32(directory, cursor + 20)
+    let uncompressedSize = readU32(directory, cursor + 24)
+    const nameLength = readU16(directory, cursor + 28)
+    const extraLength = readU16(directory, cursor + 30)
+    const commentLength = readU16(directory, cursor + 32)
+    let localHeaderOffset = readU32(directory, cursor + 42)
+    const end = cursor + 46 + nameLength + extraLength + commentLength
+    if (end > directory.length) throw new Error('Invalid ZIP archive: truncated central directory')
+    if (flags & 0x0001) throw new Error('Encrypted ZIP backups are not supported')
+    const rawPath = strFromU8(directory.subarray(cursor + 46, cursor + 46 + nameLength), !(flags & 0x0800))
+    const extra = directory.subarray(cursor + 46 + nameLength, cursor + 46 + nameLength + extraLength)
+    if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localHeaderOffset === 0xffffffff) {
+      const z64 = zip64Values(extra, {
+        uncompressed: uncompressedSize === 0xffffffff,
+        compressed: compressedSize === 0xffffffff,
+        offset: localHeaderOffset === 0xffffffff,
+      })
+      if (z64.uncompressedSize !== undefined) uncompressedSize = z64.uncompressedSize
+      if (z64.compressedSize !== undefined) compressedSize = z64.compressedSize
+      if (z64.localHeaderOffset !== undefined) localHeaderOffset = z64.localHeaderOffset
+    }
+    entries.push({ path: rawPath, compression, compressedSize, uncompressedSize, localHeaderOffset })
+    cursor = end
+  }
+  return entries
+}
+
+function shouldSkipBackupEntry(rawPath: string): boolean {
+  if (rawPath.endsWith('/') || rawPath.startsWith('__MACOSX/')) return true
+  if (rawPath.split('/').pop() === '.DS_Store') return true
+  if (rawPath === '.bfosa-pool' || rawPath.startsWith('.bfosa-pool/')) return true
+  if (rawPath === BACKUP_TMP_DIR || rawPath.startsWith(BACKUP_TMP_DIR + '/')) return true
+  return false
+}
+
+function normalizeBackupPath(rawPath: string): string {
+  const path = rawPath.replace(/^\.\//, '')
+  if (!path || path.startsWith('/') || path.split('/').includes('..')) {
+    throw new Error(`Invalid entry in backup archive: "${rawPath}"`)
+  }
+  return path
+}
+
+async function createStagedWritable(
+  stagingDir: FileSystemDirectoryHandle,
+  path: string,
+): Promise<FileSystemWritableFileStream> {
+  const segments = path.split('/')
+  const filename = segments.pop()!
+  let dir = stagingDir
+  for (const segment of segments) {
+    dir = await dir.getDirectoryHandle(segment, { create: true })
+  }
+  const handle = await dir.getFileHandle(filename, { create: true })
+  return handle.createWritable()
+}
+
+async function streamZipEntryToStaging(
+  file: File,
+  entry: ZipEntryLocation,
+  path: string,
+  stagingDir: FileSystemDirectoryHandle,
+): Promise<number> {
+  const header = await readFileSliceWithRetry(
+    file,
+    entry.localHeaderOffset,
+    entry.localHeaderOffset + 30,
+  )
+  if (header.length !== 30 || readU32(header, 0) !== 0x04034b50) {
+    throw new Error(`Invalid ZIP local header for "${path}"`)
+  }
+  const dataStart = entry.localHeaderOffset + 30 + readU16(header, 26) + readU16(header, 28)
+  const dataEnd = dataStart + entry.compressedSize
+  if (dataEnd > file.size) throw new Error(`Invalid ZIP data range for "${path}"`)
+  if (entry.compression !== 0 && entry.compression !== 8) {
+    throw new Error(`Unsupported ZIP compression method ${entry.compression} for "${path}"`)
+  }
+
+  const writable = await createStagedWritable(stagingDir, path)
+  let bytesWritten = 0
+  let firstBytes = new Uint8Array(0)
+  let writeTail: Promise<void> = Promise.resolve()
+  let streamError: Error | null = null
+  const enqueueWrite = (chunk: Uint8Array) => {
+    const stableChunk = new Uint8Array(chunk)
+    writeTail = writeTail.then(async () => {
+      if (path === REQUIRED_DB_FILE && firstBytes.length < SQLITE_DB_MAGIC.length) {
+        const needed = SQLITE_DB_MAGIC.length - firstBytes.length
+        const combined = new Uint8Array(firstBytes.length + Math.min(needed, stableChunk.length))
+        combined.set(firstBytes)
+        combined.set(stableChunk.subarray(0, needed), firstBytes.length)
+        firstBytes = combined
+      }
+      if (stableChunk.length) await writable.write(stableChunk)
+      bytesWritten += stableChunk.length
+    })
+  }
+
+  try {
+    if (entry.compression === 0) {
+      for (let offset = dataStart; offset < dataEnd; offset += PUSH_SLICE) {
+        enqueueWrite(await readFileSliceWithRetry(file, offset, Math.min(offset + PUSH_SLICE, dataEnd)))
+        await writeTail
+      }
+    } else {
+      let resolveInflate!: () => void
+      const inflated = new Promise<void>((resolve) => {
+        resolveInflate = resolve
+      })
+      const inflate = new Inflate((chunk, final) => {
+        if (chunk) enqueueWrite(chunk)
+        if (final) resolveInflate()
+      })
+      try {
+        for (let offset = dataStart; offset < dataEnd; offset += PUSH_SLICE) {
+          const next = Math.min(offset + PUSH_SLICE, dataEnd)
+          inflate.push(await readFileSliceWithRetry(file, offset, next), next === dataEnd)
+          await writeTail
+        }
+        if (entry.compressedSize === 0) inflate.push(EMPTY_CHUNK, true)
+        await inflated
+        await writeTail
+      } catch (error) {
+        streamError = error instanceof Error ? error : new Error(String(error))
+      }
+      if (streamError) throw streamError
+    }
+    if (bytesWritten !== entry.uncompressedSize) {
+      throw new Error(
+        `ZIP entry "${path}" restored ${bytesWritten} bytes; expected ${entry.uncompressedSize}`
+      )
+    }
+    if (path === REQUIRED_DB_FILE) {
+      const magic = new TextDecoder().decode(firstBytes)
+      if (magic !== SQLITE_DB_MAGIC) {
+        throw new Error(`"${REQUIRED_DB_FILE}" in the archive is not a valid SQLite database`)
+      }
+    }
+    await writable.close()
+    return bytesWritten
+  } catch (error) {
+    try {
+      await writable.abort(error)
+    } catch { /* best-effort */ }
+    throw error
+  }
 }
 
 async function streamUnzipToStaging(
@@ -737,145 +966,15 @@ async function streamUnzipToStaging(
   stagingDir: FileSystemDirectoryHandle,
 ): Promise<Map<string, number>> {
   const staged = new Map<string, number>()
-  let dbMagicOk: boolean | null = null
   let dbStaged = false
-  let fatal: Error | null = null
-  let settle!: () => void
-  const settled = new Promise<void>((r) => (settle = r))
-
-  // One serial write chain across ALL entries: entry ondata callbacks fire
-  // synchronously out of fflate while OPFS writes are async — the chain
-  // keeps ordering and lets the reader await (backpressure).
-  let writeTail: Promise<void> = Promise.resolve()
-  const enqueue = (job: () => Promise<void>): Promise<void> => {
-    writeTail = writeTail.then(job).catch((error) => {
-      if (!fatal) {
-        fatal = error instanceof Error ? error : new Error(String(error))
-        settle()
-      }
-    })
-    return writeTail
+  for (const entry of await readZipDirectory(file)) {
+    if (shouldSkipBackupEntry(entry.path)) continue
+    const path = normalizeBackupPath(entry.path)
+    const size = await streamZipEntryToStaging(file, entry, path, stagingDir)
+    staged.set(path, size)
+    if (path === REQUIRED_DB_FILE) dbStaged = true
   }
-
-  // Completion tracking. Entries ≥320 KB decode through AsyncUnzipInflate's
-  // WORKER, whose final output chunk arrives asynchronously — AFTER the
-  // last unzip.push() returns. Settling on "writeTail drained after the
-  // final push" races those late chunks (entries silently lost/truncated).
-  // Instead: settle only when every started entry has reported final.
-  let startedEntries = 0
-  let finishedEntries = 0
-  let inputFinished = false
-  const maybeSettle = () => {
-    if (inputFinished && startedEntries > 0 && startedEntries === finishedEntries) {
-      settle()
-    }
-  }
-
-  const skipEntry = (rawPath: string): boolean => {
-    if (rawPath.endsWith('/') || rawPath.startsWith('__MACOSX/')) return true
-    if (rawPath.split('/').pop() === '.DS_Store') return true
-    if (rawPath === '.bfosa-pool' || rawPath.startsWith('.bfosa-pool/')) return true
-    if (rawPath === BACKUP_TMP_DIR || rawPath.startsWith(BACKUP_TMP_DIR + '/')) return true
-    return false
-  }
-
-  const unzip = new Unzip((entry) => {
-    const rawPath = entry.name
-    if (skipEntry(rawPath)) return
-    const path = rawPath.replace(/^\.\//, '')
-    if (!path || path.startsWith('/') || path.split('/').includes('..')) {
-      fatal = new Error(`Invalid entry in backup archive: "${rawPath}"`)
-      entry.terminate?.()
-      settle()
-      return
-    }
-    startedEntries++
-    let writable: FileSystemWritableFileStream | null = null
-    let bytesWritten = 0
-    let magicChecked = false
-    entry.ondata = (err, chunk, final) => {
-      if (fatal) return
-      if (err) {
-        fatal = err instanceof Error ? err : new Error(String(err))
-        settle()
-        return
-      }
-      enqueue(async () => {
-        if (fatal) return
-        if (!writable) {
-          const segments = path.split('/')
-          const filename = segments.pop()!
-          let dir: FileSystemDirectoryHandle = stagingDir
-          for (const segment of segments) {
-            dir = await dir.getDirectoryHandle(segment, { create: true })
-          }
-          const fileHandle = await dir.getFileHandle(filename, { create: true })
-          writable = await fileHandle.createWritable()
-        }
-        // Validate the SQLite header from the first bytes of the db entry.
-        if (path === REQUIRED_DB_FILE && !magicChecked) {
-          magicChecked = true
-          dbStaged = true
-          const header = new TextDecoder().decode(
-            chunk.subarray(0, SQLITE_DB_MAGIC.length)
-          )
-          dbMagicOk = chunk.length === 0 || header === SQLITE_DB_MAGIC
-          if (!dbMagicOk) {
-            fatal = new Error(
-              `"${REQUIRED_DB_FILE}" in the archive is not a valid SQLite database`
-            )
-            settle()
-            return
-          }
-        }
-        if (chunk.length) {
-          await writable.write(chunk)
-          bytesWritten += chunk.length
-        }
-        if (final) {
-          await writable.close()
-          writable = null
-          staged.set(path, bytesWritten)
-          finishedEntries++
-          maybeSettle()
-        }
-      })
-    }
-    entry.start()
-  })
-  unzip.register(AsyncUnzipInflate)
-
-  const stream = await readFileStreamWithRetry(file)
-  const reader = stream.getReader()
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      unzip.push(value, false)
-      // Backpressure: don't buffer input while staged writes lag behind.
-      await writeTail
-      if (fatal) break
-    }
-    if (!fatal) {
-      unzip.push(new Uint8Array(0), true)
-      // onfile for tail entries fires synchronously inside that push, but
-      // worker-decoded entries deliver their final chunks later — they drive
-      // maybeSettle from their write jobs. Mark input complete, drain the
-      // queued writes, and let maybeSettle close things out (this also
-      // covers the all-synchronous case immediately).
-      inputFinished = true
-      await writeTail
-      maybeSettle()
-    }
-  } finally {
-    try {
-      reader.releaseLock()
-    } catch { /* already released */ }
-  }
-  await settled
-
-  if (fatal) throw fatal
-  if (!dbStaged || dbMagicOk !== true) {
+  if (!dbStaged) {
     throw new Error(
       `Backup archive does not contain the SQLite database (${REQUIRED_DB_FILE})`
     )
@@ -899,10 +998,17 @@ export async function importOPFSBackup(file: File): Promise<{ fileCount: number 
   // disk file is retried inside. The staged tree is validated (SQLite magic
   // included) so a bad archive leaves the current data untouched.
   //
-  // Peak disk usage: current data + staged copy (≈ backup size). The
-  // staging dir is removed in the finally below either way.
+  // Peak disk usage: current data + staged copy (≈ backup size). Remove any
+  // stale temp tree from an interrupted export/import before creating this
+  // restore's staging directory, so old files cannot leak into the restore.
   let stagingDir: FileSystemDirectoryHandle
   try {
+    await opfsRoot.removeEntry(BACKUP_TMP_DIR, { recursive: true }).catch((error) => {
+      // Absence is expected. A lock error here may come from an unrelated
+      // entry in coarse test/browser implementations; creation below is the
+      // authoritative check for whether staging itself is usable.
+      if (!isImportNotFoundError(error) && !isImportLockError(error)) throw error
+    })
     stagingDir = await opfsRoot.getDirectoryHandle(BACKUP_TMP_DIR, { create: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -939,7 +1045,10 @@ export async function importOPFSBackup(file: File): Promise<{ fileCount: number 
     const { resetWorkspaceManager } = await import('@/opfs')
     resetWorkspaceManager()
 
-    await clearOPFSRoot(opfsRoot)
+    // The staging tree lives under the same OPFS root, so preserve it while
+    // deleting the old data. Removing it here invalidates `stagingDir` in a
+    // real browser even though the old Map-based unit fake kept it readable.
+    await clearOPFSRoot(opfsRoot, new Set([BACKUP_TMP_DIR]))
 
     // Side-channel entries — extracted from the staged tree (small files,
     // safe to read into memory) BEFORE the tree is moved into place.
