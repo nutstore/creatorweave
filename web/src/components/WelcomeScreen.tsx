@@ -1,11 +1,13 @@
 /**
- * WelcomeScreen - 3-step onboarding with local folder mount
+ * WelcomeScreen - setup onboarding with local folder mount
  *
  * State machine: welcome → api-key → mount-folder → ready
  * - welcome: shown only to first-time users (no project created + not seen)
  * - api-key: shown when no API key configured
  * - mount-folder: shown when API key ok but no folder mounted
  * - ready: shows quick-start prompts + rich input
+ *
+ * Steps are conditional, so use setup labels instead of a linear step count.
  */
 
 import { useState, useCallback, useEffect } from 'react'
@@ -201,10 +203,10 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
             </span>
           </div>
         ) : step === 'welcome' ? (
-          /* ── Step 1/3: Welcome ── */
+          /* ── Welcome ── */
           <div className="rounded-xl border border-border bg-card p-6 text-center">
             <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary-600">
-              {t('welcome.step1Of3')}
+              {t('welcome.welcomeLabel')}
             </p>
             <h2 className="mb-2 text-xl font-semibold text-foreground">
               {t('welcome.welcomeHeading')}
@@ -231,7 +233,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
             </div>
           </div>
         ) : step === 'api-key' ? (
-          /* ── Step 2/3: API Key Setup ── */
+          /* ── AI connection setup ── */
           <div className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/50 text-left dark:border-amber-800/50 dark:bg-amber-950/10">
             <div className="flex items-center justify-between border-b border-amber-200/60 px-4 py-3 dark:border-amber-800/40">
               <div className="flex items-center gap-2">
@@ -241,7 +243,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                 </p>
               </div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                {t('welcome.step2Of3')}
+                {t('welcome.apiKeyLabel')}
               </span>
             </div>
 
@@ -310,10 +312,10 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
             </div>
           </div>
         ) : step === 'mount-folder' ? (
-          /* ── Step 3/3: Mount Local Folder ── */
+          /* ── Local folder setup ── */
           <div className="rounded-xl border border-border bg-card p-6 text-center">
             <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary-600">
-              {t('welcome.step3Of3')}
+              {t('welcome.mountFolderLabel')}
             </p>
             <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50/80 shadow-sm">
               <FolderOpen className="h-6 w-6 text-primary-600" />

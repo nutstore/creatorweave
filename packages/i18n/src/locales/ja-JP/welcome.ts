@@ -16,10 +16,10 @@ export const welcome = {
     setupApiKeyTitle: "独自の API Key を構成",
     setupApiKeyDesc: "OpenAI、OpenRouter、Anthropic などに対応",
     setupLocalFirstHint: "すべてのデータはブラウザにローカル保存され、サーバーにアップロードされません",
-    // 3-step onboarding
-    step1Of3: "ステップ 1 / 3",
-    step2Of3: "ステップ 2 / 3",
-    step3Of3: "ステップ 3 / 3",
+    // Conditional onboarding labels (these are not a linear progress count)
+    welcomeLabel: "はじめる",
+    apiKeyLabel: "AI に接続",
+    mountFolderLabel: "ローカルフォルダを追加",
     welcomeHeading: "EO2Weave へようこそ",
     welcomeSubtitle: "ローカル AI ワークスペース、ファイルとコードはブラウザ内に",
     continueButton: "続ける",

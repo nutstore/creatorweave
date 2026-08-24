@@ -14,10 +14,10 @@ export const welcome = {
     setupApiKeyTitle: "Configure Your Own API Key",
     setupApiKeyDesc: "Supports OpenAI, OpenRouter, Anthropic, and more",
     setupLocalFirstHint: "All data is stored locally in your browser, never uploaded",
-    // 3-step onboarding
-    step1Of3: "Step 1 of 3",
-    step2Of3: "Step 2 of 3",
-    step3Of3: "Step 3 of 3",
+    // Conditional onboarding labels (these are not a linear progress count)
+    welcomeLabel: "Get started",
+    apiKeyLabel: "Connect AI",
+    mountFolderLabel: "Add a local folder",
     welcomeHeading: "Welcome to eo2weave",
     welcomeSubtitle: "Your local AI workspace for files, code, and creation",
     continueButton: "Continue",

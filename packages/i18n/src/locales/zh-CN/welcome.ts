@@ -16,10 +16,10 @@ export const welcome = {
     setupApiKeyTitle: "配置自己的 API Key",
     setupApiKeyDesc: "支持 OpenAI、OpenRouter、Anthropic 等自定义模型",
     setupLocalFirstHint: "所有数据存储在本地浏览器中，不会上传到服务器",
-    // 3-step onboarding
-    step1Of3: "步骤 1 / 3",
-    step2Of3: "步骤 2 / 3",
-    step3Of3: "步骤 3 / 3",
+    // Conditional onboarding labels (these are not a linear progress count)
+    welcomeLabel: "开始使用",
+    apiKeyLabel: "连接 AI",
+    mountFolderLabel: "添加本地文件夹",
     welcomeHeading: "欢迎使用 怡氧知知",
     welcomeSubtitle: "本地 AI 创作工坊，文件和代码都在浏览器中",
     continueButton: "继续",
