@@ -3,7 +3,7 @@
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "web/dist",
   "installCommand": "pnpm install",
-  "framework": null,
+  "framework": "nextjs",
   "rewrites": [
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/privacy/zh", "destination": "/privacy/zh.html" }

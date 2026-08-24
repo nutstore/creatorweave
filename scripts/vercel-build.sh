@@ -42,32 +42,9 @@ cd web
 # Install dependencies
 pnpm install
 
-# Build with Vite
-pnpm exec vite build
-
-# Copy Pyodide
-echo "Copying Pyodide..."
-mkdir -p dist/assets/pyodide
-cp -r node_modules/pyodide/* dist/assets/pyodide/
-
-# Package skills (generates dist/skills/manifest.json + zip files)
-echo "Packaging skills..."
-cd .. && bash scripts/pack-skills.sh
-cd web
-
-# Build browser extension and copy to dist
-echo "Building browser extension..."
-cd ../browser-extension
-pnpm install
+# Build Next static export. The web build prepares Pyodide, skill-store and
+# browser-extension artifacts under public/ before exporting to dist/.
 pnpm run build
-cd ../web
-mkdir -p dist/extension
-cp -r ../browser-extension/dist/chrome-mv3/* dist/extension/
-echo "Extension copied to dist/extension/"
-
-# Copy EdgeOne config
-rm -f dist/middleware.js dist/package.json && rm -rf dist/cloud-functions
-cp ../edgeone.json dist/edgeone.json
 
 echo "=== Build Complete ==="
 echo "Output directory: web/dist"

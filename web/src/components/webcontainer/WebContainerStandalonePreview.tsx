@@ -1,3 +1,5 @@
+'use client'
+
 import { useMemo } from 'react'
 import { getPreviewUrlFromLocation } from '@/services/webcontainer/preview-route'
 

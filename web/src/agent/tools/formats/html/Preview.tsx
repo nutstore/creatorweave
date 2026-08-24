@@ -41,7 +41,7 @@ export function HtmlPreview({ blob, fileName, filePath }: HtmlPreviewProps) {
     const path = filePath || fileName
     try {
       localStorage.setItem('preview-content-' + path, content)
-      window.open(`#/preview?path=${encodeURIComponent(path)}`, '_blank')
+      window.open(`/preview?path=${encodeURIComponent(path)}`, '_blank')
     } catch (err) {
       toast.error(t('filePreview.openInNewTabFailed', { error: err instanceof Error ? err.message : String(err) }))
     }

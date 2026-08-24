@@ -25,7 +25,7 @@
  */
 
 import { Fragment, memo, type ReactNode, useContext, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from '@/router/next-router-compat'
 import { Bot, Database, Split, AlertTriangle, Download } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {

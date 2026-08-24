@@ -11,10 +11,11 @@
     },
 
     /* WASM support */
-    "types": ["vite/client", "@types/react", "@types/react-dom"],
+    "types": ["@types/react", "@types/react-dom"],
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "plugins": [{ "name": "next" }]
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "app", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "vite.config.ts", "vite-plugin-*.ts"]
 }

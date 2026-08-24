@@ -3,7 +3,7 @@ export function buildConversationNotificationRoute(projectId: string, conversati
   return `/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(conversationId)}`
 }
 
-/** Build the HashRouter URL used by Service Worker `clients.openWindow`. */
+/** Build the canonical pathname URL used by Service Worker `clients.openWindow`. */
 export function buildConversationNotificationUrl(projectId: string, conversationId: string): string {
-  return `/#${buildConversationNotificationRoute(projectId, conversationId)}`
+  return buildConversationNotificationRoute(projectId, conversationId)
 }

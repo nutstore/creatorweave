@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '@/router/next-router-compat'
 import { ChevronLeft, ChevronRight, Menu, X, FileText, BookOpen, Code2, Github } from 'lucide-react'
 import { MarkdownContent } from '@/components/agent/MarkdownContent'
 import { BrandButton } from '@creatorweave/ui'

@@ -22,7 +22,7 @@ const DYNAMIC_CACHE = 'dynamic-v2'
 // Keep this dependency-free: the development SW middleware transpiles this
 // file without bundling imports, and browser workers do not provide require().
 function buildConversationNotificationUrl(projectId: string, conversationId: string): string {
-  return `/#/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(conversationId)}`
+  return `/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(conversationId)}`
 }
 
 // In dev mode (vite dev server), bypass precaching and fetch interception

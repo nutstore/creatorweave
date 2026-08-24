@@ -1,3 +1,5 @@
+import { APP_BUILD_ID } from '@/app-build'
+
 interface RegisterServiceWorkerOptions {
   buildId: string
   scope?: string
@@ -124,7 +126,7 @@ export function applyServiceWorkerUpdate(): void {
       // Mark the current buildId as notified *before* reload so that
       // the refreshed page won't show a duplicate toast.
       try {
-        sessionStorage.setItem(SW_NOTIFIED_KEY, __APP_BUILD_ID__)
+        sessionStorage.setItem(SW_NOTIFIED_KEY, APP_BUILD_ID)
       } catch {
         // ignore
       }

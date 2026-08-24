@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { HashRouter, Routes, Route, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { HashRouter, Routes, Route, useParams, useNavigate, useSearchParams } from '@/router/next-router-compat'
 import { Toaster, toast } from 'sonner'
 import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout'

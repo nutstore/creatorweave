@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '@/router/next-router-compat'
 import { getSQLiteDB } from '@/sqlite/sqlite-database'
 import { useT } from '@/i18n'
 import { useTheme } from '@/store/theme.store'

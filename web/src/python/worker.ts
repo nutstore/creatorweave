@@ -144,8 +144,9 @@ async function initPyodide() {
     // Dynamic import for classic worker compatibility
     const { loadPyodide } = await import('pyodide')
 
-    // Build local index URL (respects Vite BASE_URL for sub-path deployments)
-    const baseUrl = import.meta.env.BASE_URL || '/'
+    // Static-export deployments publish Pyodide at the origin root. A future
+    // basePath can be supplied explicitly instead of relying on Vite globals.
+    const baseUrl = self.location.pathname.startsWith('/') ? '/' : ''
     const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
     const localIndexURL = new URL(`assets/pyodide/`, self.location.origin + normalizedBaseUrl).toString()
     console.log('[Pyodide Worker] Initializing with local indexURL:', localIndexURL)

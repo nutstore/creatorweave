@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HashRouter } from 'react-router-dom'
+import { HashRouter } from '@/router/next-router-compat'
 import { DocsPage } from '../DocsPage'
 
 function renderDocs(ui: React.ReactElement) {
@@ -103,7 +103,7 @@ describe('DocsPage sidebar grouping', () => {
   afterEach(() => {
     localeState.value = 'zh-CN'
     setLocaleMock.mockReset()
-    window.location.hash = ''
+    window.history.replaceState({}, '', '/')
     vi.restoreAllMocks()
   })
 
@@ -168,7 +168,7 @@ describe('DocsPage sidebar grouping', () => {
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
 
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/docs/en/user/getting-started')
+      expect(window.location.pathname).toBe('/docs/en/user/getting-started')
     })
   })
 
@@ -179,7 +179,7 @@ describe('DocsPage sidebar grouping', () => {
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
 
     await waitFor(() => {
-      expect(window.location.hash).toBe('#/docs/en/developer')
+      expect(window.location.pathname).toBe('/docs/en/developer')
     })
   })
 })

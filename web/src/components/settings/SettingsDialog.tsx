@@ -1397,7 +1397,7 @@ const SettingsDialogContent = forwardRef<
     }
   }, [open])
 
-  const docsUrl = locale === 'zh-CN' ? '/#/docs/zh' : '/#/docs/en'
+  const docsUrl = locale === 'zh-CN' ? '/docs/zh' : '/docs/en'
 
   const themeOptions: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
     { value: 'light', label: t('settings.themeLight'), icon: <Sun className="h-4 w-4" /> },
