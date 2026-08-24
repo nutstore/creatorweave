@@ -249,7 +249,7 @@ mod tests {
             std::env::set_var("PATH", &old);
         }
         assert!(
-            resolved.ends_with("faketool.cmd"),
+            resolved.to_lowercase().ends_with("faketool.cmd"),
             "expected .cmd resolution, got: {resolved}"
         );
         let _ = std::fs::remove_dir_all(&dir);

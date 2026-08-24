@@ -150,7 +150,33 @@ pub fn resolve_safe_relative(scope_id: &str, relative_path: &str) -> Result<Path
         ));
     }
 
+    // Windows: canonicalize() returns a verbatim path (\\?\G:\...). cmd.exe
+    // (.cmd/.bat shims like pnpm) does NOT understand the \\?\ prefix — it
+    // treats it as a UNC path, refuses it as cwd, and silently falls back to
+    // C:\Windows, breaking every spawned pnpm/npm script. Strip the prefix
+    // before returning (the security check above already ran on the
+    // canonical form, so this is purely cosmetic for consumers).
+    #[cfg(windows)]
+    let normalized = strip_verbatim_prefix(normalized);
+
     Ok(normalized)
+}
+
+/// Remove the Windows verbatim/UNC-device prefixes (`\\?\`, `\\.\`) from a
+/// path so legacy consumers (cmd.exe, some CLIs) can use it as a cwd.
+#[cfg(windows)]
+fn strip_verbatim_prefix(p: PathBuf) -> PathBuf {
+    let s = p.to_string_lossy();
+    let stripped = if let Some(rest) = s.strip_prefix("\\\\?\\UNC\\") {
+        format!("\\\\{rest}") // \\?\UNC\server\share → \\server\share
+    } else if let Some(rest) = s.strip_prefix("\\\\?\\") {
+        rest.to_string() // \\?\C:\... → C:\...
+    } else if let Some(rest) = s.strip_prefix("\\\\.\\") {
+        rest.to_string() // \\.\C:\... → C:\... (rare)
+    } else {
+        s.into_owned()
+    };
+    PathBuf::from(stripped)
 }
 
 /// Normalize a path without requiring it to exist on disk.
