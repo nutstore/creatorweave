@@ -1,5 +1,5 @@
-import CreatorWeaveClientShell from '../../src/app/CreatorWeaveClientShell'
+import ClientAppShell from '@/shell/ClientAppShell'
 
 export default function LegacyWorkspacePage() {
-  return <CreatorWeaveClientShell />
+  return <ClientAppShell />
 }

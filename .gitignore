@@ -26,6 +26,7 @@ lerna-debug.log*
 # Build artifacts
 dist/
 web/dist/
+web/out/
 build/
 storybook-static/
 

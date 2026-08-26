@@ -33,14 +33,10 @@ echo "📦 Building frontend..."
 cd "$PROJECT_ROOT/web"
 pnpm run build
 
-# Package skills (generates dist/skills/manifest.json + zip files)
-echo "📦 Packaging skills..."
-cd "$PROJECT_ROOT" && bash scripts/pack-skills.sh
-
 echo ""
 echo "✅ Build completed successfully!"
-echo "📂 Output: $PROJECT_ROOT/web/dist/"
-echo "🔌 Extension: $PROJECT_ROOT/web/dist/extension/"
+echo "📂 Next.js build: $PROJECT_ROOT/web/.next/"
+echo "🔌 Extension: $PROJECT_ROOT/browser-extension/dist/"
 echo ""
 echo "To preview the build:"
 echo "  cd web && pnpm run preview"

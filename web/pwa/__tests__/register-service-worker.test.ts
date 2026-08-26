@@ -1,0 +1,145 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { registerServiceWorker } from '../register-service-worker'
+
+type EventHandler = (event?: Event) => void
+
+function createEventTargetMock() {
+  const listeners = new Map<string, Set<EventHandler>>()
+
+  return {
+    addEventListener: vi.fn((type: string, handler: EventHandler) => {
+      if (!listeners.has(type)) listeners.set(type, new Set())
+      listeners.get(type)!.add(handler)
+    }),
+    removeEventListener: vi.fn((type: string, handler: EventHandler) => {
+      listeners.get(type)?.delete(handler)
+    }),
+    dispatch(type: string, event?: Event) {
+      listeners.get(type)?.forEach((handler) => handler(event))
+    },
+  }
+}
+
+describe('registerServiceWorker', () => {
+  const originalServiceWorker = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker')
+  let windowMock: ReturnType<typeof createEventTargetMock>
+
+  beforeEach(() => {
+    windowMock = createEventTargetMock()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    if (originalServiceWorker) {
+      Object.defineProperty(navigator, 'serviceWorker', originalServiceWorker)
+    }
+  })
+
+  it('registers with versioned script url and updateViaCache=none on load', async () => {
+    const register = vi.fn(async () => ({
+      addEventListener: vi.fn(),
+      waiting: null,
+      update: vi.fn(),
+    }))
+
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        register,
+        addEventListener: vi.fn(),
+      },
+    })
+
+    registerServiceWorker({
+      buildId: 'build-123',
+      windowTarget: windowMock,
+      updateIntervalMs: 60_000,
+    })
+
+    await windowMock.dispatch('load')
+
+    expect(register).toHaveBeenCalledWith('/sw.js?v=build-123', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
+  })
+
+  it('calls onUpdateAvailable when update is installed', async () => {
+    const onUpdateAvailable = vi.fn()
+    const installingWorker = createEventTargetMock()
+    ;(installingWorker as unknown as { state: string }).state = 'installed'
+
+    let updateFoundHandler: EventHandler | undefined
+
+    const registration = {
+      waiting: { postMessage: vi.fn() },
+      installing: installingWorker,
+      update: vi.fn(),
+      addEventListener: vi.fn((type: string, handler: EventHandler) => {
+        if (type === 'updatefound') updateFoundHandler = handler
+      }),
+    }
+
+    const register = vi.fn(async () => registration)
+
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        register,
+        addEventListener: vi.fn(),
+      },
+    })
+
+    registerServiceWorker({
+      buildId: 'build-123',
+      windowTarget: windowMock,
+      onUpdateAvailable,
+      updateIntervalMs: 60_000,
+    })
+
+    await windowMock.dispatch('load')
+    updateFoundHandler?.()
+    installingWorker.dispatch('statechange')
+
+    expect(onUpdateAvailable).toHaveBeenCalled()
+  })
+
+  it('silently activates an already-waiting worker instead of notifying', async () => {
+    const onUpdateAvailable = vi.fn()
+
+    const registration = {
+      waiting: { postMessage: vi.fn() },
+      installing: null,
+      update: vi.fn(),
+      addEventListener: vi.fn(),
+    }
+
+    const register = vi.fn(async () => registration)
+
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        register,
+        addEventListener: vi.fn(),
+      },
+    })
+
+    registerServiceWorker({
+      buildId: 'build-123',
+      windowTarget: windowMock,
+      onUpdateAvailable,
+      updateIntervalMs: 60_000,
+    })
+
+    await windowMock.dispatch('load')
+
+    // The page has already loaded the new version (buildId matches) — the
+    // waiting worker is SKIP_WAITING-activated silently instead of showing
+    // an update toast. See register-service-worker.ts.
+    expect(onUpdateAvailable).not.toHaveBeenCalled()
+    expect(registration.waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' })
+  })
+})

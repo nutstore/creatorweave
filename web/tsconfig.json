@@ -6,16 +6,31 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["./*"],
       "@wasm/*": ["./public/wasm/*"]
     },
-
     /* WASM support */
-    "types": ["@types/react", "@types/react-dom"],
+    "types": [
+      "@types/react",
+      "@types/react-dom"
+    ],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "plugins": [{ "name": "next" }]
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "jsx": "preserve"
   },
-  "include": ["src", "app", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "vite.config.ts", "vite-plugin-*.ts"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "tests/e2e", "playwright.config.ts"]
 }

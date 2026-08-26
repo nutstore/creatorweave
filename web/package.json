@@ -1,18 +1,18 @@
 {
   "name": "creatorweave-web",
   "version": "0.1.4",
-  "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 5173",
-    "build": "pnpm run build:wasm && pnpm run prepare:assets && next build",
+    "dev": "node scripts/prepare-pwa.mjs && next dev --hostname 0.0.0.0 --port 5173",
+    "build": "pnpm run build:wasm && pnpm run prepare:assets && pnpm run prepare:pwa && next build",
+    "prepare:pwa": "node scripts/prepare-pwa.mjs",
     "build:wasm": "cd ../wasm && bash scripts/build-wasm.sh",
     "build:extension": "cd ../browser-extension && pnpm install && pnpm run build",
     "build:vercel": "pnpm run build",
     "prepare:assets": "node scripts/prepare-static-assets.mjs",
     "pack:skills": "cd .. && bash scripts/pack-skills.sh skill-store web/public/skills",
-    "preview": "npx serve dist",
-    "preview:prod": "pnpm build && npx serve dist -l 3000",
+    "preview": "next start --hostname 0.0.0.0 --port 3000",
+    "preview:prod": "pnpm build && pnpm preview",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
@@ -23,11 +23,10 @@
     "test:e2e:debug": "playwright test --debug",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "lint:fix": "eslint . --ext ts,tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "format": "prettier --write \"{app,agent,components,export,hooks,lib,opfs,pwa,python,router,services,shell,skills,sqlite,store,styles}/**/*.{ts,tsx,css}\" \"*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"{app,agent,components,export,hooks,lib,opfs,pwa,python,router,services,shell,skills,sqlite,store,styles}/**/*.{ts,tsx,css}\" \"*.{ts,tsx,css}\"",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky",
-    "postbuild": "node scripts/finalize-static-output.mjs"
+    "prepare": "husky"
   },
   "dependencies": {
     "@creatorweave/config": "workspace:*",

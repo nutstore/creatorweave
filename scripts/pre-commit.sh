@@ -30,7 +30,7 @@ else
 fi
 
 # Run frontend checks if there are TypeScript files
-if [ -d "$PROJECT_ROOT/web/src" ]; then
+if [ -d "$PROJECT_ROOT/web/app" ]; then
     echo ""
     echo "⚛️  Running frontend checks..."
     cd "$PROJECT_ROOT/web"

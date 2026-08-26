@@ -3,18 +3,18 @@
 # pack-skills.sh — 打包 skill-store/ 里的所有 skill
 #
 # 流程：
-#   1. 遍历 skill-store/*/，每个打成 dist/skills/{name}.zip
-#   2. 调用 Python 生成 dist/skills/manifest.json
+#   1. 遍历 skill-store/*/，每个打成 public/skills/{name}.zip
+#   2. 调用 Python 生成 public/skills/manifest.json
 #
 # 用法：bash scripts/pack-skills.sh [skill-store目录] [输出目录]
-# 默认：skill-store/ → web/dist/skills/
+# 默认：skill-store/ → web/public/skills/
 # ============================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SRC="${1:-$ROOT/skill-store}"
-OUT="${2:-$ROOT/web/dist/skills}"
+OUT="${2:-$ROOT/web/public/skills}"
 SCRIPTS="$ROOT/scripts"
 
 if [ ! -d "$SRC" ]; then
@@ -22,7 +22,12 @@ if [ ! -d "$SRC" ]; then
   exit 1
 fi
 
+# Absolutize SRC/OUT: the zip step runs from inside $SRC (cd "$SRC"), so a
+# relative OUT would resolve under $SRC — e.g. skill-store/web/public/skills/
+# — and zip would fail with "Could not create output file".
+SRC="$(cd "$SRC" && pwd)"
 mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
 rm -f "$OUT"/*.zip "$OUT/manifest.json"
 
 echo "🔗 打包 skill ZIP..."

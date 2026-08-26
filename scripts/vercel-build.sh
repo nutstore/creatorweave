@@ -29,12 +29,6 @@ fi
 
 echo "wasm-pack version: $(wasm-pack --version)"
 
-# Build WASM
-echo "Building WASM..."
-cd wasm
-bash scripts/build-wasm.sh
-cd ..
-
 # Build frontend
 echo "Building frontend..."
 cd web
@@ -42,10 +36,9 @@ cd web
 # Install dependencies
 pnpm install
 
-# Build Next static export. The web build prepares Pyodide, skill-store and
-# browser-extension artifacts under public/ before exporting to dist/.
+# Build the Next runtime application. The web build also compiles WASM and
+# prepares Pyodide, docs, skill-store, browser-extension and PWA assets.
 pnpm run build
 
 echo "=== Build Complete ==="
-echo "Output directory: web/dist"
-ls -la dist/
+echo "Next runtime output: web/.next"

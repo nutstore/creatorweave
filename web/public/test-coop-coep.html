@@ -34,16 +34,20 @@
       results.innerHTML += `<p>crossOriginIsolated: ${e.data.crossOriginIsolated}</p>`;
     };
 
-    // Test module worker
+    // Test a module worker without depending on source-tree URLs.
     try {
-      const moduleWorker = new Worker(new URL('./src/sqlite/sqlite-worker.ts', import.meta.url), { type: 'module' });
+      const moduleWorkerSource = `postMessage({
+        typeofSharedArrayBuffer: typeof SharedArrayBuffer,
+        crossOriginIsolated: self.crossOriginIsolated
+      });`;
+      const moduleWorkerUrl = URL.createObjectURL(new Blob([moduleWorkerSource], { type: 'text/javascript' }));
+      const moduleWorker = new Worker(moduleWorkerUrl, { type: 'module' });
       moduleWorker.onmessage = (e) => {
-        if (e.data.type === 'init') {
-          results.innerHTML += '<h2>Module Worker (sqlite-worker.ts)</h2>';
-          results.innerHTML += '<p>Worker initialized - check console for diagnostics</p>';
-        }
+        results.innerHTML += '<h2>Worker Thread (Module)</h2>';
+        results.innerHTML += `<p>typeof SharedArrayBuffer: ${e.data.typeofSharedArrayBuffer}</p>`;
+        results.innerHTML += `<p>crossOriginIsolated: ${e.data.crossOriginIsolated}</p>`;
+        URL.revokeObjectURL(moduleWorkerUrl);
       };
-      moduleWorker.postMessage({ type: 'init', schemaSQL: 'SELECT 1;' });
     } catch (err) {
       results.innerHTML += `<p>Module worker error: ${err.message}</p>`;
     }

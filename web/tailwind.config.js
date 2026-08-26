@@ -10,8 +10,10 @@ import { createBaseConfig } from '@creatorweave/config/tailwind'
 /** @type {import('tailwindcss').Config} */
 export default createBaseConfig({
   content: [
-    './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
+    './app/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
+    './shell/**/*.{js,ts,jsx,tsx}',
+    './WorkspaceApp.tsx',
     '../packages/ui/src/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {

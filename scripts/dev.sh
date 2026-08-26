@@ -45,12 +45,9 @@ if [ ! -d "$PROJECT_ROOT/browser-extension/node_modules" ]; then
   cd "$PROJECT_ROOT/browser-extension" && pnpm install
 fi
 
-# Start browser-extension dev server LAST.
-# It must start after web's vite server, because vite-plugin-extension-serve's
-# ensureExtensionBuilt() will run a PROD build (wxt build) if dist/chrome-mv3 is
-# empty when an /extension/* request arrives. wxt dev clears+rebuilds that dir
-# on startup — if it runs while web is serving, the PROD build can overwrite the
-# DEV artifacts. Starting it last lets its DEV build win.
+# Start browser-extension dev server LAST so its WXT development build is the
+# final writer of dist/chrome-mv3. The Next.js web runtime serves its own public
+# assets and no longer depends on the former Vite extension middleware.
 #
 # stdin trick: WXT 0.19.29 dev server registers a readline on process.stdin
 # (keyboard-shortcuts.mjs) to stay alive. In background mode stdin is closed

@@ -1,5 +1,8 @@
 import type { MetadataRoute } from 'next'
 
+// The manifest is deterministic and can be cached by the Next runtime.
+export const dynamic = 'force-static'
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'EO2Weave',
@@ -12,8 +15,10 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#3b82f6',
     categories: ['utilities', 'developer', 'productivity'],
     icons: [
-      { src: '/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-      { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      // Icons are copied from browser-extension/public by scripts/prepare-pwa.mjs
+      // (the web app shares the extension's logo; no separate icon set exists).
+      { src: '/icons/icon-128.png', sizes: '128x128', type: 'image/png', purpose: 'maskable' },
+      { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
     ],
     shortcuts: [
       {
@@ -21,7 +26,7 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: 'New',
         description: 'Start a new creator workspace session',
         url: '/?new=true',
-        icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+        icons: [{ src: '/icons/icon-128.png', sizes: '128x128', type: 'image/png' }],
       },
     ],
   }

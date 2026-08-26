@@ -1,13 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "bash scripts/vercel-build.sh",
-  "outputDirectory": "web/dist",
   "installCommand": "pnpm install",
   "framework": "nextjs",
-  "rewrites": [
-    { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/privacy/zh", "destination": "/privacy/zh.html" }
-  ],
   "headers": [
     {
       "source": "/(.*)",

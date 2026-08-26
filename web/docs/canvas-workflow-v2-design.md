@@ -161,7 +161,7 @@ async function runFlow(flow: FlowFile, context: {
 ## 2. 文件结构
 
 ```
-web/src/
+web/
 ├── agent/
 │   ├── flow/                          # 新建：流程引擎 + 类型
 │   │   ├── types.ts                   # FlowFile / FlowNode / FlowEdge
