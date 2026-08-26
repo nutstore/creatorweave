@@ -504,7 +504,7 @@ export const settings = {
       loginFailed: "Login failed",
       retry: "Retry",
       authHint: "Secure authentication via Device Code Flow — no API key management needed.",
-      clientIdMissing: "Client ID not configured. Set the VITE_JIANGUOYUN_AI_CLIENT_ID environment variable.",
+      clientIdMissing: "Client ID not configured. Set the NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID environment variable.",
       authFailed: "Authentication failed",
     },
     // Provider display names (company pinyin/English brand for non-Chinese

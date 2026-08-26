@@ -492,7 +492,7 @@ export const settings = {
       loginFailed: "登录失败",
       retry: "重试",
       authHint: "通过 Device Code Flow 安全认证，无需手动管理 API Key。",
-      clientIdMissing: "Client ID 未配置，请设置 VITE_JIANGUOYUN_AI_CLIENT_ID 环境变量",
+      clientIdMissing: "Client ID 未配置，请设置 NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID 环境变量",
       authFailed: "认证失败",
     },
     // Provider 显示名（中文品牌保留中文，国际用户看公司拼音/英文品牌；

@@ -2,15 +2,6 @@
 
 declare global {
   interface ImportMeta {
-    env: {
-      DEV: boolean
-      PROD: boolean
-      BASE_URL?: string
-      VITE_JIANGUOYUN_AI_BASE_URL?: string
-      VITE_JIANGUOYUN_AI_CLIENT_ID?: string
-      VITE_ENABLE_SW_IN_DEV?: string
-      MODE?: string
-    }
     hot?: { dispose(callback: () => void): void }
   }
 

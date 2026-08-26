@@ -35,7 +35,6 @@ export const webContainer = {
     logOutput: "ログ出力 ({count})",
     clearLogs: "クリア",
     copyLogs: "コピー",
-    openPreview: "プレビューを開く",
     noOutputYet: "出力がまだありません，「起動」をクリックして開始",
     // Directory picker dialog
     selectStartupDir: "起動ディレクトリを選択",

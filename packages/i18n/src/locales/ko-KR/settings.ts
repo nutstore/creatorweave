@@ -500,7 +500,7 @@ export const settings = {
       loginFailed: "로그인 실패",
       retry: "재시도",
       authHint: "Device Code Flow를 통한 안전한 인증 — API Key 관리가 필요 없습니다.",
-      clientIdMissing: "Client ID가 설정되지 않았습니다. VITE_JIANGUOYUN_AI_CLIENT_ID 환경 변수를 설정하세요.",
+      clientIdMissing: "Client ID가 설정되지 않았습니다. NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID 환경 변수를 설정하세요.",
       authFailed: "인증 실패",
     },
     // Provider display names (company pinyin/English brand; NOT separate

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import 'sonner/dist/styles.css'
 
@@ -17,6 +17,21 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: '/icons/icon-128.png', sizes: '128x128', type: 'image/png' }],
   },
+}
+
+// Viewport settings — restores the pre-Next PWA behaviour from the old
+// Vite index.html: viewport-fit=cover is required for env(safe-area-inset-*)
+// on notched devices (PWA standalone mode), and zoom is disabled to match the
+// app-like input experience (double-tap zoom fights the editor UI).
+// themeColor uses the brand primary baseline (--primary-500 = #4D9F98 in
+// globals.css); the OS UI chrome (address bar / status bar) follows it.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#4D9F98',
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

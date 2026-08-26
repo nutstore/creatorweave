@@ -33,7 +33,6 @@ export const webContainer = {
     logOutput: "日志输出 ({count})",
     clearLogs: "清空日志",
     copyLogs: "复制日志",
-    openPreview: "打开预览",
     noOutputYet: '暂无输出，点击"启动"开始',
     // Directory picker dialog
     selectStartupDir: "选择启动目录",

@@ -77,4 +77,7 @@ export const app = {
     reloadPage: "Reload Page",
     updateAvailable: "A new version is available, update for the latest features",
     updateNow: "Update Now",
+    notFoundTitle: "Page not found",
+    notFoundDescription: "The page you are looking for does not exist or has been moved.",
+    notFoundBack: "Back to projects",
 } as const

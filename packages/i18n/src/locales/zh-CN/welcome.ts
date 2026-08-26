@@ -41,7 +41,7 @@ export const welcome = {
         waiting: "等待授权完成...",
         success: "登录成功！",
         clientIdMissing:
-            "Client ID 未配置，请设置 VITE_JIANGUOYUN_AI_CLIENT_ID 环境变量",
+            "Client ID 未配置，请设置 NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID 环境变量",
         authFailedFallback: "认证失败",
     },
 } as const

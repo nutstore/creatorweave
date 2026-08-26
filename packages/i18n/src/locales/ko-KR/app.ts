@@ -79,4 +79,7 @@ export const app = {
     reloadPage: "페이지 새로고침",
     updateAvailable: "새 버전을 사용할 수 있습니다. 최신 기능을 위해 업데이트하세요",
     updateNow: "지금 업데이트",
+    notFoundTitle: "페이지를 찾을 수 없습니다",
+    notFoundDescription: "요청한 페이지가 존재하지 않거나 이동되었습니다.",
+    notFoundBack: "프로젝트 목록으로 돌아가기",
 } as const

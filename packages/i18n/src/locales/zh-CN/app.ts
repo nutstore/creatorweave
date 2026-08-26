@@ -69,4 +69,7 @@ export const app = {
     reloadPage: "重新加载页面",
     updateAvailable: "发现新版本，建议更新以获取最新功能",
     updateNow: "立即更新",
+    notFoundTitle: "页面不存在",
+    notFoundDescription: "你访问的页面不存在或已被移动。",
+    notFoundBack: "返回项目列表",
 } as const

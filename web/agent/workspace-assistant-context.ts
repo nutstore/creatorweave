@@ -304,7 +304,11 @@ export async function handleWorkspaceAssistantOnReady(
       localStorage.setItem(HOSTNAME_TO_PROJECT_KEY, JSON.stringify(map))
     } catch {}
 
-    navigate(`/projects/${encodeURIComponent(projectId!)}/workspace`)
+    // Bare project URL (workspace resolved from store state by the route
+    // sync hook). NOTE: this module intentionally has no top-level imports
+    // (kept out of the startup bundle), so the path builder is imported here.
+    const { projectWorkspacePath } = await import('@/lib/route-paths')
+    navigate(projectWorkspacePath(projectId!))
   } catch (err) {
     console.warn('[Workspace Assistant] Failed to handle side panel open:', err)
   }

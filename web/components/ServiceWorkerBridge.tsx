@@ -11,7 +11,7 @@
  */
 
 import { useEffect } from 'react'
-import { useNavigate } from '@/router/next-router-compat'
+import { useRouter } from 'next/navigation'
 import { buildConversationNotificationRoute } from '@/services/notification-route'
 
 interface NavigateToConversationMessage {
@@ -21,7 +21,7 @@ interface NavigateToConversationMessage {
 }
 
 export function ServiceWorkerBridge() {
-  const navigate = useNavigate()
+  const navigate = useRouter()
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) {
@@ -37,7 +37,7 @@ export function ServiceWorkerBridge() {
       if (message.type === 'NAVIGATE_TO_CONVERSATION') {
         const { projectId, conversationId } = message
         if (projectId && conversationId) {
-          navigate(buildConversationNotificationRoute(projectId, conversationId))
+          navigate.push(buildConversationNotificationRoute(projectId, conversationId))
         }
       }
     }

@@ -924,7 +924,7 @@ export function ProjectHome({
                   {t('projectHome.hero.docsHub')}
                 </BrandButton>
                 <a
-                  href={locale === 'zh-CN' ? '/privacy/zh/' : '/privacy/'}
+                  href="/help/privacy/"
                   className="inline-flex items-center gap-1.5 h-9 px-3 text-xs rounded-lg border border-gray-200 bg-transparent text-secondary hover:bg-gray-50 hover:text-primary dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium transition-colors"
                 >
                   <Shield className="w-3.5 h-3.5 mr-1.5" />

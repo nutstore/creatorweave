@@ -41,7 +41,7 @@ export const welcome = {
         waiting: "認可を待機中...",
         success: "ログイン成功！",
         clientIdMissing:
-            "Client ID が設定されていません。VITE_JIANGUOYUN_AI_CLIENT_ID 環境変数を設定してください。",
+            "Client ID が設定されていません。NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID 環境変数を設定してください。",
         authFailedFallback: "認証に失敗しました",
     },
 } as const

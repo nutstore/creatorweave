@@ -4,6 +4,29 @@ import { fileURLToPath } from 'node:url'
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || process.env.npm_package_version || 'dev'
 
+// ─── Deployment region (build-time required) ─────────────────────────────
+// The domestic (weave.eo2suite.cn) and international (weave.eo2suite.com)
+// sites are BUILT separately; NEXT_PUBLIC_DEPLOY_REGION is inlined into each
+// build at compile time. Production builds MUST set it explicitly so a
+// misconfigured CI job fails fast instead of silently shipping the default
+// region's language to the wrong domain.
+//   NEXT_PUBLIC_DEPLOY_REGION=cn      → domestic build (Chinese privacy policy)
+//   NEXT_PUBLIC_DEPLOY_REGION=global  → international build (English privacy policy)
+const DEPLOY_REGION_VALUES = ['cn', 'global']
+if (
+  process.env.NODE_ENV === 'production' &&
+  !DEPLOY_REGION_VALUES.includes(process.env.NEXT_PUBLIC_DEPLOY_REGION)
+) {
+  throw new Error(
+    [
+      '[next.config] NEXT_PUBLIC_DEPLOY_REGION is required for production builds.',
+      `Expected one of: ${DEPLOY_REGION_VALUES.map((v) => `'${v}'`).join(' | ')} (got ${JSON.stringify(process.env.NEXT_PUBLIC_DEPLOY_REGION)}).`,
+      "Set it in the build environment: cn for the domestic deployment (weave.eo2suite.cn), global for the international one (weave.eo2suite.com).",
+      'Local dev is exempt and defaults to global (English).',
+    ].join('\n')
+  )
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Project and workspace IDs live in browser OPFS/SQLite and are resolved by
@@ -30,10 +53,24 @@ const nextConfig = {
       },
     ]
   },
+  // Legacy singular workspace URL → bare project URL (permanent 308 so
+  // bookmarks/external links converge on the canonical shape). The bare
+  // page resolves the workspace from store state and replaces the URL with
+  // the canonical /workspaces/:workspaceId form.
+  async redirects() {
+    return [
+      {
+        source: '/projects/:projectId/workspace',
+        destination: '/projects/:projectId',
+        permanent: true,
+      },
+    ]
+  },
   transpilePackages: [
     '@creatorweave/config',
     '@creatorweave/encryption',
     '@creatorweave/i18n',
+    '@creatorweave/shared',
     '@creatorweave/skills-system',
     '@creatorweave/ui',
   ],
@@ -41,12 +78,10 @@ const nextConfig = {
     NEXT_PUBLIC_APP_BUILD_ID: buildId,
     NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version || '0.0.0',
     NEXT_PUBLIC_EXTENSION_LATEST_VERSION: process.env.EXTENSION_LATEST_VERSION || '0.0.0',
-    // Retain compatibility with existing Vite-prefixed deployment variables
-    // while exposing client-safe values through Next's public env convention.
     NEXT_PUBLIC_JIANGUOYUN_AI_BASE_URL:
-      process.env.NEXT_PUBLIC_JIANGUOYUN_AI_BASE_URL || process.env.VITE_JIANGUOYUN_AI_BASE_URL || '',
+      process.env.NEXT_PUBLIC_JIANGUOYUN_AI_BASE_URL || '',
     NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID:
-      process.env.NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID || process.env.VITE_JIANGUOYUN_AI_CLIENT_ID || '',
+      process.env.NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID || '',
   },
   webpack(config, { webpack, isServer }) {
     // This client-heavy application produces a multi-gigabyte persistent

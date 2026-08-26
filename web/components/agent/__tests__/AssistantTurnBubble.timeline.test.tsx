@@ -7,9 +7,28 @@ vi.mock('@/i18n', () => ({
   useT: () => (key: string) => key,
 }))
 
+// The bubble navigates (branch conversation) via next/navigation; there is
+// no App Router in unit tests — provide a minimal mock.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useNavigate: () => vi.fn(),
+  useParams: () => ({}),
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 describe('AssistantTurnBubble timeline ordering', () => {
   it('renders summary/runtime events by timestamp order during processing', () => {
+    // Runtime steps arrive in LLM emission order: compression (250) completed
+    // first, then the tool call (300) started. The timeline renders committed
+    // messages first, then runtime steps in emission (array) order.
     const runtimeSteps: DraftAssistantStep[] = [
+      {
+        id: 'compression-1',
+        timestamp: 250,
+        type: 'compression',
+        content: 'Context compressed and summary generated',
+        streaming: false,
+      },
       {
         id: 'tool-1',
         timestamp: 300,
@@ -23,13 +42,6 @@ describe('AssistantTurnBubble timeline ordering', () => {
           },
         },
         args: '{}',
-        streaming: false,
-      },
-      {
-        id: 'compression-1',
-        timestamp: 250,
-        type: 'compression',
-        content: 'Context compressed and summary generated',
         streaming: false,
       },
     ]
@@ -125,6 +137,19 @@ describe('AssistantTurnBubble timeline ordering', () => {
       },
     }
 
+    // In real flows an executing tool call always has a streaming runtime
+    // step; the committed message's copy is suppressed in favour of it.
+    const runtimeSteps: DraftAssistantStep[] = [
+      {
+        id: 'tool-dup-1-step',
+        timestamp: 150,
+        type: 'tool_call',
+        toolCall,
+        args: '{}',
+        streaming: true,
+      },
+    ]
+
     const { container } = render(
       <AssistantTurnBubble
         turn={{
@@ -143,12 +168,15 @@ describe('AssistantTurnBubble timeline ordering', () => {
         }}
         toolResults={new Map()}
         isProcessing={true}
+        runtimeSteps={runtimeSteps}
         currentToolCall={toolCall}
       />
     )
 
+    // batch_spawn renders as a "Subagents" card; assert on the card title
+    // count so the raw tool name never appears as a duplicate either.
     const text = container.textContent || ''
-    const count = text.split('batch_spawn').length - 1
+    const count = text.split('Subagents').length - 1
     expect(count).toBe(1)
   })
 
@@ -189,7 +217,8 @@ describe('AssistantTurnBubble timeline ordering', () => {
     )
 
     const text = container.textContent || ''
-    const count = text.split('batch_spawn').length - 1
+    // batch_spawn renders as a "Subagents" card (see test above).
+    const count = text.split('Subagents').length - 1
     expect(count).toBe(1)
   })
 

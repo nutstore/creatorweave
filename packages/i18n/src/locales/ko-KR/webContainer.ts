@@ -35,7 +35,6 @@ export const webContainer = {
     logOutput: "로그 출력 ({count})",
     clearLogs: "지우기",
     copyLogs: "복사",
-    openPreview: "미리보기 열기",
     noOutputYet: '아직 출력이 없습니다. "시작"을 클릭하여 시작하세요',
     // Directory picker dialog
     selectStartupDir: "시작 디렉터리 선택",

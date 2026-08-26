@@ -39,7 +39,7 @@ export const welcome = {
         waiting: "Waiting for authorization...",
         success: "Login successful!",
         clientIdMissing:
-            "Client ID not configured. Set VITE_JIANGUOYUN_AI_CLIENT_ID env variable.",
+            "Client ID not configured. Set NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID env variable.",
         authFailedFallback: "Authentication failed",
     },
 } as const

@@ -1,11 +1,21 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HashRouter } from '@/router/next-router-compat'
 import { DocumentationPage } from '@/components/docs/DocsPage'
 
-function renderDocs(ui: React.ReactElement) {
-  return render(<HashRouter>{ui}</HashRouter>)
-}
+// The docs page now navigates via next/navigation (App Router). In unit
+// tests there is no Next router, so provide a minimal mock whose push()
+// writes to window.location (like the real router would) — the tests below
+// assert on window.location.pathname after clicking locale buttons.
+const pushMock = vi.fn((to: string) => {
+  window.history.pushState({}, '', to)
+})
+
+vi.mock('next/navigation', () => ({
+  useNavigate: () => pushMock,
+  useRouter: () => ({ push: pushMock, replace: pushMock, back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}))
 
 const { localeState, setLocaleMock } = vi.hoisted(() => ({
   localeState: { value: 'zh-CN' as 'zh-CN' | 'en-US' },
@@ -67,6 +77,7 @@ const developerIndexEn = {
 
 describe('DocsPage sidebar grouping', () => {
   beforeEach(() => {
+    pushMock.mockClear()
     vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url
 
@@ -108,7 +119,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('renders user docs without group headers', async () => {
-    renderDocs(<DocumentationPage category="user" />)
+    render(<DocumentationPage category="user" />)
 
     const entries = await screen.findAllByText('快速入门')
     expect(entries.length).toBeGreaterThan(0)
@@ -116,7 +127,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('renders developer docs without group headers', async () => {
-    renderDocs(<DocumentationPage category="developer" />)
+    render(<DocumentationPage category="developer" />)
 
     const entries = await screen.findAllByText('快速入门')
     expect(entries.length).toBeGreaterThan(0)
@@ -127,7 +138,7 @@ describe('DocsPage sidebar grouping', () => {
   it('loads locale-prefixed docs index for english locale', async () => {
     localeState.value = 'en-US'
 
-    renderDocs(<DocumentationPage category="user" />)
+    render(<DocumentationPage category="user" />)
 
     const entries = await screen.findAllByText('Getting Started')
     expect(entries.length).toBeGreaterThan(0)
@@ -135,7 +146,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('uses zh-prefixed index path for chinese locale', async () => {
-    renderDocs(<DocumentationPage category="user" />)
+    render(<DocumentationPage category="user" />)
 
     await screen.findAllByText('快速入门')
     const fetchMock = vi.mocked(globalThis.fetch)
@@ -145,7 +156,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('switches locale to english from docs home', () => {
-    renderDocs(<DocumentationPage />)
+    render(<DocumentationPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
 
@@ -153,7 +164,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('strips frontmatter from loaded markdown', async () => {
-    renderDocs(<DocumentationPage category="user" page="getting-started" />)
+    render(<DocumentationPage category="user" page="getting-started" />)
 
     await screen.findByText('快速入门正文')
     expect(screen.queryByText('title: 快速入门')).not.toBeInTheDocument()
@@ -162,7 +173,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('keeps current page on locale switch when same slug exists', async () => {
-    renderDocs(<DocumentationPage category="user" page="getting-started" />)
+    render(<DocumentationPage category="user" page="getting-started" />)
 
     await screen.findByText('快速入门正文')
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
@@ -173,7 +184,7 @@ describe('DocsPage sidebar grouping', () => {
   })
 
   it('falls back to category home on locale switch when slug is missing', async () => {
-    renderDocs(<DocumentationPage category="developer" page="guides-quick-start" />)
+    render(<DocumentationPage category="developer" page="guides-quick-start" />)
 
     await screen.findByText('开发者快速入门')
     fireEvent.click(screen.getByRole('button', { name: 'English' }))

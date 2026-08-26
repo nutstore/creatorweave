@@ -3,6 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ProjectHome } from './ProjectHome'
 
+// ProjectHome embeds ActivityHeatmap, which navigates via next/navigation.
+// There is no App Router in unit tests — provide a minimal mock.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useNavigate: () => vi.fn(),
+  useParams: () => ({}),
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 vi.mock('@/store/theme.store', () => ({
   useTheme: () => ({
     mode: 'light',
@@ -21,7 +30,7 @@ vi.mock('@/store/theme.store', () => ({
 }))
 
 const localeSetter = vi.fn()
-const t = (key: string) => {
+const t = (key: string, params?: Record<string, string | number>) => {
   const messages: Record<string, string> = {
     'projectHome.hero.badge': 'Local First',
     'projectHome.hero.title': 'Start creating here',
@@ -79,7 +88,13 @@ const t = (key: string) => {
     'common.processing': 'Processing',
     'common.save': 'Save',
   }
-  return messages[key] ?? key
+  let text = messages[key] ?? key
+  if (params) {
+    for (const [name, value] of Object.entries(params)) {
+      text = text.replaceAll(`{${name}}`, String(value))
+    }
+  }
+  return text
 }
 
 vi.mock('@/i18n', () => ({

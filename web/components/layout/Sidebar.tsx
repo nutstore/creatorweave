@@ -17,7 +17,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
-import { useNavigate } from '@/router/next-router-compat'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { projectWorkspacePath } from '@/lib/route-paths'
 import { createPortal } from 'react-dom'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -70,6 +72,8 @@ interface ConversationItemData {
 }
 
 interface ConversationItemProps extends ConversationItemData {
+  /** Canonical workspace URL — rendered as a next/link for prefetch + middle-click. */
+  href: string
   onSelect: (id: string) => void
   onStartRename: (id: string, title: string) => void
   onDeleteClick: (id: string, x: number, y: number) => void
@@ -115,6 +119,12 @@ const NewWorkspaceButton = memo(function NewWorkspaceButton({
 /**
  * Memoized conversation item — prevents all 30+ ContextMenu instances from
  * re-rendering when only one item's state changes.
+ *
+ * The row is rendered as a next/link so the target workspace page is
+ * prefetched on hover/viewport and middle/right-click "open in new tab"
+ * works. `onSelect` keeps only the non-navigation side effects (touch
+ * last-accessed timestamp, close the mobile sidebar, in-place fallback when
+ * no onSelectWorkspace prop was provided).
  */
 const ConversationItem = memo(function ConversationItem({
   id,
@@ -125,6 +135,7 @@ const ConversationItem = memo(function ConversationItem({
   isEditing,
   isArchived,
   isPinned,
+  href,
   onSelect,
   onStartRename,
   onDeleteClick: _onDeleteClick,
@@ -147,9 +158,9 @@ const ConversationItem = memo(function ConversationItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div
+        <Link
+          href={href}
           role="listitem"
-          tabIndex={0}
           aria-current={isActive ? 'page' : undefined}
           aria-label={workspaceLabel}
           className={`group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
@@ -157,20 +168,17 @@ const ConversationItem = memo(function ConversationItem({
               ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               : 'hover:bg-hover text-secondary'
           }`}
-          onClick={() => {
-            if (isEditing) return
+          onClick={(e) => {
+            if (isEditing) {
+              e.preventDefault()
+              return
+            }
             onSelect(id)
           }}
           onDoubleClick={(e) => {
             e.stopPropagation()
+            e.preventDefault()
             onStartRename(id, title)
-          }}
-          onKeyDown={(e) => {
-            if (isEditing) return
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              onSelect(id)
-            }
           }}
         >
           {/* Pin indicator icon */}
@@ -252,7 +260,7 @@ const ConversationItem = memo(function ConversationItem({
               {pendingReviewCount}
             </span>
           )}
-        </div>
+        </Link>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <ContextMenuItem
@@ -293,6 +301,7 @@ const ConversationItem = memo(function ConversationItem({
   // Custom comparison — only re-render when meaningful data changes
   return (
     prev.id === next.id &&
+    prev.href === next.href &&
     prev.title === next.title &&
     prev.isRunning === next.isRunning &&
     prev.isActive === next.isActive &&
@@ -634,7 +643,7 @@ export const Sidebar = memo(function Sidebar({
   onSelectWorkspace,
 }: SidebarProps) {
   const t = useT()
-  const navigate = useNavigate()
+  const navigate = useRouter()
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   // Use selectors to avoid re-rendering on every streaming delta.
@@ -699,7 +708,6 @@ export const Sidebar = memo(function Sidebar({
     })
   )
   const activeWorkspaceId = useConversationContextStore((state) => state.activeWorkspaceId)
-  const switchWorkspace = useConversationContextStore((state) => state.switchWorkspace)
   const workspaceIds = workspaceStats.map((w) => w.id)
   const currentPendingCount = useConversationContextStore((state) => state.currentPendingCount)
   const scopedWorkspaceIdSet = useMemo(() => new Set(workspaceIds), [workspaceIds])
@@ -1010,7 +1018,7 @@ export const Sidebar = memo(function Sidebar({
   const handleCreateNewWorkspace = useCallback(() => {
     const conv = createNew()
     void setActive(conv.id)
-    navigate(`/projects/${encodeURIComponent(activeProjectId)}/workspaces/${encodeURIComponent(conv.id)}`)
+    navigate.push(projectWorkspacePath(activeProjectId, conv.id))
     closeMobileSidebar()
   }, [createNew, setActive, activeProjectId, navigate, closeMobileSidebar])
 
@@ -1028,23 +1036,21 @@ export const Sidebar = memo(function Sidebar({
   }, [setSidebarCollapsed])
 
   // Stable callbacks for ConversationItem memoization
+  // Side effects for clicking a conversation row. Navigation itself is
+  // handled by the <Link href> the row renders as; this callback only touches
+  // the last-accessed timestamp (so the item sorts to the top) and closes the
+  // mobile sidebar. It deliberately does NOT call onSelectWorkspace/
+  // switchWorkspace — that would push a second navigation on top of the link.
   const handleItemSelect = useCallback((id: string) => {
     if (pendingRenameIdRef.current === id) return
     // Clicking the already-active workspace should still bump its
     // lastAccessedAt so it sorts to the top of the unpinned list.
-    // onSelectWorkspace / switchWorkspace both early-return when the target
-    // is already active, so we touch the timestamp here explicitly.
     const currentActive = useConversationContextStore.getState().activeWorkspaceId
     if (currentActive === id) {
       void useConversationContextStore.getState().touchActiveWorkspaceAccessTime()
     }
-    if (onSelectWorkspace) {
-      onSelectWorkspace(id)
-    } else {
-      void switchWorkspace(id)
-    }
     closeMobileSidebar()
-  }, [onSelectWorkspace, switchWorkspace, closeMobileSidebar])
+  }, [closeMobileSidebar])
 
   const handleItemDeleteClick = useCallback((id: string, x: number, y: number) => {
     setConfirmDeleteId(id)
@@ -1256,6 +1262,7 @@ export const Sidebar = memo(function Sidebar({
                   isEditing={isEditing}
                   isArchived={isArchived}
                   isPinned={isPinned}
+                  href={projectWorkspacePath(activeProjectId, conv.id)}
                   onSelect={handleItemSelect}
                   onStartRename={startRename}
                   onDeleteClick={handleItemDeleteClick}

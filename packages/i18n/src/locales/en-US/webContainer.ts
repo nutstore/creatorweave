@@ -34,7 +34,6 @@ export const webContainer = {
     logOutput: "Log Output ({count})",
     clearLogs: "Clear",
     copyLogs: "Copy",
-    openPreview: "Open Preview",
     noOutputYet: 'No output yet, click "Start" to begin',
     // Directory picker dialog
     selectStartupDir: "Select Startup Directory",

@@ -41,7 +41,7 @@ export const welcome = {
         waiting: "인증 대기 중...",
         success: "로그인 성공!",
         clientIdMissing:
-            "Client ID가 설정되지 않았습니다. VITE_JIANGUOYUN_AI_CLIENT_ID 환경 변수를 설정하세요.",
+            "Client ID가 설정되지 않았습니다. NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID 환경 변수를 설정하세요.",
         authFailedFallback: "인증 실패",
     },
 } as const

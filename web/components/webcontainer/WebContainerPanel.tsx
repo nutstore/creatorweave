@@ -6,7 +6,6 @@ import {
   RotateCcw,
   RefreshCcw,
   Trash2,
-  ExternalLink,
   Copy,
   ChevronDown,
   ChevronRight,
@@ -15,7 +14,6 @@ import { useWebContainerStore } from '@/store/webcontainer.store'
 import { useProjectStore } from '@/store/project.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
-import { buildWebContainerPreviewRoute } from '@/services/webcontainer/preview-route'
 import { toast } from 'sonner'
 import {
   BrandBadge,
@@ -73,7 +71,6 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
     startupPath,
     effectiveDevWorkingDirectory,
     effectiveInstallWorkingDirectory,
-    previewUrl,
     previewPort,
     logs,
     errorMessage,
@@ -108,10 +105,6 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
 
   const logsText = useMemo(() => logs.join('\n'), [logs])
   const logCount = logs.length
-  const standalonePreviewHref = useMemo(() => {
-    if (!previewUrl) return null
-    return buildWebContainerPreviewRoute(previewUrl, activeProjectId)
-  }, [previewUrl, activeProjectId])
 
   const mergedScriptOptions = useMemo(() => {
     const options = startScriptOptions.slice()
@@ -377,19 +370,6 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
                 >
                   <Copy className="h-3.5 w-3.5" />
                   {t('webContainer.copyLogs')}
-                </BrandButton>
-                <BrandButton
-                  type="button"
-                  variant="outline"
-                  className="h-7 px-2 text-xs"
-                  disabled={!standalonePreviewHref}
-                  onClick={() => {
-                    if (!standalonePreviewHref) return
-                    window.open(standalonePreviewHref, '_blank', 'noopener')
-                  }}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  {t('webContainer.openPreview')}
                 </BrandButton>
               </div>
             </div>

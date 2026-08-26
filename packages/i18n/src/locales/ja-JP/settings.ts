@@ -504,7 +504,7 @@ export const settings = {
       loginFailed: "ログインに失敗しました",
       retry: "再試行",
       authHint: "Device Code Flow による安全な認証 — API Key の管理は不要です。",
-      clientIdMissing: "Client ID が未設定です。VITE_JIANGUOYUN_AI_CLIENT_ID 環境変数を設定してください。",
+      clientIdMissing: "Client ID が未設定です。NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID 環境変数を設定してください。",
       authFailed: "認証に失敗しました",
     },
     // Provider display names (company pinyin/English brand; NOT separate

@@ -25,7 +25,8 @@
  */
 
 import { Fragment, memo, type ReactNode, useContext, useRef, useState } from 'react'
-import { useNavigate, useParams } from '@/router/next-router-compat'
+import { useParams, useRouter } from 'next/navigation'
+import { projectWorkspacePath } from '@/lib/route-paths'
 import { Bot, Database, Split, AlertTriangle, Download } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
@@ -333,7 +334,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   iterationLimitReached,
 }: AssistantTurnBubbleProps) {
   const t = useT()
-  const navigate = useNavigate()
+  const navigate = useRouter()
   const { projectId } = useParams<{ projectId: string }>()
   const conversationActions = useContext(ConversationActionContext)
   const isStreamingReasoning = streamingState?.reasoning ?? false
@@ -374,7 +375,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
       const branched = await useConversationStore.getState().branchConversation(conversationId, branchPointMessageId)
       // Navigate to the new branched conversation so syncFromRoute triggers workspace switching
       if (projectId && branched) {
-        navigate(`/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(branched.id)}`)
+        navigate.push(projectWorkspacePath(projectId, branched.id))
       }
     } catch (error) {
       console.error('[AssistantTurnBubble] Failed to branch conversation:', error)

@@ -11,9 +11,10 @@
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { useNavigate } from '@/router/next-router-compat'
+import { useRouter } from 'next/navigation'
 import { getSQLiteDB } from '@/sqlite/sqlite-database'
 import { useT } from '@/i18n'
+import { projectWorkspacePath } from '@/lib/route-paths'
 import { useTheme } from '@/store/theme.store'
 import { AlertCircle, FileText, MessageSquare, X } from 'lucide-react'
 
@@ -280,7 +281,7 @@ const TOOLTIP_OFFSET_Y = 44
 export function ActivityHeatmap() {
   const t = useT()
   const { isDark } = useTheme()
-  const navigate = useNavigate()
+  const navigate = useRouter()
   const [range, setRange] = useState<ActivityRange>(() => loadPersistedRange())
   const [data, setData] = useState<Map<string, RawDayRow>>(new Map())
   const [loaded, setLoaded] = useState(false)
@@ -428,7 +429,7 @@ export function ActivityHeatmap() {
 
   const handleJumpToWorkspace = useCallback(
     (item: DayDetailItem) => {
-      navigate(`/projects/${item.projectId}/workspaces/${item.workspaceId}`)
+      navigate.push(projectWorkspacePath(item.projectId, item.workspaceId))
     },
     [navigate]
   )

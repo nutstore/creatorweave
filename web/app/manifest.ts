@@ -12,7 +12,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     orientation: 'any',
     background_color: '#0f172a',
-    theme_color: '#3b82f6',
+    // Brand primary baseline (#4D9F98 = --primary-500 in globals.css); keep in
+    // sync with the `viewport.themeColor` export in app/layout.tsx.
+    theme_color: '#4D9F98',
     categories: ['utilities', 'developer', 'productivity'],
     icons: [
       // Icons are copied from browser-extension/public by scripts/prepare-pwa.mjs
