@@ -32,10 +32,10 @@ const copy: Record<Locale, Copy> = {
     documentLabel: 'Privacy, by design',
     title: 'Your work stays yours.',
     lead:
-      'EO2Weave is built around local processing, explicit actions, and controls you can revoke. This policy explains what the browser extension processes and when data may leave your device.',
-    appliesTo: 'EO2Weave browser extension',
+      'EO2Weave is built around local processing, explicit actions, and controls you can revoke. This policy explains what the EO2Weave websites and browser extension process and when data may leave your device.',
+    appliesTo: 'EO2Weave websites and browser extension',
     updated: 'Last updated',
-    updatedValue: 'August 17, 2026',
+    updatedValue: 'August 26, 2026',
     localLabel: 'Operating model',
     localValue: 'Local-first',
     summary: [
@@ -52,13 +52,13 @@ const copy: Record<Locale, Copy> = {
       {
         icon: 'shield',
         title: 'No ads or tracking',
-        body: 'We do not sell your data, run behavioral advertising, or add third-party trackers to the extension.',
+        body: 'We do not sell your data, run behavioral advertising, or add third-party trackers to EO2Weave.',
       },
     ],
     contents: 'On this page',
     intro: (
       <>
-        This policy applies to the EO2Weave browser extension (the “extension”) offered by Astronet Technology Pte. Ltd. (“we”, “us”). We do not operate a server that receives your conversations, files, or browsing activity.
+        This policy applies to the EO2Weave services available at weave.eo2suite.cn and weave.eo2suite.com (the “websites”), as well as the EO2Weave browser extension (the “extension”). Together, they are referred to as the “services”. In this policy, “EO2Weave”, “we”, and “us” refer to the provider of these services. We do not operate a server that receives your conversations, files, or browsing activity.
       </>
     ),
     sections: [
@@ -67,9 +67,9 @@ const copy: Record<Locale, Copy> = {
         title: 'Data we process',
         body: (
           <>
-            <p>The extension runs locally in your browser. To complete tasks, it may process the following information on your device:</p>
+            <p>The services run primarily in your browser and process task data locally where possible. To complete tasks, they may process the following information on your device:</p>
             <ul>
-              <li><strong>Page content.</strong> When you or your agent ask about a page, the extension extracts the relevant content for that task.</li>
+              <li><strong>Page content.</strong> When you or your agent ask about a page, the services extract the relevant content for that task.</li>
               <li><strong>Page interactions.</strong> With your consent, the agent may click controls or fill forms only for a task you initiate.</li>
               <li><strong>Local state.</strong> Settings, per-site authorization grants, and cached tool descriptions are stored locally on your device.</li>
               <li><strong>Search queries.</strong> When you request a web search, the query is passed to the search service needed to fulfill it.</li>
@@ -85,7 +85,7 @@ const copy: Record<Locale, Copy> = {
             <li>We do not collect or upload your browsing history.</li>
             <li>We do not read pages in the background; content is processed only for tasks you explicitly run.</li>
             <li>We do not send your data to servers operated by us.</li>
-            <li>We do not include ads or third-party trackers, and we do not sell or share your data.</li>
+            <li>We do not include ads or third-party trackers in the services, and we do not sell or share your data.</li>
           </ul>
         ),
       },
@@ -93,32 +93,39 @@ const copy: Record<Locale, Copy> = {
         id: 'ai-providers',
         title: 'AI model providers',
         body: (
-          <p>To answer your request, the extension sends the relevant task content—which may include page content you asked about—to the AI model provider you configure. That provider processes the content under its own privacy policy. This happens only when you run a task, never automatically in the background.</p>
+          <p>To answer your request, the services send the relevant task content—which may include page content you asked about—to the AI model provider you configure. That provider processes the content under its own privacy policy. This happens only when you run a task, never automatically in the background.</p>
         ),
       },
       {
         id: 'webmcp',
         title: 'Website tools (WebMCP)',
         body: (
-          <p>When a website exposes tools through WebMCP, the extension can list them for you. Using those tools requires your explicit per-site authorization, which you can revoke at any time. Tool calls are routed between your browser tabs only.</p>
+          <p>When you use the browser extension and a website exposes tools through WebMCP, the extension can list them for you. Using those tools requires your explicit per-site authorization, which you can revoke at any time. Tool calls are routed between your browser tabs only.</p>
         ),
       },
       {
         id: 'desktop-helper',
-        title: 'Optional desktop helper',
+        title: 'Optional local helper',
         body: (
-          <p>The extension can optionally integrate with a separately installed desktop helper so the agent can read and write files in folders you designate. It is never installed silently, and the extension works without it.</p>
+          <>
+            <p>You may separately install and connect the EO2Weave local helper to extend the agent’s capabilities on your device. Within project folders you explicitly authorize, it may:</p>
+            <ul>
+              <li><strong>Access local files.</strong> Read, create, modify, and organize files needed for tasks you initiate.</li>
+              <li><strong>Run local commands.</strong> Execute approved development commands, such as tests, builds, type checks, and other project tooling.</li>
+            </ul>
+            <p>The local helper is never installed or connected silently. File access is limited to folders you authorize, and command execution is subject to the configured permission and approval policy. EO2Weave remains usable without the local helper.</p>
+          </>
         ),
       },
       {
         id: 'storage-deletion',
         title: 'Storage and deletion',
-        body: <p>All local state—including settings, authorizations, and caches—stays on your device. Removing the extension deletes that extension data.</p>,
+        body: <p>Local state—including settings, authorizations, and caches—stays on your device. You can remove website data through your browser settings; removing the extension deletes data stored by the extension.</p>,
       },
       {
         id: 'changes',
         title: 'Changes to this policy',
-        body: <p>We may update this policy as the extension changes. Material changes will be reflected on this page together with a revised update date.</p>,
+        body: <p>We may update this policy as the services change. Material changes will be reflected on this page together with a revised update date.</p>,
       },
       {
         id: 'contact',
@@ -132,10 +139,10 @@ const copy: Record<Locale, Copy> = {
   zh: {
     documentLabel: '隐私，始于设计',
     title: '你的工作，只属于你。',
-    lead: 'EO2Weave 坚持本地处理、明确操作与可撤销授权。本政策说明浏览器扩展会处理哪些数据，以及数据可能在何时离开你的设备。',
-    appliesTo: 'EO2Weave 浏览器扩展',
+    lead: 'EO2Weave 坚持本地处理、明确操作与可撤销授权。本政策说明 EO2Weave 网站和浏览器扩展会处理哪些数据，以及数据可能在何时离开你的设备。',
+    appliesTo: 'EO2Weave 网站与浏览器扩展',
     updated: '最近更新',
-    updatedValue: '2026 年 8 月 17 日',
+    updatedValue: '2026 年 8 月 26 日',
     localLabel: '运行模式',
     localValue: '本地优先',
     summary: [
@@ -152,13 +159,13 @@ const copy: Record<Locale, Copy> = {
       {
         icon: 'shield',
         title: '无广告、无追踪',
-        body: '我们不出售你的数据，不投放行为广告，也不会在扩展中加入第三方追踪器。',
+        body: '我们不出售你的数据，不投放行为广告，也不会在 EO2Weave 中加入第三方追踪器。',
       },
     ],
     contents: '本页目录',
     intro: (
       <>
-        本政策适用于由 Astronet Technology Pte. Ltd.（“我们”）提供的 EO2Weave 浏览器扩展（“本扩展”）。我们不运营接收你的对话、文件或浏览活动的服务器。
+        本政策适用于通过 weave.eo2suite.cn 和 weave.eo2suite.com 提供的 EO2Weave 服务（“网站”），以及 EO2Weave 浏览器扩展（“扩展”），以下统称“服务”。本政策中的“EO2Weave”及“我们”指这些服务的提供方。我们不运营接收你的对话、文件或浏览活动的服务器。
       </>
     ),
     sections: [
@@ -167,9 +174,9 @@ const copy: Record<Locale, Copy> = {
         title: '我们处理的数据',
         body: (
           <>
-            <p>本扩展在你的浏览器中本地运行。为完成任务，它可能在你的设备上处理以下信息：</p>
+            <p>这些服务主要在你的浏览器中运行，并尽可能在本地处理任务数据。为完成任务，它们可能在你的设备上处理以下信息：</p>
             <ul>
-              <li><strong>页面内容。</strong>当你或智能体就某个页面提问时，本扩展会为该任务提取相关页面内容。</li>
+              <li><strong>页面内容。</strong>当你或智能体就某个页面提问时，这些服务会为该任务提取相关页面内容。</li>
               <li><strong>页面操作。</strong>经你同意，智能体可为你发起的任务点击控件或填写表单。</li>
               <li><strong>本地状态。</strong>设置、按站点的授权记录及缓存的工具说明保存在你的设备上。</li>
               <li><strong>搜索查询。</strong>当你要求搜索网络时，查询内容会发送给完成该请求所需的搜索服务。</li>
@@ -185,34 +192,43 @@ const copy: Record<Locale, Copy> = {
             <li>我们不收集、不上传你的浏览历史。</li>
             <li>我们不在后台读取页面；内容仅为你明确运行的任务而处理。</li>
             <li>我们不将你的数据发送到我们运营的服务器。</li>
-            <li>我们不含广告与第三方追踪器，也不出售或共享你的数据。</li>
+            <li>我们不会在服务中加入广告与第三方追踪器，也不出售或共享你的数据。</li>
           </ul>
         ),
       },
       {
         id: 'ai-providers',
         title: 'AI 模型服务',
-        body: <p>为响应你的请求，本扩展会将相关任务内容（可能包含你要求阅读的页面内容）发送给你自行配置的 AI 模型服务。该服务商会按其自身隐私政策处理这些内容。发送仅在你运行任务时发生，绝不会在后台自动进行。</p>,
+        body: <p>为响应你的请求，这些服务会将相关任务内容（可能包含你要求阅读的页面内容）发送给你自行配置的 AI 模型服务。该服务商会按其自身隐私政策处理这些内容。发送仅在你运行任务时发生，绝不会在后台自动进行。</p>,
       },
       {
         id: 'webmcp',
         title: '网站工具（WebMCP）',
-        body: <p>当网站通过 WebMCP 提供工具时，本扩展可以将其列出。使用工具需要你按站点明确授权，且你可随时撤销。工具调用仅在你的浏览器标签页之间路由。</p>,
+        body: <p>当你使用浏览器扩展，且网站通过 WebMCP 提供工具时，扩展可以将其列出。使用工具需要你按站点明确授权，且你可随时撤销。工具调用仅在你的浏览器标签页之间路由。</p>,
       },
       {
         id: 'desktop-helper',
-        title: '可选的桌面助手',
-        body: <p>本扩展可与单独安装的桌面助手集成，使智能体能够读写你指定文件夹中的文件。桌面助手绝不会被静默安装；不安装它，本扩展也可使用。</p>,
+        title: '可选的本地助手',
+        body: (
+          <>
+            <p>你可以单独安装并连接 EO2Weave 本地助手，以扩展智能体在本机上的能力。在你明确授权的项目文件夹范围内，本地助手可以：</p>
+            <ul>
+              <li><strong>访问本地文件。</strong>为你发起的任务读取、创建、修改和整理文件。</li>
+              <li><strong>运行本地命令。</strong>执行获准的开发命令，例如测试、构建、类型检查及其他项目工具。</li>
+            </ul>
+            <p>本地助手不会被静默安装或连接。文件访问仅限于你授权的文件夹，命令执行受已配置的权限与审批策略约束。不安装本地助手也可以使用 EO2Weave。</p>
+          </>
+        ),
       },
       {
         id: 'storage-deletion',
         title: '存储与删除',
-        body: <p>包括设置、授权和缓存在内的本地状态均保存在你的设备上。卸载扩展会删除这些扩展数据。</p>,
+        body: <p>包括设置、授权和缓存在内的本地状态均保存在你的设备上。你可以通过浏览器设置删除网站数据；卸载扩展会删除由扩展保存的数据。</p>,
       },
       {
         id: 'changes',
         title: '政策变更',
-        body: <p>我们可能随扩展功能变化更新本政策。重大变更会在本页体现，并同时更新最近更新日期。</p>,
+        body: <p>我们可能随服务功能变化更新本政策。重大变更会在本页体现，并同时更新最近更新日期。</p>,
       },
       {
         id: 'contact',
@@ -305,7 +321,7 @@ export function PrivacyPage({ locale }: { locale: Locale }) {
 
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
-          <span>© 2026 Astronet Technology Pte. Ltd.</span>
+          <span>© 2026 EO2Weave</span>
           <Link href={isChinese ? '/privacy/' : '/privacy/zh/'} hrefLang={isChinese ? 'en' : 'zh-CN'}>{isChinese ? 'Read in English' : '阅读简体中文版'}</Link>
         </div>
       </footer>

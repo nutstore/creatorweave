@@ -8,6 +8,7 @@ export const projectHome = {
       projectCount: "{count} 프로젝트",
       workspaceCount: "{count} 대화",
       docsHub: "문서 센터",
+      privacy: "개인정보 처리방침",
       userDocs: "사용자 문서",
       developerDocs: "개발자 문서",
     },

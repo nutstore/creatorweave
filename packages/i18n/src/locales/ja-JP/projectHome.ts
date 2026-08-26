@@ -9,6 +9,7 @@ export const projectHome = {
       projectCount: "{count} プロジェクト",
       workspaceCount: "{count} 会話",
       docsHub: "ドキュメントセンター",
+      privacy: "プライバシー",
       userDocs: "ユーザードキュメント",
       developerDocs: "開発者ドキュメント",
     },

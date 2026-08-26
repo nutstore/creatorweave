@@ -10,6 +10,7 @@ export const projectHome = {
       projectCount: "{count} projects",
       workspaceCount: "{count} conversations",
       docsHub: "Docs Hub",
+      privacy: "Privacy",
       userDocs: "User Docs",
       developerDocs: "Developer Docs",
     },

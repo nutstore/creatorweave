@@ -3,7 +3,7 @@ import { PrivacyPage } from './PrivacyPage'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy — EO2Weave',
-  description: 'How the EO2Weave browser extension processes data, protects local files, and gives you control over website tools.',
+  description: 'How the EO2Weave websites and browser extension process data, protect local files, and give you control over website tools.',
   alternates: {
     canonical: '/privacy/',
     languages: {
