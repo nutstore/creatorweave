@@ -35,6 +35,17 @@ import { formatBytes } from '@/lib/utils'
 const BACKUP_TMP_DIR = '.eo2weave-backup-tmp'
 
 /**
+ * Timer for deferred cleanup of the spill directory. We defer cleanup to
+ * give the browser time to asynchronously read the Blob URL data after
+ * `<a>.click()` — removing the spill file before it is read produces a
+ * "Failed - Network error" download ("请检查互联网连接状况"). Reset on each
+ * new export so rapid consecutive exports don't have their shared spill
+ * file pulled out from under a still-in-flight download. See
+ * downloadOPFSBackup's finally block for the full rationale.
+ */
+let spillCleanupTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
  * Final-chunk terminator for `ZipDeflate.push()`. fflate expects a
  * zero-length Uint8Array with `final=true` to flush the compressor.
  */
@@ -554,16 +565,29 @@ export async function downloadOPFSBackup(): Promise<{
     }
     return { filename, includesDeviceKey, includesLocalStorage }
   } finally {
-    // Best-effort: remove the spill directory (whether the export succeeded
-    // or failed) — the backup bytes are already on their way to the user's
-    // Downloads folder, the temp copy is pure quota waste. Stale leftovers
-    // from a crashed run are also tolerated by the walker/validator.
-    try {
-      const opfsRoot = await navigator.storage.getDirectory()
-      await opfsRoot.removeEntry(BACKUP_TMP_DIR, { recursive: true })
-    } catch {
-      // absent or locked — harmless either way
-    }
+    // Defer spill cleanup so the browser has time to read the Blob URL data
+    // asynchronously after `<a>.click()`. Without this 60s delay, the
+    // "remove immediately" pattern can finish before the browser finishes
+    // reading → "Failed - Network error" / "请检查互联网连接状况" in the
+    // downloads bar. The 60s window matches the URL.revokeObjectURL delay
+    // above so the spill file is alive for at least as long as the Blob
+    // URL.
+    //
+    // Reset the timer on each new export so rapid consecutive exports don't
+    // have their shared spill file (`backup.zip` is reused — see openSpill)
+    // pulled out from under a still-in-flight download. Stale leftovers from
+    // a crashed export are also tolerated by the walker/validator, so
+    // delaying the cleanup is safe even when the export itself fails.
+    if (spillCleanupTimer !== null) clearTimeout(spillCleanupTimer)
+    spillCleanupTimer = setTimeout(() => {
+      spillCleanupTimer = null
+      navigator.storage
+        .getDirectory()
+        .then((root) => root.removeEntry(BACKUP_TMP_DIR, { recursive: true }))
+        .catch(() => {
+          // absent or locked — harmless either way
+        })
+    }, 60_000)
     // Re-open the worker so subsequent SQL operations work without a page
     // reload. initialize() is idempotent and no-ops when someone else has
     // already re-initialized. Best-effort: an app that never touches SQLite
