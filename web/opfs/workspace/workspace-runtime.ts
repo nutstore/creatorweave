@@ -1268,6 +1268,56 @@ export class WorkspaceRuntime {
   }
 
   /**
+   * Mark a DIRECTORY for deletion as a pending change, without touching any
+   * file. Mirrors deleteFile()'s pending pipeline but for directory paths.
+   *
+   * Why this exists: deleteDir() in the workspace backend deletes files one by
+   * one (each producing its own pending 'delete' record), but directories that
+   * contain no files produced ZERO records — so empty directory trees on disk
+   * could never be cleaned up by sync (pruneEmptyParents only fires when a
+   * file record exists as the anchor). Recording the directory path itself as
+   * a pending delete closes that gap; sync executes idempotent deletes that
+   * also handle empty directories (FS Access removeEntry / native-host
+   * delete_file are both directory-capable and idempotent).
+   *
+   * Semantics:
+   * - The path is expected to be an empty (or empty-in-OPFS) directory on
+   *   disk. fsMtime is recorded as 0 so conflict detection is skipped
+   *   (directories have no meaningful baseline mtime in this model).
+   * - Callers should record deepest-first ordering (children before parents)
+   *   so sync executes bottom-up.
+   * - Rollback (discard/reject) treats it as a ghost delete: no baseline
+   *   exists, so the record is simply dropped and nothing is restored —
+   *   correct, because no file data was ever removed.
+   * - Idempotent with respect to files/: there is no OPFS files/ entry for a
+   *   directory, and markForDeletion on a fresh path just creates a record.
+   */
+  async deleteDirPending(path: string, directoryHandle?: FileSystemDirectoryHandle | null, _projectId?: string | null): Promise<void> {
+    if (!this.initialized) await this.initialize()
+
+    const normalizedPath = this.normalizeWorkspacePath(path)
+
+    // Pure OPFS mode: no native root mounted — nothing on disk to delete, and
+    // no pending record is meaningful. Still prune the OPFS files/ side as a
+    // best-effort (no-op when the directory has no files/ representation).
+    if (directoryHandle == null && !(await this.hasAnyNativeDirectoryHandle())) {
+      try {
+        await this.deleteFromFilesDirIfExists(normalizedPath)
+      } catch {
+        // Directory has no files/ representation — expected, ignore.
+      }
+      return
+    }
+
+    // Mark the directory path itself as pending deletion.
+    // fsMtime = 0 → sync's conflict check is skipped for this record.
+    await this.pendingManager.markForDeletion(normalizedPath, 0)
+
+    this.metadata.lastAccessedAt = Date.now()
+    await this.saveMetadata()
+  }
+
+  /**
    * Get pending changes
    */
   getPendingChanges(): PendingChange[] {

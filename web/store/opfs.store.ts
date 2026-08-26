@@ -109,6 +109,18 @@ interface OPFSState {
     projectId?: string | null
   ) => Promise<void>
 
+  /**
+   * Mark a DIRECTORY path as pending deletion (empty-dir cleanup records).
+   * See WorkspaceRuntime.deleteDirPending for semantics. State updates mirror
+   * deleteFile so pendingChanges / counts stay in sync.
+   */
+  deleteDirPending: (
+    path: string,
+    directoryHandle?: FileSystemDirectoryHandle | null,
+    workspaceId?: string | null,
+    projectId?: string | null
+  ) => Promise<void>
+
   /** Get pending changes for current workspace */
   getPendingChanges: () => PendingChange[]
 
@@ -316,6 +328,35 @@ export const useOPFSStore = create<OPFSState>()(
         }
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to delete file'
+        set({ error: message, isLoading: false })
+        throw new Error(message)
+      }
+    },
+
+    deleteDirPending: async (path, directoryHandle, workspaceId, projectId) => {
+      set({ isLoading: true, error: null })
+
+      try {
+        const { workspace, workspaceId: targetWorkspaceId } = await getWorkspaceForOperation(workspaceId)
+        await workspace.deleteDirPending(path, directoryHandle, projectId)
+
+        // Update state (mirror deleteFile)
+        const { useWorkspaceStore } = await import('./workspace.store')
+        const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
+        set((state) => {
+          if (activeWorkspaceId === targetWorkspaceId) {
+            state.pendingChanges = workspace.getPendingChanges()
+            state.cachedPaths = workspace.getCachedPaths()
+          }
+          state.isLoading = false
+        })
+
+        if (activeWorkspaceId === targetWorkspaceId) {
+          await useWorkspaceStore.getState().updateCurrentCounts()
+          await useWorkspaceStore.getState().refreshPendingChanges(true)
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to delete directory'
         set({ error: message, isLoading: false })
         throw new Error(message)
       }

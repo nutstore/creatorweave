@@ -215,7 +215,17 @@ export class WorkspacePendingManager {
     return Array.from(this.pendingChanges.values())
       .filter((change) => change.reviewStatus !== 'rejected')
       .map((change) => ({ ...change }))
-      .sort((a, b) => a.timestamp - b.timestamp)
+      .sort((a, b) => {
+        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
+        // Same-timestamp batch (e.g. deleteDir marking a whole tree within one
+        // millisecond): execute delete records deepest-path-first so child
+        // directories are removed before their parents regardless of the
+        // order SQLite returns rows with equal updated_at.
+        if (a.type === 'delete' && b.type === 'delete') {
+          return b.path.split('/').length - a.path.split('/').length
+        }
+        return 0
+      })
   }
 
   /**
@@ -850,6 +860,13 @@ export class WorkspacePendingManager {
       return file.lastModified
     } catch (err: unknown) {
       if (this.getErrorName(err) === 'NotFoundError') {
+        return null
+      }
+      // Directory pending records (see deleteDirPending) point at directory
+      // paths — getFileHandle throws TypeMismatchError for those. Treat "path
+      // is a directory" as "no file mtime" so the delete record proceeds:
+      // sync executors remove empty directories idempotently.
+      if (this.getErrorName(err) === 'TypeMismatchError') {
         return null
       }
       throw err

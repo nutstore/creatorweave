@@ -209,6 +209,31 @@ export class WorkspaceBackend implements VfsBackend {
     // affect real disk. Removing native entries directly here would bypass the
     // pending pipeline — see the regression in deleteDir that wiped real files.
 
+    // Record the emptied directories as pending deletes too — deepest-first so
+    // sync removes children before parents. Without this, a directory tree with
+    // no files (e.g. web/src with 153 empty dirs) produces zero pending records
+    // and the empty dirs can never be cleaned from disk: pruneEmptyParents only
+    // runs when a FILE delete record anchors it, and there are no file records.
+    // The sync executors handle directory paths idempotently (FS Access
+    // removeEntry / native-host delete_file both delete empty dirs), so a
+    // directory pending record executes as an empty-dir removal.
+    //
+    // Dedupe against file records already marked above, so a directory that
+    // also exists as a file entry isn't recorded twice.
+    try {
+      const { deleteDirPending } = useOPFSStore.getState()
+      const fileRecorded = new Set(deletedFiles)
+      for (const dirPath of deletedDirs) {
+        if (fileRecorded.has(dirPath)) continue
+        // Mirror deleteFile's store call convention (null handle → runtime
+        // resolves the root; workspaceId + projectId for multi-root routing).
+        await deleteDirPending(dirPath, null, this.workspaceId, this.projectId)
+      }
+    } catch {
+      // Directory pending records are best-effort — file records above remain
+      // the source of truth for actual deletions.
+    }
+
     return { deletedFiles, deletedDirs }
   }
 
@@ -217,7 +242,7 @@ export class WorkspaceBackend implements VfsBackend {
     const maxDepth = options?.maxDepth ?? 1
 
     // Phase 1: Collect native filesystem entries (may fail for OPFS-only directories)
-    let nativeEntries: VfsDirEntry[] = []
+    const nativeEntries: VfsDirEntry[] = []
     const nativePathSet = new Set<string>()
 
     // Multi-root: resolve the correct root handle for this path.
