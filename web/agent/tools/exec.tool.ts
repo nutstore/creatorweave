@@ -260,7 +260,11 @@ export const execExecutor: ToolExecutor = async (args, context) => {
       context.abortSignal,
     )
 
-    if (!approved) {
+    // Stale-approval guard: the auth queue is global and outlives loop
+    // lifecycles, so the user may approve a request whose originating run
+    // was already aborted/interrupted. Never let that execute. Mirrors the
+    // guard in page-write.tool.ts.
+    if (!approved || context.abortSignal?.aborted) {
       return toolErrorJson('exec', 'user_denied',
         `User denied execution of "${cmdDisplay}".`,
         { retryable: false })

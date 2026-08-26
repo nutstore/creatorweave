@@ -104,5 +104,7 @@ export const agent = {
         subtitle: "AI가 컴퓨터에서 명령어를 실행하려고 합니다",
         allow: "허용",
         deny: "거부",
+        denyAll: "모두 거부",
+        denyAllHint: "이 명령과 대기 중인 모든 명령을 거부",
     },
 } as const

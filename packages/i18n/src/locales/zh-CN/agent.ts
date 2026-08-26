@@ -77,6 +77,8 @@ export const agent = {
         subtitle: "AI 想要在你的机器上执行命令",
         allow: "允许",
         deny: "拒绝",
+        denyAll: "全部拒绝",
+        denyAllHint: "拒绝当前及所有排队的命令",
     },
 
     // 搜索会话工具

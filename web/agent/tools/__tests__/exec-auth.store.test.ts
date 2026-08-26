@@ -52,4 +52,18 @@ describe('exec authorization store', () => {
     expect(useExecAuthStore.getState().pending).toBeNull()
     expect(useExecAuthStore.getState().queue).toEqual([])
   })
+
+  it('denyAll denies the pending and every queued request at once', async () => {
+    const first = useExecAuthStore.getState().request(['pnpm', 'run', 'build'], 'First command')
+    const second = useExecAuthStore.getState().request(['pnpm', 'run', 'lint'], 'Second command')
+    const third = useExecAuthStore.getState().request(['pnpm', 'run', 'test'], 'Third command')
+
+    useExecAuthStore.getState().denyAll()
+
+    await expect(first).resolves.toBe(false)
+    await expect(second).resolves.toBe(false)
+    await expect(third).resolves.toBe(false)
+    expect(useExecAuthStore.getState().pending).toBeNull()
+    expect(useExecAuthStore.getState().queue).toEqual([])
+  })
 })

@@ -78,6 +78,8 @@ export const agent = {
         subtitle: "Agent wants to run a command on your machine",
         allow: "Allow",
         deny: "Deny",
+        denyAll: "Deny all",
+        denyAllHint: "Deny this command and all queued ones",
     },
 
     // Search-conversations tool

@@ -33,6 +33,9 @@ interface ExecAuthState {
   /** User denied the current request. */
   deny: () => void
 
+  /** Deny the current request AND all queued ones ("Deny all" button). */
+  denyAll: () => void
+
   /** Deny all queued requests (e.g. component unmount safety). */
   clear: () => void
 }
@@ -86,6 +89,13 @@ export const useExecAuthStore = create<ExecAuthState>((set, get) => ({
 
   deny: () => {
     get().pending?.resolve(false)
+  },
+
+  // "Deny all" is the escape hatch for the stale-queue UX: denying one by one
+  // advances the FIFO queue, which can feel endless when many stale requests
+  // from interrupted loops piled up.
+  denyAll: () => {
+    get().clear()
   },
 
   clear: () => {

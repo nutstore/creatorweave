@@ -17,6 +17,7 @@ export function ExecAuthModal() {
   const queueLength = useExecAuthStore((s) => s.queue.length)
   const approve = useExecAuthStore((s) => s.approve)
   const deny = useExecAuthStore((s) => s.deny)
+  const denyAll = useExecAuthStore((s) => s.denyAll)
   const t = useT()
 
   if (!pending) return null
@@ -84,6 +85,15 @@ export function ExecAuthModal() {
 
         {/* Actions */}
         <div className="flex gap-2 border-t border-border px-5 py-4">
+          {queueLength > 1 && (
+            <button
+              onClick={denyAll}
+              className="rounded-lg border border-border px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+              title={t('agent.execAuth.denyAllHint')}
+            >
+              {t('agent.execAuth.denyAll')}
+            </button>
+          )}
           <button
             onClick={deny}
             className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"

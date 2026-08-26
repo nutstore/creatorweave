@@ -104,5 +104,7 @@ export const agent = {
         subtitle: "AIがあなたのマシンでコマンドを実行しようとしています",
         allow: "許可",
         deny: "拒否",
+        denyAll: "すべて拒否",
+        denyAllHint: "このコマンドと待機中のすべてのコマンドを拒否",
     },
 } as const

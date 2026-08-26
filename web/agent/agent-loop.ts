@@ -41,6 +41,11 @@ const DEFAULT_SYSTEM_PROMPT = getUniversalSystemPrompt()
 const DEFAULT_TOOL_TIMEOUT = 30000
 const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>([
   'spawn_subagent', 'batch_spawn', 'ask_user_question', 'generate_image', 'search_tools',
+  // exec manages its own timeout internally (per-call override, default 120s,
+  // hard cap 600s). The outer wrapper timer starts when the tool call begins —
+  // before exec_auth queueing and the serializeExecExecution chain — so a 30s
+  // outer timer would kill parallel calls that were still waiting to run.
+  'exec',
   // Page action tools — interact with the upstream page which may involve
   // complex editors (ProseMirror, Yjs协同) that take unbounded time.
   'page_snapshot', 'page_text_content', 'page_find_elements', 'page_synthesize_locators',
@@ -400,6 +405,13 @@ export class AgentLoop {
       callbacks?.onError?.(err)
       throw err
     } finally {
+      // Abort the run signal on teardown. Tools forward this signal as their
+      // context.abortSignal; global UI-level queues (e.g. the exec auth modal
+      // queue in exec-auth.store) listen on it to deny their pending requests.
+      // Without this, requests left unconsumed when the loop ends (aborted,
+      // errored, or completed while a prompt-level auth was still queued)
+      // survive as stale popups that keep surfacing across later loops.
+      this.abortController?.abort()
       this.abortController = null
     }
   }
