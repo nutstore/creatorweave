@@ -32,6 +32,7 @@
     "@creatorweave/config": "workspace:*",
     "@creatorweave/encryption": "workspace:*",
     "@creatorweave/i18n": "workspace:*",
+    "@creatorweave/shared": "workspace:*",
     "@creatorweave/skills-system": "workspace:*",
     "@creatorweave/ui": "workspace:*",
     "@earendil-works/pi-agent-core": "^0.78.0",

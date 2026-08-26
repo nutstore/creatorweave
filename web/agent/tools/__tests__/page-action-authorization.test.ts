@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import * as pageActionAuthorization from '../../../../browser-extension/lib/page-action-authorization'
 import {
   CW_WEBAPP_ORIGIN_CN,
   CW_WEBAPP_ORIGIN_COM,
   CW_WEBAPP_ORIGIN_LEGACY,
-} from '../../../../browser-extension/lib/webapp-origins'
-
-const { isTrustedCreatorWeaveSenderUrl } = pageActionAuthorization
+  isTrustedCreatorWeaveSenderUrl,
+  isSidePanelBindingId,
+} from '@creatorweave/shared'
 
 describe('page action extension authorization', () => {
   it('allows only the exact eo2weave production, legacy, and local development origins', () => {
@@ -25,12 +24,8 @@ describe('page action extension authorization', () => {
   })
 
   it('accepts only opaque UUID side-panel bindings sent from session state', () => {
-    const isSidePanelBindingId = (pageActionAuthorization as {
-      isSidePanelBindingId?: (value: unknown) => boolean
-    }).isSidePanelBindingId
-
-    expect(isSidePanelBindingId?.('7e30f3b0-d790-4d42-9e05-8f3d38e90be4')).toBe(true)
-    expect(isSidePanelBindingId?.('12')).toBe(false)
-    expect(isSidePanelBindingId?.(undefined)).toBe(false)
+    expect(isSidePanelBindingId('7e30f3b0-d790-4d42-9e05-8f3d38e90be4')).toBe(true)
+    expect(isSidePanelBindingId('12')).toBe(false)
+    expect(isSidePanelBindingId(undefined)).toBe(false)
   })
 })
