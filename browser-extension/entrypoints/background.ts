@@ -21,7 +21,7 @@ import { WEBMCP_TAB_REPORT_TYPE } from './webmcp/relay-protocol'
 import {
   isSidePanelBindingId,
   isTrustedCreatorWeaveSenderUrl,
-} from '../lib/page-action-authorization'
+} from '@creatorweave/shared'
 import { SidePanelBindingStore, type SidePanelBinding } from '../lib/side-panel-binding-store'
 import { getCwWebappBaseUrl } from '../lib/webapp-origins'
 

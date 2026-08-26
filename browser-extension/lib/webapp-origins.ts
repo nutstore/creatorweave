@@ -1,25 +1,31 @@
-// Canonical eo2weave web-app origins (single source of truth).
+// Browser-extension-side shim around the shared webapp origins.
 //
-// Production is dual-site:
-//   - weave.eo2suite.cn  — domestic (国内) deployment
-//   - weave.eo2suite.com — international deployment
-// The legacy creatorweave.eo2suite.cn origin stays trusted during the
-// migration window so existing bookmarks/installed panels keep working
-// until the old domain is decommissioned.
-// Plus the local Vite origin used during development.
+// The pure-data origin constants (CW_WEBAPP_ORIGIN_*) and `isCwWebappOrigin`
+// live in `@creatorweave/shared` so the web app and the extension consume
+// from the same source. This file adds the one extension-specific piece —
+// `getCwWebappBaseUrl()`, which uses Vite-injected `import.meta.env.MODE`
+// to choose between the local dev origin and the production origin.
+//
+// Re-exports are kept so existing extension callers
+// (`import { ... } from './webapp-origins'`) keep working without churn.
 
-export const CW_WEBAPP_ORIGIN_CN = 'https://weave.eo2suite.cn'
-export const CW_WEBAPP_ORIGIN_COM = 'https://weave.eo2suite.com'
-export const CW_WEBAPP_ORIGIN_LEGACY = 'https://creatorweave.eo2suite.cn'
-export const CW_WEBAPP_ORIGIN_DEV = 'http://localhost:5173'
+import {
+  CW_WEBAPP_ORIGIN_CN,
+  CW_WEBAPP_ORIGIN_COM,
+  CW_WEBAPP_ORIGIN_DEV,
+  CW_WEBAPP_ORIGIN_LEGACY,
+  CW_WEBAPP_ORIGINS,
+  isCwWebappOrigin,
+} from '@creatorweave/shared'
 
-/** Every origin the web app is (or was, during migration) served from. */
-export const CW_WEBAPP_ORIGINS: readonly string[] = [
+export {
   CW_WEBAPP_ORIGIN_CN,
   CW_WEBAPP_ORIGIN_COM,
   CW_WEBAPP_ORIGIN_LEGACY,
   CW_WEBAPP_ORIGIN_DEV,
-]
+  CW_WEBAPP_ORIGINS,
+  isCwWebappOrigin,
+}
 
 /**
  * Base URL the extension uses to OPEN the web app (side panel / new tab).
@@ -31,6 +37,10 @@ export const CW_WEBAPP_ORIGINS: readonly string[] = [
  * ['en-US', 'zh-CN'] for an English-primary user who also reads Chinese,
  * and routing should follow their primary preference.
  * Dev builds always target the local Vite server regardless of language.
+ *
+ * Vite-flavored: `import.meta.env.MODE` is provided by the extension's
+ * WXT/Vite build and is NOT available in the web app's Next.js bundle.
+ * Keep this function out of any cross-workspace import.
  */
 export function getCwWebappBaseUrl(): string {
   if (import.meta.env.MODE === 'development') return CW_WEBAPP_ORIGIN_DEV
@@ -38,9 +48,4 @@ export function getCwWebappBaseUrl(): string {
     typeof navigator === 'undefined' ? {} : navigator
   const primary = nav.language || nav.languages?.[0] || ''
   return /^zh/i.test(primary) ? CW_WEBAPP_ORIGIN_CN : CW_WEBAPP_ORIGIN_COM
-}
-
-/** True when `origin` is one of the web app's own origins. */
-export function isCwWebappOrigin(origin: string): boolean {
-  return CW_WEBAPP_ORIGINS.includes(origin)
 }
