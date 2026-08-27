@@ -2,12 +2,22 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { captureTabMock, addFilesMock, addNativeHostRootMock, conversationState, pageActionAvailable } = vi.hoisted(() => ({
+const { captureTabMock, addFilesMock, addNativeHostRootMock, conversationState, pageActionAvailable, folderAccessState } = vi.hoisted(() => ({
   captureTabMock: vi.fn(async () => ({ ok: true, dataUrl: 'data:image/png;base64,c2NyZWVuc2hvdA==' })),
   addFilesMock: vi.fn(),
   addNativeHostRootMock: vi.fn(async () => true),
   conversationState: { conversations: [] as unknown[] },
   pageActionAvailable: { value: true },
+  // Mock state for folder-access store. `rootsHydrated` defaults to true so
+  // existing tests (which expect the mount-folder step to render on first
+  // paint) keep working; the dedicated hydration test below flips it to
+  // false to verify the loading gate.
+  folderAccessState: {
+    roots: [] as unknown[],
+    rootsHydrated: true,
+    addRoot: async () => {},
+    addNativeHostRoot: async () => true,
+  },
 }))
 
 vi.mock('@/store/settings.store', () => ({
@@ -31,13 +41,10 @@ vi.mock('@/store/conversation.store', () => ({
 vi.mock('@/store/folder-access.store', () => ({
   useFolderAccessStore: (selector: (state: {
     roots: unknown[]
+    rootsHydrated: boolean
     addRoot: () => Promise<void>
     addNativeHostRoot: () => Promise<boolean>
-  }) => unknown) => selector({
-    roots: [],
-    addRoot: async () => {},
-    addNativeHostRoot: addNativeHostRootMock,
-  }),
+  }) => unknown) => selector(folderAccessState),
 }))
 
 vi.mock('@/hooks/useGatewayLogin', () => ({
@@ -109,6 +116,11 @@ describe('WelcomeScreen', () => {
     delete (window as unknown as { __agentWeb?: unknown }).__agentWeb
     addNativeHostRootMock.mockClear()
     localStorage.setItem('creatorweave:onboarding:welcome-seen', 'true')
+    // Reset mock state so each test starts from a deterministic baseline.
+    // The hydration test flips `rootsHydrated` explicitly.
+    folderAccessState.roots = []
+    folderAccessState.rootsHydrated = true
+    folderAccessState.addNativeHostRoot = addNativeHostRootMock
   })
 
   // hasApiKey=true + roots=[] (store mocks) + welcome-seen → mount-folder
@@ -167,5 +179,30 @@ describe('WelcomeScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect locally' }))
     await waitFor(() => expect(addNativeHostRootMock).toHaveBeenCalledTimes(1))
+  })
+
+  // Regression for the cold-start flash where users who already had a folder
+  // mounted briefly saw the "select a folder" step on entry. We now wait
+  // for `rootsHydrated` before rendering any step.
+  it('does not flash the mount-folder step while roots are still hydrating', () => {
+    folderAccessState.rootsHydrated = false
+    folderAccessState.roots = []
+
+    render(<WelcomeScreen onStartConversation={vi.fn()} />)
+
+    // While hydration is in flight we render a loading placeholder, NOT the
+    // mount-folder step — the user might already have a folder mounted
+    // (just not yet read from IndexedDB/SQLite).
+    expect(screen.queryByRole('button', { name: 'Choose a folder' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
+  })
+
+  it('renders the mount-folder step once hydration completes and no roots exist', () => {
+    folderAccessState.rootsHydrated = true
+    folderAccessState.roots = []
+
+    render(<WelcomeScreen onStartConversation={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Choose a folder' })).toBeInTheDocument()
   })
 })

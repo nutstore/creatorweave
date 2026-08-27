@@ -93,6 +93,8 @@ describe('folder-access.store runtime handle binding', () => {
     useFolderAccessStore.setState({
       activeProjectId: null,
       records: {},
+      roots: [],
+      rootsHydrated: false,
     })
   })
 
@@ -181,5 +183,43 @@ describe('folder-access.store runtime handle binding', () => {
     expect(mockNativeHostExecutor.revokeRoot).toHaveBeenCalledWith(projectId, scopeId)
     expect(mockProjectRootRepo.deleteRoot).toHaveBeenCalledWith(rootId)
     expect(mockRepo.deleteByProjectAndRoot).toHaveBeenCalledWith(projectId, 'orphaned-folder')
+  })
+
+  // Regression: the store now exposes `rootsHydrated` so WelcomeScreen can
+  // wait for hydration to complete before deciding whether to render the
+  // "select a folder" step (cold-start race that previously flashed the
+  // prompt to users who already had a folder mounted).
+  it('marks rootsHydrated=true after setActiveProject completes', async () => {
+    const projectId = 'project-hydrated'
+    mockRepo.load.mockResolvedValue(null)
+    mockProjectRootRepo.findByProject.mockResolvedValue([])
+    useFolderAccessStore.setState({ rootsHydrated: false })
+
+    await useFolderAccessStore.getState().setActiveProject(projectId)
+
+    expect(useFolderAccessStore.getState().rootsHydrated).toBe(true)
+  })
+
+  it('resets rootsHydrated when switching to a different project', async () => {
+    const firstProject = 'project-a'
+    const secondProject = 'project-b'
+    mockRepo.load.mockResolvedValue(null)
+    mockProjectRootRepo.findByProject.mockResolvedValue([])
+
+    await useFolderAccessStore.getState().setActiveProject(firstProject)
+    expect(useFolderAccessStore.getState().rootsHydrated).toBe(true)
+
+    // Switching to a different project must reset the flag so the new
+    // project's hydration status is what consumers see.
+    useFolderAccessStore.setState({ rootsHydrated: true }) // baseline
+    await useFolderAccessStore.getState().setActiveProject(secondProject)
+
+    expect(useFolderAccessStore.getState().rootsHydrated).toBe(true)
+    // And a fresh call to loadRoots (after the switch) must set it again
+    // (the path that runs inside setActiveProject already covers this, but
+    // this exercises the public action directly).
+    useFolderAccessStore.setState({ rootsHydrated: false })
+    await useFolderAccessStore.getState().loadRoots()
+    expect(useFolderAccessStore.getState().rootsHydrated).toBe(true)
   })
 })

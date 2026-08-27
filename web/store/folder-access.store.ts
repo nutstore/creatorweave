@@ -170,6 +170,11 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     activeProjectId: null,
     records: {},
     allFilePaths: {},
+    // Defaulted to false so WelcomeScreen and other consumers don't render
+    // the "no folder mounted" step until loadRoots() has actually resolved
+    // for the current active project. Mirrors `hasApiKeyLoaded` in
+    // `useSettingsStore` — see types/folder-access.ts for details.
+    rootsHydrated: false,
 
     // ========================================================================
     // Actions
@@ -184,6 +189,15 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       const prevId = get().activeProjectId
       set((state) => {
         state.activeProjectId = projectId
+        // Reset hydration flag on project switch so WelcomeScreen shows its
+        // loading state until loadRoots() completes for the new project.
+        // Same-project re-entry (prevId === projectId) leaves the flag alone:
+        // the existing roots list is still authoritative and loadRoots() will
+        // set rootsHydrated=true again at the end.
+        if (prevId !== projectId) {
+          state.roots = []
+          state.rootsHydrated = false
+        }
       })
 
       if (!projectId) return
@@ -789,101 +803,112 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
     loadRoots: async () => {
       const projectId = get().activeProjectId
-      if (!projectId) {
-        set({ roots: [] })
-        return
-      }
+      // Mark hydration complete even when there's no active project (so the
+      // empty roots state isn't mistaken for "still loading" by the UI).
+      // We use a single set() at exit so subscribers see a consistent
+      // (roots, rootsHydrated) pair.
+      try {
+        if (!projectId) {
+          set({ roots: [] })
+          return
+        }
 
-      // Self-heal SQLite `project_roots` before reading: IndexedDB handles and
-      // the SQLite table can drift (e.g. after a DB reset / migration), which
-      // makes resolvePath() fall back to the wrong root on sync-to-disk.
-      await reconcileProjectRoots(projectId)
+        // Self-heal SQLite `project_roots` before reading: IndexedDB handles and
+        // the SQLite table can drift (e.g. after a DB reset / migration), which
+        // makes resolvePath() fall back to the wrong root on sync-to-disk.
+        await reconcileProjectRoots(projectId)
 
-      // Load from SQLite
-      const dbRoots: ProjectRoot[] = await getProjectRootRepository().findByProject(projectId)
+        // Load from SQLite
+        const dbRoots: ProjectRoot[] = await getProjectRootRepository().findByProject(projectId)
 
-      // Load handles from DirectoryHandleManager
-      const runtimeHandles = getRuntimeHandlesForProject(projectId)
+        // Load handles from DirectoryHandleManager
+        const runtimeHandles = getRuntimeHandlesForProject(projectId)
 
-      const roots: RootInfo[] = await Promise.all(
-        dbRoots.map(async (dbRoot) => {
-          if (dbRoot.backend === 'native-host') {
-            const ready = dbRoot.scopeId && isNativeHostAvailable()
-              ? await new NativeHostExecutor().hydrateRoot(projectId, dbRoot.scopeId)
-              : false
+        const roots: RootInfo[] = await Promise.all(
+          dbRoots.map(async (dbRoot) => {
+            if (dbRoot.backend === 'native-host') {
+              const ready = dbRoot.scopeId && isNativeHostAvailable()
+                ? await new NativeHostExecutor().hydrateRoot(projectId, dbRoot.scopeId)
+                : false
+              return {
+                id: dbRoot.id,
+                name: dbRoot.name,
+                isDefault: dbRoot.isDefault,
+                readOnly: dbRoot.readOnly,
+                backend: 'native-host',
+                scopeId: dbRoot.scopeId,
+                handle: null,
+                persistedHandle: null,
+                status: ready ? 'ready' : 'idle',
+                error: ready ? undefined : 'Native Host is unavailable or this folder authorization no longer exists',
+              }
+            }
+
+            const runtimeHandle = runtimeHandles.get(dbRoot.name)
+            let handle = runtimeHandle ?? null
+
+            // Try to restore persisted handle
+            let persistedHandle: FileSystemDirectoryHandle | null = null
+            let status: FolderAccessStatus = 'idle'
+            let error: string | undefined
+
+            if (handle) {
+              status = 'ready'
+            } else {
+              try {
+                const record = await folderAccessRepo.findByProjectAndRoot(projectId, dbRoot.name)
+                if (record?.persistedHandle) {
+                  persistedHandle = record.persistedHandle
+                  // Auto-check if browser still has cached permission
+                  const permission = await persistedHandle.queryPermission({ mode: 'readwrite' })
+                  if (permission === 'granted') {
+                    handle = persistedHandle
+                    status = 'ready'
+                    bindRuntimeDirectoryHandle(projectId, dbRoot.name, handle)
+                  } else {
+                    status = 'needs_user_activation'
+                  }
+                } else {
+                  status = 'idle'
+                }
+              } catch {
+                status = 'idle'
+              }
+            }
+
             return {
               id: dbRoot.id,
               name: dbRoot.name,
               isDefault: dbRoot.isDefault,
               readOnly: dbRoot.readOnly,
-              backend: 'native-host',
-              scopeId: dbRoot.scopeId,
-              handle: null,
-              persistedHandle: null,
-              status: ready ? 'ready' : 'idle',
-              error: ready ? undefined : 'Native Host is unavailable or this folder authorization no longer exists',
+              backend: 'fsaccess',
+              scopeId: null,
+              handle,
+              persistedHandle,
+              status,
+              error,
             }
-          }
-
-          const runtimeHandle = runtimeHandles.get(dbRoot.name)
-          let handle = runtimeHandle ?? null
-
-          // Try to restore persisted handle
-          let persistedHandle: FileSystemDirectoryHandle | null = null
-          let status: FolderAccessStatus = 'idle'
-          let error: string | undefined
-
-          if (handle) {
-            status = 'ready'
-          } else {
-            try {
-              const record = await folderAccessRepo.findByProjectAndRoot(projectId, dbRoot.name)
-              if (record?.persistedHandle) {
-                persistedHandle = record.persistedHandle
-                // Auto-check if browser still has cached permission
-                const permission = await persistedHandle.queryPermission({ mode: 'readwrite' })
-                if (permission === 'granted') {
-                  handle = persistedHandle
-                  status = 'ready'
-                  bindRuntimeDirectoryHandle(projectId, dbRoot.name, handle)
-                } else {
-                  status = 'needs_user_activation'
-                }
-              } else {
-                status = 'idle'
-              }
-            } catch {
-              status = 'idle'
-            }
-          }
-
-          return {
-            id: dbRoot.id,
-            name: dbRoot.name,
-            isDefault: dbRoot.isDefault,
-            readOnly: dbRoot.readOnly,
-            backend: 'fsaccess',
-            scopeId: null,
-            handle,
-            persistedHandle,
-            status,
-            error,
-          }
-        })
-      )
-
-      set({ roots })
-
-      // Sync first ready handle to agent.store for backward compat
-      const firstReady = roots.find((r) => r.status === 'ready' && r.handle)
-      if (firstReady?.handle) {
-        try {
-          const { useAgentStore } = await import('./agent.store')
-          useAgentStore.setState({
-            directoryHandle: firstReady.handle,
-            directoryName: firstReady.name,
           })
-        } catch { /* ignore */ }
+        )
+
+        set({ roots })
+
+        // Sync first ready handle to agent.store for backward compat
+        const firstReady = roots.find((r) => r.status === 'ready' && r.handle)
+        if (firstReady?.handle) {
+          try {
+            const { useAgentStore } = await import('./agent.store')
+            useAgentStore.setState({
+              directoryHandle: firstReady.handle,
+              directoryName: firstReady.name,
+            })
+          } catch { /* ignore */ }
+        }
+      } finally {
+        // Always mark hydration complete on exit (success or failure), so the
+        // UI's "no folder mounted" prompt doesn't flash for users who actually
+        // have a root mounted. Mirrors hasApiKeyLoaded in settings.store.
+        set({ rootsHydrated: true })
       }
     },
 

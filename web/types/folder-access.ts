@@ -109,6 +109,15 @@ export interface FolderAccessStore extends FolderAccessActions {
 
   /** All roots for the active project (hydrated from SQLite) */
   roots: RootInfo[]
+  /**
+   * True once `loadRoots()` has completed at least once for the active
+   * project (regardless of whether roots is empty). UI components that gate
+   * on `roots.length === 0` should also gate on `rootsHydrated` to avoid
+   * flashing the "no folder mounted" state during the initial async
+   * hydration (which defaults `roots` to `[]`). Mirrors `hasApiKeyLoaded`
+   * in `useSettingsStore`.
+   */
+  rootsHydrated: boolean
 
   // ---- Shared file path cache ----
 

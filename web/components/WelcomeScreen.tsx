@@ -89,6 +89,13 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
   const hasCreatedProject = typeof window !== 'undefined'
     && localStorage.getItem('creatorweave:auto-default-project-created') === '1'
 
+  // Track whether folder-access hydration has completed for the current
+  // project. Until then we don't know whether `folderRoots` is genuinely
+  // empty (user has no folder mounted) or just hasn't been populated from
+  // disk yet — rendering the mount-folder step in the latter case would
+  // flash a misleading prompt to users who already have a folder mounted.
+  const rootsHydrated = useFolderAccessStore((s) => s.rootsHydrated)
+
   const [step, setStep] = useState<OnboardingStep>(() =>
     getInitialStep(hasApiKey, folderRoots.length, hasCreatedProject)
   )
@@ -181,7 +188,13 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
     [],
   )
 
-  const isLoading = !hasApiKeyLoaded
+  // Block rendering any step until BOTH the API-key check AND folder-roots
+  // hydration have settled. Without the `rootsHydrated` gate, a user who
+  // already has a folder mounted would briefly see the "select a folder"
+  // prompt during the cold-start race between loadFromDB and loadRoots.
+  // (`hasApiKey` defaults to false, so we also gate on `hasApiKeyLoaded` for
+  // the same reason — see settings.store.hasApiKeyLoaded.)
+  const isLoading = !hasApiKeyLoaded || !rootsHydrated
 
   return (
     <main className="flex h-full flex-col items-center justify-center bg-background px-4 dark:bg-neutral-950">

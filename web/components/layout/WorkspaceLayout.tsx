@@ -118,6 +118,24 @@ export function WorkspaceLayout({
   const roots = useFolderAccessStore((s) => s.roots)
   const addRoot = useFolderAccessStore((s) => s.addRoot)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
+  const projectIsLoading = useProjectStore((s) => s.isLoading)
+  // Snapshot workspace-store flags so we can gate on workspace readiness.
+  // projectStore.setActiveProject briefly clears the workspace store
+  // (PENDING_RESET_PATCH: workspaces=[], initialized=false) before
+  // refreshWorkspaces repopulates it. Reading workspaceStore during that
+  // window — as loadFromDB does when picking a fallback activeConversationId —
+  // yields an empty workspaces array and would set activeConversationId=null,
+  // briefly flashing WelcomeScreen on the conversation page. `workspaceReady`
+  // mirrors the project-switch settled state: !projectIsLoading covers the
+  // surrounding setActiveProject call, workspaceInitialized covers the inner
+  // refreshWorkspaces. Both must hold before we trust workspaceStore for
+  // either rendering or loading.
+  const workspaceInitialized = useConversationContextStore((s) => s.initialized)
+  // See note above on the workspace-store transient during project switches.
+  // We deliberately don't require activeWorkspaceId/workspaces.length here:
+  // an empty project (no workspaces yet) is a stable end-state, not a
+  // transient — gating on it would leave such users stuck on the spinner.
+  const workspaceReady = !projectIsLoading && workspaceInitialized
 
   // Stable key derived from active project + roots + manual scan trigger.
   // Prevents redundant scans on reference-only updates while still scanning
@@ -281,9 +299,17 @@ export function WorkspaceLayout({
   // overlapping calls.
   const loadError = useConversationStore((s) => s.loadError)
   useEffect(() => {
-    if (!loaded) loadFromDB()
+    // Don't load conversations while the workspace store is still settling.
+    // syncFromRoute's project switch transiently clears workspaceStore
+    // (workspaces=[], initialized=false) before refreshWorkspaces refills
+    // it; loading during that window would set activeConversationId=null
+    // and briefly render WelcomeScreen before the workspace list returns.
+    // Gating on `workspaceReady` also covers the case where the previous
+    // loadFromDB ran with an empty workspace list — when the store later
+    // settles, this effect re-fires and retries.
+    if (!loaded && workspaceReady) loadFromDB()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, loadError, loadFromDB])
+  }, [loaded, loadError, loadFromDB, workspaceReady])
 
   // Pre-initialize Pyodide runtime in the background so first Python execution is fast
   useEffect(() => {
@@ -889,9 +915,15 @@ export function WorkspaceLayout({
         <div ref={splitContainerRef} className="flex min-w-0 flex-1 overflow-hidden">
           {/* Conversation / Welcome */}
           <main id="main-content" className="min-w-0 flex-1 overflow-hidden">
-            {!loaded ? (
-              // Do not mount WelcomeScreen until persisted conversations have loaded.
-              // Otherwise an existing workspace briefly flashes onboarding on entry.
+            {!loaded || !workspaceReady ? (
+              // Do not mount WelcomeScreen until BOTH persisted conversations
+              // have loaded AND the workspace store has settled. Without the
+              // second condition, syncFromRoute's project switch can clear
+              // workspaceStore.workspaces=[] (before refreshWorkspaces refills
+              // it), causing loadFromDB to read an empty list and set
+              // activeConversationId=null — which would briefly flash
+              // WelcomeScreen on a conversation page that should land directly
+              // on ConversationView.
               <div
                 role="status"
                 aria-live="polite"
