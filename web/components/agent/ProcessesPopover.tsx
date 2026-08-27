@@ -1,7 +1,7 @@
 /**
  * ProcessesPopover — a small floating button in the conversation view
  * (next to AssetsPopover) that expands to show background processes
- * started via the exec tool (dev servers etc, STATUS.md §17).
+ * started via the exec tool (dev servers etc).
  *
  * Lists processes from the Native Host registry (exec_list), polls while
  * open, and supports viewing the log tail and stopping a process (with

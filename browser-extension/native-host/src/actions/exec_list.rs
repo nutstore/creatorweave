@@ -1,6 +1,6 @@
 //! `exec_list` — list managed background processes (optionally per scope).
 //!
-//! STATUS.md §17.2: lets a new session discover processes left over from a
+//! Lets a new session discover processes left over from a
 //! previous one, and powers the UI "running processes" panel.
 
 use serde_json::{json, Value};

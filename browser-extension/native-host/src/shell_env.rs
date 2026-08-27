@@ -74,7 +74,7 @@ static SHELL_ENV: OnceLock<HashMap<String, String>> = OnceLock::new();
 ///   2. `/bin/zsh` (macOS default)
 ///   3. `/bin/bash`
 ///
-/// Windows (STATUS.md §8.2 (7)): returns an empty map immediately — Windows
+/// Windows: returns an empty map immediately — Windows
 /// Chrome passes the user's full environment to NM hosts, so the macOS
 /// launchd PATH problem doesn't exist there.
 ///

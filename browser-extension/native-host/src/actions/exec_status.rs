@@ -1,7 +1,7 @@
 //! `exec_status` — check whether a background process is alive, and
 //! optionally probe a localhost port for readiness.
 //!
-//! STATUS.md §17.2: stateless primitive used by the web executor's internal
+//! Stateless primitive used by the web executor's internal
 //! readiness loop (the LLM never polls this directly).
 
 use serde_json::{json, Value};

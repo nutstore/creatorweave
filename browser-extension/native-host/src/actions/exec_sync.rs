@@ -74,7 +74,7 @@ pub fn handle(request: &Value) -> Value {
     // ── Build and spawn command ──
     #[cfg(windows)]
     let command = {
-        // STATUS.md §8.2 (6): PATH×PATHEXT resolution AFTER policy check.
+        // PATH×PATHEXT resolution AFTER policy check.
         let mut resolved = command.clone();
         resolved[0] = crate::win::resolve_command(&resolved[0]);
         resolved

@@ -29,7 +29,7 @@ pub fn handle(request: &Value) -> Value {
 
     // Cap length to avoid exceeding NM limit after base64 encoding
     // base64 expands by 4/3, so max raw = 1MB * 3/4 ≈ 786KB.
-    // We use 512KB as the safe chunk size (STATUS.md §4.1).
+    // We use 512KB as the safe chunk size.
     let max_chunk = 512 * 1024;
     let length = length.min(max_chunk);
 

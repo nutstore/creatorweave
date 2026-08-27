@@ -1,6 +1,6 @@
 //! Process registry — tracks detached background processes (dev servers etc).
 //!
-//! STATUS.md §17: the NM host is stateless (a new process per message), so
+//! The NM host is stateless (a new process per message), so
 //! background-process state must live on disk. This module owns
 //! `~/.creatorweave/processes.json` plus a lock file for read-modify-write
 //! serialization across concurrent host processes.
@@ -17,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-/// Max concurrently-running managed processes (STATUS.md §17.1).
+/// Max concurrently-running managed processes.
 pub const MAX_RUNNING: usize = 10;
 
 /// Finished records (and their log files) older than this are pruned.
@@ -128,7 +128,7 @@ impl RegistryLock {
                     }
                     #[cfg(windows)]
                     {
-                        // STATUS.md §8.2 (3): LockFileEx exclusive + fail-fast,
+                        // LockFileEx exclusive + fail-fast,
                         // same retry/timeout loop as Unix flock. No stale-lock
                         // breaking needed: the OS releases the lock when the
                         // owning (crashed) process's handle is closed.
@@ -160,7 +160,7 @@ unsafe fn libc_flock(fd: i32) -> i32 {
     flock(fd, 2 | 4) // LOCK_EX | LOCK_NB
 }
 
-/// STATUS.md §8.2 (3): LockFileEx(LOCKFILE_EXCLUSIVE_LOCK |
+/// LockFileEx(LOCKFILE_EXCLUSIVE_LOCK |
 /// LOCKFILE_FAIL_IMMEDIATELY) over the whole file (offsets 0..u32::MAX).
 #[cfg(windows)]
 fn lock_file_exclusive(handle: std::os::windows::io::RawHandle) -> bool {
@@ -214,7 +214,7 @@ pub fn load() -> ProcessesFile {
 }
 
 /// Is a pid still alive? Unix: kill(pid, 0) probe. Windows: OpenProcess +
-/// GetExitCodeProcess (STATUS.md §8.2 (2)).
+/// GetExitCodeProcess.
 pub fn pid_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {

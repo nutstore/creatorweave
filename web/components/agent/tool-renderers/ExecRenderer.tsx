@@ -176,7 +176,7 @@ registerRenderer({
     const hasOutput = output.stdout || output.stderr
     const bg = extractBackground(ctx)
 
-    // Background-process result (STATUS.md §17): dedicated card
+    // Background-process result: dedicated card
     if (bg) {
       return (
         <div className="px-3 py-2 space-y-2">

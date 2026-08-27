@@ -1,14 +1,12 @@
 /**
- * NativeHostExecutor — DiskExecutor 的 Native Messaging 实现
+ * NativeHostExecutor — the Native Messaging implementation of DiskExecutor.
  *
- * 通过 window.__agentWeb.nativeHostCall → extension background →
- * chrome.runtime.sendNativeMessage → Rust host 二进制 的链路进行磁盘 IO。
+ * Performs disk IO through the chain: window.__agentWeb.nativeHostCall →
+ * extension background → chrome.runtime.sendNativeMessage → Rust host binary.
  *
- * 大文件分块：
- *   read: stat 拿大小 → ≤512KB 走 read_file 单次；>512KB 走 read_file_at 分块拼接
- *   write: ≤512KB 走 write_file 单次；>512KB 走 write_file_at 分块（truncate + finalize）
- *
- * 详见 STATUS.md §3.2 & §4 & §9 阶段3。
+ * Large-file chunking:
+ *   read: stat for size → ≤512KB via single read_file; >512KB via chunked read_file_at
+ *   write: ≤512KB via single write_file; >512KB via chunked write_file_at (truncate + finalize)
  */
 
 import type {
@@ -89,7 +87,7 @@ export class NativeHostExecutor implements DiskExecutor {
     return response
   }
 
-  // —— 授权管理 ————————————————————————————————————————————
+  // —— Authorization management ———————————————————————————————————
 
   async listRoots(_projectId: string): Promise<DiskRoot[]> {
     // Native host doesn't know about projectId — list all scopes.
@@ -151,7 +149,7 @@ export class NativeHostExecutor implements DiskExecutor {
     }
   }
 
-  // —— 磁盘执行 ————————————————————————————————————————————
+  // —— Disk execution ————————————————————————————————————————————
 
   async read(rootId: string, relativePath: string): Promise<DiskReadResult> {
     // 1. Stat to get file size
@@ -314,9 +312,11 @@ export class NativeHostExecutor implements DiskExecutor {
     const resp = await this.call('delete_file', { scope_id: rootId, relative_path: relativePath })
     if (!resp.ok) throw new Error(`delete_file failed: ${resp.error}`)
 
-    // 向上修剪因此变空的父目录链（best-effort）。Rust 侧 remove_dir 对
-    // 空目录本来就成功，非空目录会报错，因此逐级 list_dir 检查 + delete
-    // 即可实现，无需新 RPC。停止条件：非空 / 不存在 / 到达根。
+    // Prune the now-empty chain of parent directories upward (best-effort).
+    // The Rust side's remove_dir already succeeds on empty directories and
+    // errors on non-empty ones, so level-by-level list_dir checks + deletes
+    // implement this without a new RPC. Stop conditions: non-empty /
+    // missing / reached the root.
     if (opts?.pruneEmptyParents) {
       const parts = relativePath.split('/').filter(Boolean)
       for (let i = parts.length - 1; i > 0; i--) {
@@ -326,9 +326,9 @@ export class NativeHostExecutor implements DiskExecutor {
             scope_id: rootId,
             relative_path: dirRel,
           })
-          if (!listResp.ok) break // 目录不存在 —— 停止
+          if (!listResp.ok) break // directory missing — stop
           const entries = (listResp.entries as Array<{ name: string }> | undefined) || []
-          if (entries.length > 0) break // 非空 —— 停止向上修剪
+          if (entries.length > 0) break // non-empty — stop pruning upward
           const delResp = await this.call('delete_file', {
             scope_id: rootId,
             relative_path: dirRel,
@@ -375,7 +375,7 @@ export class NativeHostExecutor implements DiskExecutor {
     }))
   }
 
-  // —— 工具 ———————————————————————————————————————————————
+  // —— Helpers ——————————————————————————————————————————————
 
   private guessContentType(path: string): 'text' | 'binary' {
     // Delegate to the shared util for consistency

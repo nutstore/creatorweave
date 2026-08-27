@@ -476,7 +476,7 @@ export function ConversationView({
         {/* Assets popover — small trigger button, expands to show workspace assets */}
         <AssetsPopover convId={convId ?? undefined} onPreviewAsset={onPreviewAsset} />
 
-        {/* Background processes popover — dev servers etc started via exec (STATUS.md §17) */}
+        {/* Background processes popover — dev servers etc started via exec */}
         <ProcessesPopover />
 
         {/* Message navigation dots */}

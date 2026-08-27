@@ -1,36 +1,38 @@
 /**
- * DiskExecutor — native 磁盘执行器抽象层
+ * DiskExecutor — abstraction layer for native disk executors.
  *
- * 取代 `FileSystemDirectoryHandle` 在 WorkspaceRuntime 里的三重角色：
- *   ① 授权凭证  — FSAccess: showDirectoryPicker + IDB | NH: pick_folder + scopes.json
- *   ② 路由标识  — rootId（FSAccess: compoundKey | NH: scope_id）
- *   ③ 磁盘执行器 — read / write / delete / stat / listDir
+ * Replaces the triple role `FileSystemDirectoryHandle` used to play in
+ * WorkspaceRuntime:
+ *   ① authorization credential — FSAccess: showDirectoryPicker + IDB | NH: pick_folder + scopes.json
+ *   ② routing identifier       — rootId (FSAccess: compoundKey | NH: scope_id)
+ *   ③ disk executor            — read / write / delete / stat / listDir
  *
- * 两个实现：
- *   - `FSAccessExecutor`    — 包装现有 File System Access API 逻辑（阶段1，行为不变）
- *   - `NativeHostExecutor`  — 走 Native Messaging → Rust host（阶段3）
+ * Two implementations:
+ *   - `FSAccessExecutor`    — wraps the existing File System Access API logic (phase 1, behavior unchanged)
+ *   - `NativeHostExecutor`  — goes through Native Messaging → Rust host (phase 3)
  *
- * ⚠️ 范围边界：本接口只抽象 **native 磁盘层**（用户授权的项目目录）。
- * OPFS 内部层（workspaceDir → files/.baseline/assets/）继续用原生 handle，
- * 与 native host 体系无关。详见 STATUS.md §1 & §3。
+ * ⚠️ Scope boundary: this interface abstracts ONLY the **native disk layer**
+ * (user-authorized project directories). The OPFS internal layer
+ * (workspaceDir → files/.baseline/assets/) keeps using native handles and is
+ * unrelated to the native host system.
  */
 
-/** 授权后端类型 — UI 据此渲染后端徽章（见 STATUS.md §6.4） */
+/** Authorized backend type — the UI renders a backend badge from this. */
 export type DiskBackend = 'fsaccess' | 'native-host'
 
-/** 一个已授权的磁盘根 */
+/** An authorized disk root. */
 export interface DiskRoot {
-  /** FSAccess: compoundKey（projectId:rootName）| NH: scope_id */
+  /** FSAccess: compoundKey (projectId:rootName) | NH: scope_id */
   readonly id: string
-  /** rootName，用于多根路由与 UI 展示 */
+  /** rootName — used for multi-root routing and UI display */
   readonly displayName: string
   readonly readOnly: boolean
-  /** 区分授权通道，FolderSelector 据此渲染 native-host 徽章 */
+  /** Distinguishes the authorization channel; FolderSelector renders the native-host badge from this */
   readonly backend: DiskBackend
   readonly permissions: readonly ('read' | 'write' | 'search')[]
 }
 
-/** 文件元信息 */
+/** File metadata. */
 export interface DiskStat {
   mtime: number
   size: number
@@ -38,7 +40,7 @@ export interface DiskStat {
   isFile: boolean
 }
 
-/** 目录条目 */
+/** Directory entry. */
 export interface DiskEntry {
   name: string
   kind: 'file' | 'directory'
@@ -46,10 +48,10 @@ export interface DiskEntry {
 }
 
 /**
- * 文件读取结果。
+ * File read result.
  *
- * content 类型对齐 WorkspaceRuntime 现有 readFromNativeFS 的返回：
- * 文本文件返回 string，二进制返回 ArrayBuffer。
+ * The content type mirrors WorkspaceRuntime's existing readFromNativeFS
+ * return: string for text files, ArrayBuffer for binary.
  */
 export interface DiskReadResult {
   content: string | ArrayBuffer
@@ -57,32 +59,33 @@ export interface DiskReadResult {
 }
 
 /**
- * 文件写入入参类型。对齐 WorkspaceRuntime 的 FileContent。
+ * File write input type. Mirrors WorkspaceRuntime's FileContent.
  */
 export type DiskWriteContent = string | ArrayBuffer
 
 /**
- * 磁盘执行器 — 取代 FileSystemDirectoryHandle 的 native 磁盘三重角色。
+ * Disk executor — replaces FileSystemDirectoryHandle's triple native-disk role.
  *
- * 所有方法按 rootId 寻址：FSAccessExecutor 的 rootId = compoundKey，
- * NativeHostExecutor 的 rootId = scope_id。上层（WorkspaceRuntime）
- * 通过 resolvePath() 拿到 rootName 后，向 executor 查询对应的 rootId。
+ * All methods address by rootId: FSAccessExecutor's rootId = compoundKey,
+ * NativeHostExecutor's rootId = scope_id. Upper layers (WorkspaceRuntime)
+ * resolve rootName via resolvePath() and then ask the executor for the
+ * corresponding rootId.
  */
 export interface DiskExecutor {
   readonly backend: DiskBackend
 
-  // —— 授权管理（角色①）——————————————————————————————————
+  // —— Authorization management (role ①) ———————————————————
 
   /**
-   * 列出某 project 下所有已授权的磁盘根。
-   * 对应 WorkspaceRuntime.getAllNativeDirectoryHandles()。
+   * List all authorized disk roots for a project.
+   * Mirrors WorkspaceRuntime.getAllNativeDirectoryHandles().
    */
   listRoots(projectId: string): Promise<DiskRoot[]>
 
   /**
-   * 弹出授权对话框，授权一个新的磁盘根。
-   * 返回 null 表示用户取消（不抛错）。
-   * 对应 folder-access.store.pickDirectory / addRoot。
+   * Show the authorization dialog and authorize a new disk root.
+   * Returns null when the user cancels (no error thrown).
+   * Mirrors folder-access.store.pickDirectory / addRoot.
    */
   authorizeRoot(projectId: string, opts?: {
     displayName?: string
@@ -90,61 +93,69 @@ export interface DiskExecutor {
   }): Promise<DiskRoot | null>
 
   /**
-   * 撤销一个磁盘根的授权。
-   * 对应 folder-access.store.release / removeRoot。
+   * Revoke authorization for a disk root.
+   * Mirrors folder-access.store.release / removeRoot.
    */
   revokeRoot(projectId: string, rootId: string): Promise<void>
 
   /**
-   * 重新校验已持久化的授权是否仍然有效（如浏览器重启后权限可能失效）。
-   * 返回 true 表示权限仍可用（ready），false 表示需要用户重新激活。
-   * 对应 FSAccess 的 queryPermission / NH 的 ping+list_scopes。
+   * Re-validate that a persisted authorization is still valid (permissions
+   * may be lost after a browser restart).
+   * Returns true when the permission is still usable (ready), false when the
+   * user must re-activate it.
+   * Mirrors FSAccess's queryPermission / NH's ping+list_scopes.
    */
   hydrateRoot(projectId: string, rootId: string): Promise<boolean>
 
-  // —— 磁盘执行（角色③；角色②由 rootId 隐式承担）——————————————
+  // —— Disk execution (role ③; role ② is carried implicitly by rootId) ——
 
   /**
-   * 读取文件全部内容 + 元信息。
-   * 对应 WorkspaceRuntime.readFromNativeFS(path, dirHandle)。
+   * Read a file's full content + metadata.
+   * Mirrors WorkspaceRuntime.readFromNativeFS(path, dirHandle).
    *
-   * 大文件分块由实现内部处理（NativeHostExecutor 走 read_file_at 分块），
-   * 上层无感知。
+   * Large-file chunking is handled internally by implementations
+   * (NativeHostExecutor chunks via read_file_at) — invisible to callers.
    */
   read(rootId: string, relativePath: string): Promise<DiskReadResult>
 
   /**
-   * 写入文件（覆盖）。自动创建父目录。
-   * 对应 WorkspaceRuntime.writeNativeFile(dirHandle, path, content)。
+   * Write a file (overwrite). Creates parent directories automatically.
+   * Mirrors WorkspaceRuntime.writeNativeFile(dirHandle, path, content).
    */
   write(rootId: string, relativePath: string, content: DiskWriteContent): Promise<DiskStat>
 
   /**
-   * 删除文件或空目录。路径不存在时静默成功（幂等）。
-   * 对应 WorkspaceRuntime.deleteFromNativeIfExists / deleteFromNative。
+   * Delete a file or empty directory. Silently succeeds when the path does
+   * not exist (idempotent).
+   * Mirrors WorkspaceRuntime.deleteFromNativeIfExists / deleteFromNative.
    *
-   * pruneEmptyParents: 删除后向上修剪磁盘侧因此变空的父目录链（直到
-   * rootId 根或遇到非空目录为止）。同步 delete 落盘时开启，避免「文件
-   * 已删、空目录残留」甚至被后续 flush 重建的幽灵目录问题。
+   * pruneEmptyParents: after deletion, prune the now-empty chain of parent
+   * directories on the disk side (up to the rootId root, or until a
+   * non-empty directory is met). Enabled when syncing deletes to disk, to
+   * avoid "file deleted but empty dir left behind" or even ghost
+   * directories resurrected by a later flush.
    */
   delete(rootId: string, relativePath: string, opts?: { pruneEmptyParents?: boolean }): Promise<void>
 
   /**
-   * 查询文件/目录元信息。不存在时返回 null（不抛错）。
-   * 对应 WorkspaceRuntime.getFileMetadata(dirHandle, path)。
+   * Query file/directory metadata. Returns null when it doesn't exist (no
+   * error thrown).
+   * Mirrors WorkspaceRuntime.getFileMetadata(dirHandle, path).
    */
   stat(rootId: string, relativePath: string): Promise<DiskStat | null>
 
   /**
-   * 非递归列举目录的直接子项。
-   * 对应 WorkspaceRuntime.scanDirRecursive / search tool 的目录遍历。
+   * List the direct children of a directory (non-recursive).
+   * Mirrors WorkspaceRuntime.scanDirRecursive / the search tool's directory
+   * traversal.
    */
   listDir(rootId: string, relativePath: string): Promise<DiskEntry[]>
 }
 
 /**
- * 能力探测：判断 native host 是否可用。
- * 检查 window.__agentWeb.nativeHostCall 是否存在（由浏览器扩展注入）。
+ * Capability probe: check whether the native host is available.
+ * Checks whether window.__agentWeb.nativeHostCall exists (injected by the
+ * browser extension).
  */
 export function isNativeHostAvailable(): boolean {
   if (typeof window === 'undefined') return false

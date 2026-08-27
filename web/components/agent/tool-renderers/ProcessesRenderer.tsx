@@ -1,6 +1,5 @@
 /**
- * Renderer for `processes` tool — background process inspection/management
- * (STATUS.md §17.6).
+ * Renderer for `processes` tool — background process inspection/management.
  *
  * Summary: action name + process name / running count
  * Detail:

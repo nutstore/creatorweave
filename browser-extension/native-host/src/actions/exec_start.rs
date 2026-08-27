@@ -1,6 +1,6 @@
 //! `exec_start` — spawn a detached background process (dev server etc).
 //!
-//! STATUS.md §17.2: stateless. Spawns the command in its own session
+//! Stateless. Spawns the command in its own session
 //! (`setsid` → own process group), redirects stdout/stderr to a log file,
 //! registers it in processes.json, and returns immediately. The child keeps
 //! running after the host process exits.
@@ -35,7 +35,7 @@ pub fn handle(request: &Value) -> Value {
         return json!({ "ok": false, "error": "empty command array" });
     }
 
-    // NOTE (STATUS.md §17.1): exec_start ALWAYS requires user approval on the
+    // NOTE: exec_start ALWAYS requires user approval on the
     // web side. The web executor gates this action behind ExecAuthModal and
     // never consults execpolicy for auto-approval. Long-running processes are
     // one risk tier above one-shot commands.
@@ -68,7 +68,7 @@ pub fn handle(request: &Value) -> Value {
     // Build the command.
     #[cfg(windows)]
     let command = {
-        // STATUS.md §8.2 (6): resolve bare names through PATH×PATHEXT AFTER
+        // resolve bare names through PATH×PATHEXT AFTER
         // policy/approval checks (execpolicy matched the user-facing name).
         let mut resolved = command.clone();
         resolved[0] = crate::win::resolve_command(&resolved[0]);
@@ -119,8 +119,8 @@ pub fn handle(request: &Value) -> Value {
 
     // ── detached spawn ──
     // Unix: new session (setsid) → own process group, pgid == pid.
-    // Windows: CREATE_NEW_PROCESS_GROUP + CREATE_NO_WINDOW (STATUS.md §8.2
-    // (4)); pgid unused (taskkill /T walks the tree by pid).
+    // Windows: CREATE_NEW_PROCESS_GROUP + CREATE_NO_WINDOW
+    // (detached + no console window); pgid unused (taskkill /T walks the tree by pid).
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -185,7 +185,7 @@ pub fn handle(request: &Value) -> Value {
 }
 
 /// Terminate the whole process tree (best-effort rollback).
-/// Unix: SIGTERM the group (-pgid). Windows: taskkill /T (STATUS.md §8.2 (5)).
+/// Unix: SIGTERM the group (-pgid). Windows: taskkill /T.
 fn kill_group(pgid: u32) {
     #[cfg(unix)]
     {

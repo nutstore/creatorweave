@@ -1,7 +1,7 @@
 /**
  * exec tool — Run a shell command on the user's machine via Native Host.
  *
- * This is the Tier 1.5 "transparent exec" capability (STATUS.md §16).
+ * This is the Tier 1.5 "transparent exec" capability.
  * It lets the agent verify its own work by running tests, builds, linters, etc.
  *
  * Approval flow (preApproved model):
@@ -17,8 +17,6 @@
  *
  * This tool is ONLY registered when the Native Host bridge is available
  * (window.__agentWeb.nativeHostCall + nativeHostCheckPolicy).
- *
- * See STATUS.md §16 for the full exec protocol.
  */
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
@@ -230,9 +228,9 @@ export const execExecutor: ToolExecutor = async (args, context) => {
       })
   }
 
-  // Background processes always require explicit user approval (STATUS.md
-  // §17.1): they keep running after the session, hold ports, and continuously
-  // execute AI-modified code — one risk tier above one-shot commands.
+  // Background processes always require explicit user approval: they keep
+  // running after the session, hold ports, and continuously execute AI-modified
+  // code — one risk tier above one-shot commands.
   if (background && decision === 'auto') {
     decision = 'prompt'
   }
@@ -272,7 +270,7 @@ export const execExecutor: ToolExecutor = async (args, context) => {
   }
 
   return serializeExecExecution(scopeId, async () => {
-    // --- Step 3.5: Flush pending changes for this root (STATUS.md §18) ---
+    // --- Step 3.5: Flush pending changes for this root before executing ---
     // The command must run against the agent's CURRENT workspace state, not a
     // stale disk snapshot. Pending write/edit/delete changes in the target root
     // are synced to disk first (reusing the normal sync pipeline, including
@@ -302,7 +300,7 @@ export const execExecutor: ToolExecutor = async (args, context) => {
         { details: { error: err instanceof Error ? err.message : String(err) } })
     }
 
-    // --- Step 4a: Background process start (STATUS.md §17) ---
+    // --- Step 4a: Background process start ---
   // exec_start ALWAYS required user approval above (decision 'prompt' is
   // forced for background: true — see policy check above), the child is
   // detached from the host, and this call waits for readiness internally so
@@ -409,7 +407,7 @@ async function resolveScopeId(
   }
 }
 
-// ─── Background processes (STATUS.md §17) ─────────────────────
+// ─── Background processes ─────────────────────────────────────
 
 function nativeHostCall(payload: Record<string, unknown>): Promise<any> {
   const agentWeb = (window as any).__agentWeb
@@ -446,7 +444,7 @@ async function readLogTail(processId: string, tailBytes = 64_000): Promise<strin
 /**
  * Start a detached background process and wait (inside this tool call) until
  * its port is ready, it exits early, or readyTimeout elapses. Returns ONE
- * result — the model never polls (STATUS.md §17.3).
+ * result — the model never polls.
  */
 async function startBackgroundProcess(params: {
   scopeId: string
@@ -599,7 +597,7 @@ export function peekExecFlushSnapshotIds(workspaceId: string): string[] {
 /**
  * Flush pending OPFS changes for the exec target root to disk.
  *
- * Semantics (STATUS.md §18): the disk the command sees must equal the agent's
+ * Semantics: the disk the command sees must equal the agent's
  * current workspace. Only the target root's pending paths are synced; other
  * roots stay in the normal approval flow.
  *

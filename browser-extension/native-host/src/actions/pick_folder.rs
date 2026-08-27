@@ -1,7 +1,7 @@
 //! `pick_folder` — show OS folder picker, authorize a new scope.
 //!
 //! macOS: NSOpenPanel via objc2-app-kit (localized copy).
-//! Windows: IFileDialog via crate::win (STATUS.md §8.2 (1)).
+//! Windows: IFileDialog via crate::win.
 
 use serde_json::{json, Value};
 
@@ -129,7 +129,7 @@ mod platform {
 mod platform {
     #[cfg(target_os = "windows")]
     pub fn pick_folder() -> Option<std::path::PathBuf> {
-        // STATUS.md §8.2 (1): IFileDialog COM folder picker.
+        // IFileDialog COM folder picker.
         crate::win::pick_folder_dialog()
     }
 

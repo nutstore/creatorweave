@@ -164,7 +164,7 @@ fn default_policy() -> Policy {
             PolicyRule { command: "launchctl".into(), args: vec![], decision: Forbidden },
             PolicyRule { command: "defaults".into(), args: vec![], decision: Forbidden },
             PolicyRule { command: "crontab".into(), args: vec![], decision: Forbidden },
-            // ── Windows shells & system tools: forbidden (STATUS.md §8.2 (8)) ──
+            // ── Windows shells & system tools: forbidden ──
             // No shell wrapping: `cmd /c x` / `powershell -Command x` would
             // hide the real command from the allow-list.
             PolicyRule { command: "cmd".into(), args: vec![], decision: Forbidden },
@@ -200,7 +200,7 @@ fn default_rules() -> Vec<PolicyRule> {
 
 /// Load the policy from disk, creating a default file if it doesn't exist.
 ///
-/// Upgrades (STATUS.md §8.2 (8)): when an existing file predates a set of
+/// Upgrades: when an existing file predates a set of
 /// safety-critical default Forbidden rules (Windows shells etc.), the
 /// missing ones are appended and persisted — user edits (Auto/Prompt rules,
 /// removals of *non-safety* defaults) are preserved. A user may still
@@ -420,7 +420,7 @@ mod tests {
 
     #[test]
     fn windows_shells_are_forbidden() {
-        // STATUS.md §8.2 (8): shell wrappers must never be allowed — they
+        // Shell wrappers must never be allowed — they
         // hide the real command from the allow-list.
         for shell in ["cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "wsl"] {
             assert_eq!(

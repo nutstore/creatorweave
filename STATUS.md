@@ -142,7 +142,12 @@ for path-traversal protection.
 
 ### Command execution
 
-- [ ] `exec` auto-flush: apply the same flush pipeline to `exec_start` (background processes)
+- [x] `exec` auto-flush covers `exec_start` too (verified 2026-08-27, TODO was stale):
+      the flush (`flushPendingForRoot`, Step 3.5) runs inside `serializeExecExecution`
+      BEFORE the background/foreground branch, so both `exec_sync` and `exec_start`
+      execute against flushed disk. `autoSynced` is threaded into `startBackgroundProcess`
+      and returned as `auto_synced` in all three background outcomes (ready/exited/timeout).
+      Landed together with the flush pipeline itself in `ed7b2a5`.
 
 ### Cross-platform & hardening
 

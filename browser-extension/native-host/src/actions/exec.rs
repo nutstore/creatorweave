@@ -1,7 +1,7 @@
 //! `exec` — execute a command in a scope root, streaming stdout/stderr (档位 1.5).
 //!
 //! This is a **streaming** action (handled via `connectNative`, see main.rs).
-//! The protocol is documented in STATUS.md §16:
+//! The protocol:
 //!
 //!   1. First message: `{ action: "exec", scope_id, command: [...], cwd?, env? }`
 //!      - Host checks execpolicy → returns `{ type: "decision", decision }`
@@ -139,7 +139,7 @@ fn execute_and_stream(
     // Build the command
     #[cfg(windows)]
     let command: Vec<String> = {
-        // STATUS.md §8.2 (6): PATH×PATHEXT resolution AFTER policy check.
+        // PATH×PATHEXT resolution AFTER policy check.
         let mut resolved = command.to_vec();
         resolved[0] = crate::win::resolve_command(&resolved[0]);
         resolved

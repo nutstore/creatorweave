@@ -1951,7 +1951,7 @@ export default defineBackground(() => {
             'write_file', 'write_file_at', 'delete_file',
             'check_policy', 'exec_sync',
             'get_execpolicy', 'set_execpolicy',
-            // Background process management (STATUS.md §17)
+            // Background process management
             'exec_start', 'exec_logs', 'exec_status', 'exec_stop', 'exec_list',
           ])
           if (!action || !allowedActions.has(action)) {

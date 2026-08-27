@@ -1643,7 +1643,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
       const userMsgTimestamp = conv.messages[userMsgIndex].timestamp
 
-      // 找到该用户消息所属轮次中，需要清理的所有后续消息（直到下一个 user）
+      // Find all subsequent messages in this user message's turn that need
+      // clearing (up to the next user message)
       const idsToDelete = new Set<string>()
       for (let i = userMsgIndex + 1; i < conv.messages.length; i++) {
         const msg = conv.messages[i]
@@ -1655,14 +1656,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const conv = draft.conversations.find((c) => c.id === conversationId)
         if (!conv) return
 
-        // 更新用户消息内容
+        // Update the user message content
         conv.messages[userMsgIndex] = {
           ...conv.messages[userMsgIndex],
           content: newContent,
           timestamp: Date.now(),
         }
 
-        // 删除该 user 消息后、下一个 user 之前的所有非 user 消息
+        // Delete all non-user messages after this user message, before the
+        // next user message
         if (idsToDelete.size > 0) {
           conv.messages = conv.messages.filter((m) => !idsToDelete.has(m.id))
         }
@@ -1670,7 +1672,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         // Invalidate compression summary if the edited message was within the compressed range
         get().invalidateCompressionBaseline(conv, userMsgTimestamp)
 
-        // 重置流式状态
+        // Reset streaming state
         conv.status = 'idle'
         conv.streamingContent = ''
         conv.streamingReasoning = ''
@@ -1682,7 +1684,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         conv.updatedAt = Date.now()
       })
 
-      // 持久化
+      // Persist
       const updatedConv = get().conversations.find((c) => c.id === conversationId)
       if (updatedConv) {
         persistMessageReplace(conversationId, updatedConv.messages).catch((error) => {
@@ -1706,7 +1708,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         return
       }
 
-      // 获取设置并执行
+      // Get settings and execute
       const settingsState = useSettingsStore.getState()
       const provider = settingsState.providerType
       const effectiveConfig = settingsState.getEffectiveProviderConfig()
@@ -2570,7 +2572,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               console.warn('[conversation.store] Auto-apply after completed run failed:', error)
             }
 
-            // === Exec auto-flush snapshots (STATUS.md §18) ===
+            // === Exec auto-flush snapshots ===
             // exec tool calls may have already flushed + snapshotted pending
             // changes mid-run (so a command could run against current code).
             // Those paths are no longer pending, so auto-apply above skipped

@@ -163,7 +163,7 @@ import {
   execPromptDoc,
 } from './tools/exec.tool'
 
-// Processes tool — inspect/manage background processes (STATUS.md §17, conditional on exec bridge)
+// Processes tool — inspect/manage background processes (conditional on exec bridge)
 import {
   processesDefinition,
   processesExecutor,

@@ -1,6 +1,6 @@
 //! `exec_stop` — terminate a background process (whole process group).
 //!
-//! STATUS.md §17.2: SIGTERM the group (-pgid) first; `force: true` escalates
+//! SIGTERM the group (-pgid) first; `force: true` escalates
 //! to SIGKILL. Marks the registry record as stopped.
 
 use serde_json::{json, Value};
@@ -37,7 +37,7 @@ pub fn handle(request: &Value) -> Value {
 
     // ── signal the whole process tree ──
     // Unix: SIGTERM(15)/SIGKILL(9) the group. Windows: taskkill /T (+ /F when
-    // force) — tree kill by pid (STATUS.md §8.2 (5)).
+    // force) — tree kill by pid.
     #[cfg(windows)]
     let signaled = crate::win::kill_tree(rec.pid, force);
     #[cfg(unix)]

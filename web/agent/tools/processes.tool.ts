@@ -1,6 +1,6 @@
 /**
  * processes tool — inspect and manage background processes started via exec
- * (dev servers etc, STATUS.md §17).
+ * (dev servers etc).
  *
  * Default call (no args) lists all managed processes — this is the cheap,
  * obvious way for the model to discover what is running in the background.

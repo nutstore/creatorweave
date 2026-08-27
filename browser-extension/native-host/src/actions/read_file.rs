@@ -1,6 +1,6 @@
 //! `read_file` — read a file (small files, single NM message).
 //!
-//! No max_bytes truncation (STATUS.md §5.4): WorkspaceRuntime always needs
+//! No max_bytes truncation: WorkspaceRuntime always needs
 //! full content. The caller (NativeHostExecutor) decides small vs chunked
 //! based on stat size before calling this action.
 

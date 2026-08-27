@@ -1,4 +1,4 @@
-//! Windows platform helpers — STATUS.md §8.
+//! Windows platform helpers.
 //!
 //! Hosts the Windows-specific primitives so action modules stay readable:
 //!   - `pid_alive`          — OpenProcess + GetExitCodeProcess liveness probe

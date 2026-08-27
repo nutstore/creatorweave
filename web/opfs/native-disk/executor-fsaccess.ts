@@ -1,17 +1,16 @@
 /**
- * FSAccessExecutor — DiskExecutor 的 File System Access API 实现
+ * FSAccessExecutor — the File System Access API implementation of DiskExecutor.
  *
- * 把 WorkspaceRuntime 原本直接调用 FileSystemDirectoryHandle 的 native
- * 磁盘逻辑，搬进一个实现类。行为与改造前完全一致（阶段1 纯重构）。
+ * Moves WorkspaceRuntime's native disk logic (which used to call
+ * FileSystemDirectoryHandle directly) into an implementation class. Behavior
+ * is identical to before the refactor (phase 1, pure restructuring).
  *
- * 数据来源：
- *   - 授权 + 持久化：@/native-fs（DirectoryHandleManager + IDB）
- *   - 运行时 handle 注册表：getRuntimeDirectoryHandle / getRuntimeHandlesForProject
- *   - 文件操作：直接调 FileSystemDirectoryHandle API
+ * Data sources:
+ *   - Authorization + persistence: @/native-fs (DirectoryHandleManager + IDB)
+ *   - Runtime handle registry: getRuntimeDirectoryHandle / getRuntimeHandlesForProject
+ *   - File operations: direct FileSystemDirectoryHandle API calls
  *
- * rootId 约定：compoundKey（`projectId:rootName`），与 native-fs 的存储键一致。
- *
- * 详见 STATUS.md §3.2 & §9 阶段1。
+ * rootId convention: compoundKey (`projectId:rootName`), same as native-fs's storage key.
  */
 
 import type {
@@ -32,13 +31,13 @@ import {
 } from '@/native-fs'
 import type { DirectoryPickerOptions } from '@/native-fs'
 
-/** resolveSafeRelative: 拒绝绝对路径 / .. 穿越 */
+/** resolveSafeRelative: reject absolute paths / .. traversal */
 function assertRelativePath(p: string): void {
   if (!p) throw new Error('relativePath is empty')
   if (p.startsWith('/')) throw new Error(`relativePath must be relative, got: ${p}`)
 }
 
-/** 沿路径解析父目录 handle，返回 (父目录handle, 文件名) */
+/** Resolve the parent directory handle along the path; returns (parent dir handle, file name). */
 async function resolveParent(
   root: FileSystemDirectoryHandle,
   path: string
@@ -53,7 +52,7 @@ async function resolveParent(
   return { parent: current, name }
 }
 
-/** 沿路径解析到目标文件 handle（不创建） */
+/** Resolve to the target file handle along the path (does not create). */
 async function resolveFileHandle(
   root: FileSystemDirectoryHandle,
   path: string
@@ -68,7 +67,7 @@ async function resolveFileHandle(
   return current.getFileHandle(name)
 }
 
-/** 从 compoundKey 还原 (projectId, rootName) */
+/** Restore (projectId, rootName) from a compoundKey. */
 function parseCompoundKey(rootId: string): { projectId: string; rootName: string } {
   const idx = rootId.indexOf(':')
   if (idx === -1) return { projectId: rootId, rootName: rootId }
@@ -78,7 +77,7 @@ function parseCompoundKey(rootId: string): { projectId: string; rootName: string
 export class FSAccessExecutor implements DiskExecutor {
   readonly backend = 'fsaccess' as const
 
-  // —— 授权管理 ————————————————————————————————————————————
+  // —— Authorization management ———————————————————————————————————
 
   async listRoots(projectId: string): Promise<DiskRoot[]> {
     const handles = getRuntimeHandlesForProject(projectId)
@@ -87,7 +86,7 @@ export class FSAccessExecutor implements DiskExecutor {
       roots.push({
         id: buildHandleKey(projectId, rootName),
         displayName: rootName,
-        readOnly: false, // FS Access 不区分读写权限（授权即 readwrite）
+        readOnly: false, // FS Access doesn't split read/write (authorization is readwrite)
         backend: 'fsaccess',
         permissions: ['read', 'write', 'search'],
       })
@@ -102,10 +101,10 @@ export class FSAccessExecutor implements DiskExecutor {
     const rootName = opts?.displayName ?? projectId
     const pickerOpts: DirectoryPickerOptions = { mode: 'readwrite' }
     const handle = await requestDirectoryAccess(projectId, rootName, pickerOpts)
-    if (!handle) return null // 用户取消
+    if (!handle) return null // user cancelled
 
-    // rootName 用实际选中的文件夹名（handle.name），而非传入的 displayName，
-    // 与现有 folder-access.store.pickDirectory 的行为一致。
+    // rootName uses the actually-picked folder name (handle.name), not the
+    // passed displayName — same behavior as folder-access.store.pickDirectory.
     const actualName = handle.name
     return {
       id: buildHandleKey(projectId, actualName),
@@ -133,7 +132,7 @@ export class FSAccessExecutor implements DiskExecutor {
     }
   }
 
-  // —— 磁盘执行 ————————————————————————————————————————————
+  // —— Disk execution ————————————————————————————————————————————
 
   async read(rootId: string, relativePath: string): Promise<DiskReadResult> {
     assertRelativePath(relativePath)
@@ -163,7 +162,7 @@ export class FSAccessExecutor implements DiskExecutor {
     const handle = this.requireHandle(rootId)
     const parts = relativePath.split('/').filter(Boolean)
     const fileName = parts.pop()!
-    // 自动建父目录
+    // Create parent directories automatically
     let current = handle
     for (const part of parts) {
       current = await current.getDirectoryHandle(part, { create: true })
@@ -173,7 +172,8 @@ export class FSAccessExecutor implements DiskExecutor {
     await writable.write(content)
     await writable.close()
 
-    // 读回 metadata 返回 stat（对齐 writeNativeFile 后getFileMetadata 的场景）
+    // Read back metadata for the returned stat (mirrors the
+    // writeNativeFile-then-getFileMetadata pattern)
     const file = await targetFile.getFile()
     return {
       mtime: file.lastModified,
@@ -194,11 +194,13 @@ export class FSAccessExecutor implements DiskExecutor {
       const { parent, name } = await resolveParent(handle, relativePath)
       await parent.removeEntry(name)
 
-      // 向上修剪因此变空的父目录链（best-effort，不抛错）。
-      // 同步 delete 落盘后调用，避免磁盘侧残留空目录树。
+      // Prune the now-empty chain of parent directories upward
+      // (best-effort, no throw). Called after syncing a delete to disk, to
+      // avoid empty directory trees left behind on the disk side.
       if (opts?.pruneEmptyParents) {
         const parts = relativePath.split('/').filter(Boolean)
-        // 从最深层父目录向根逐级检查，略过最后一层（即被删条目本身）
+        // Check level by level from the deepest parent toward the root,
+        // skipping the last level (the deleted entry itself)
         let current = handle
         for (let i = 0; i < parts.length - 1; i++) {
           try {
@@ -212,13 +214,13 @@ export class FSAccessExecutor implements DiskExecutor {
             if (!isEmpty) break
             await current.removeEntry(parts[i])
           } catch {
-            // 目录不存在或删除失败 —— 停止向上修剪
+            // Directory missing or removal failed — stop pruning upward
             break
           }
         }
       }
     } catch {
-      // 不存在则静默成功（幂等），对齐 deleteFromNativeIfExists
+      // Silently succeed when missing (idempotent), mirroring deleteFromNativeIfExists
     }
   }
 
@@ -235,14 +237,14 @@ export class FSAccessExecutor implements DiskExecutor {
         isFile: true,
       }
     } catch {
-      // 可能是目录或不存在；尝试作为目录解析
+      // May be a directory or missing; try resolving as a directory
       try {
         const parts = relativePath.split('/').filter(Boolean)
         let current = handle
         for (const part of parts) {
           current = await current.getDirectoryHandle(part)
         }
-        // 是目录
+        // It's a directory
         return { mtime: 0, size: 0, contentType: 'binary', isFile: false }
       } catch {
         return null
@@ -252,7 +254,7 @@ export class FSAccessExecutor implements DiskExecutor {
 
   async listDir(rootId: string, relativePath: string): Promise<DiskEntry[]> {
     const handle = this.requireHandle(rootId)
-    // relativePath 为空或 '.' 表示根
+    // Empty relativePath or '.' means the root
     let dir = handle
     if (relativePath && relativePath !== '.') {
       const parts = relativePath.split('/').filter(Boolean)
@@ -274,7 +276,7 @@ export class FSAccessExecutor implements DiskExecutor {
             isFile: true,
           }
         } catch {
-          /* 忽略单个文件读取失败 */
+          /* ignore single-file read failures */
         }
       }
       entries.push(entry)
@@ -282,11 +284,11 @@ export class FSAccessExecutor implements DiskExecutor {
     return entries
   }
 
-  // —— 内部工具 ————————————————————————————————————————————
+  // —— Internal helpers ———————————————————————————————————————————
 
   /**
-   * 从 rootId 解析出运行时 handle，不存在则抛错。
-   * 注意：这里拿到的是 FS Access 的 FileSystemDirectoryHandle。
+   * Resolve the runtime handle from a rootId; throws when missing.
+   * Note: this is a File System Access FileSystemDirectoryHandle.
    */
   private requireHandle(rootId: string): FileSystemDirectoryHandle {
     const { projectId, rootName } = parseCompoundKey(rootId)

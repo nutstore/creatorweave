@@ -1,6 +1,6 @@
 //! Scope management — maps opaque `scope_id` strings to real filesystem paths.
 //!
-//! Security model (STATUS.md §8):
+//! Security model:
 //!   - The web page / Agent NEVER sees real disk paths — only `scope_id`.
 //!   - Real path mapping lives in `~/.creatorweave/native-host-scopes.json`.
 //!   - Four-layer defense:

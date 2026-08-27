@@ -1,6 +1,6 @@
 //! `exec_logs` — read background-process log output (offset-paged).
 //!
-//! STATUS.md §17.2: same chunking protocol as read_file_at. Reads the log
+//! Same chunking protocol as read_file_at. Reads the log
 //! file recorded in processes.json.
 
 use std::io::{Read, Seek, SeekFrom};

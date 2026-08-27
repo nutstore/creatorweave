@@ -1,22 +1,22 @@
 /**
- * CompositeExecutor — 按 rootId 格式路由到正确的子 executor
+ * CompositeExecutor — routes to the correct child executor by rootId shape.
  *
- * 解决"native host 可用时全局劫持"问题（STATUS.md §15）：
+ * Solves the "global hijack when native host is available" problem:
  *
- *   问题：当 native host bridge 可用时，如果把所有磁盘操作都走
- *   NativeHostExecutor，agent 自己的 workspace（FS Access root）
- *   也会被劫持，导致 compoundKey rootId 传入 NativeHostExecutor →
- *   Rust 侧报 `unknown scope_id` → bootstrap 鸡生蛋崩溃。
+ *   Problem: when the native host bridge is available, routing ALL disk
+ *   operations through NativeHostExecutor would also hijack the agent's own
+ *   workspace (FS Access roots). A compoundKey rootId passed into
+ *   NativeHostExecutor makes the Rust side report `unknown scope_id`, which
+ *   crashes bootstrap (a chicken-and-egg failure).
  *
- *   修复：CompositeExecutor 按 rootId 格式路由：
- *     - `scope_xxx`（native-host scope_id）→ NativeHostExecutor
- *     - 其他（compoundKey: `projectId:rootName`）→ FSAccessExecutor
+ *   Fix: CompositeExecutor routes by rootId shape:
+ *     - `scope_xxx` (native-host scope_id) → NativeHostExecutor
+ *     - anything else (compoundKey: `projectId:rootName`) → FSAccessExecutor
  *
- * 这与 WorkspaceRuntime.ensureRootMap() 的 rootId 生成逻辑一一对应：
- *   backend === 'native-host' → rootId = root.scopeId         （scope_xxx）
- *   backend === 'fsaccess'    → rootId = buildHandleKey(...)   （compoundKey）
- *
- * 详见 STATUS.md §15。
+ * This corresponds one-to-one with WorkspaceRuntime.ensureRootMap()'s rootId
+ * generation:
+ *   backend === 'native-host' → rootId = root.scopeId         (scope_xxx)
+ *   backend === 'fsaccess'    → rootId = buildHandleKey(...)   (compoundKey)
  */
 
 import type {
@@ -30,8 +30,8 @@ import type {
 } from './executor'
 
 /**
- * native-host scope_id 格式：`scope_` 前缀 + 十六进制随机串。
- * 见 Rust scope.rs: `format!("scope_{}", rand_id())`。
+ * native-host scope_id shape: `scope_` prefix + a random hex string.
+ * See Rust scope.rs: `format!("scope_{}", rand_id())`.
  */
 function isScopeId(rootId: string): boolean {
   return rootId.startsWith('scope_')
@@ -39,9 +39,10 @@ function isScopeId(rootId: string): boolean {
 
 export class CompositeExecutor implements DiskExecutor {
   /**
-   * CompositeExecutor 本身不属于单一后端；返回的 roots 来自两个子 executor，
-   * 每个子 root 携带自己的 `backend` 字段。这里的实例属性仅在极少路径
-   * 被读取（当前无消费方），设为 'fsaccess' 作为保守默认值。
+   * CompositeExecutor itself doesn't belong to a single backend; returned
+   * roots come from both child executors and each carries its own `backend`
+   * field. This instance property is only read on rare paths (currently no
+   * consumers), so 'fsaccess' is set as a conservative default.
    */
   readonly backend: DiskBackend = 'fsaccess'
 
@@ -50,18 +51,19 @@ export class CompositeExecutor implements DiskExecutor {
     private readonly nativeHost: DiskExecutor
   ) {}
 
-  /** 按 rootId 路由到正确的子 executor */
+  /** Route to the correct child executor by rootId. */
   private route(rootId: string): DiskExecutor {
     return isScopeId(rootId) ? this.nativeHost : this.fsAccess
   }
 
-  // —— 授权管理 ————————————————————————————————————————————
+  // —— Authorization management ———————————————————————————————————
 
   async listRoots(projectId: string): Promise<DiskRoot[]> {
-    // 合并两个后端的 roots。
-    // nativeHost.listRoots 内部调 list_scopes（全量），不区分 project，
-    // 但每条 root 自带 backend 标记，调用方（WorkspaceRuntime）按 scopeId
-    // 匹配 project_roots 表，不会串项目。
+    // Merge roots from both backends.
+    // nativeHost.listRoots internally calls list_scopes (full list) without
+    // filtering by project, but each root carries its own backend marker;
+    // the caller (WorkspaceRuntime) matches scopeIds against the
+    // project_roots table, so projects never mix.
     const [fsRoots, nhRoots] = await Promise.all([
       this.fsAccess.listRoots(projectId).catch(() => [] as DiskRoot[]),
       this.nativeHost.listRoots(projectId).catch(() => [] as DiskRoot[]),
@@ -70,11 +72,13 @@ export class CompositeExecutor implements DiskExecutor {
   }
 
   /**
-   * 授权新根：优先走 FS Access（浏览器原生 picker，无需额外依赖）。
+   * Authorize a new root: prefers FS Access (the browser-native picker, no
+   * extra dependencies).
    *
-   * 调用方如果想走 native host 授权，应直接用 NativeHostExecutor，
-   * 或在此方法加 opts.backend 参数扩展。当前 folder-access.store 的
-   * addRoot 在 native-host 路径直接调 pick_folder，不经此方法。
+   * Callers that want native-host authorization should use
+   * NativeHostExecutor directly, or extend this method with an opts.backend
+   * parameter. Currently folder-access.store's addRoot calls pick_folder
+   * directly on the native-host path, bypassing this method.
    */
   async authorizeRoot(
     projectId: string,
@@ -91,7 +95,7 @@ export class CompositeExecutor implements DiskExecutor {
     return this.route(rootId).hydrateRoot(projectId, rootId)
   }
 
-  // —— 磁盘执行（按 rootId 路由）——————————————————————————
+  // —— Disk execution (routed by rootId) ——————————————————————————
 
   async read(rootId: string, relativePath: string): Promise<DiskReadResult> {
     return this.route(rootId).read(rootId, relativePath)
