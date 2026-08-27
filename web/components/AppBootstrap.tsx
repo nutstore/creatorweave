@@ -13,7 +13,6 @@ import { useOPFSStore } from '@/store/opfs.store'
 import { initStorage, setupAutoSave, getRuntimeCapability } from '@/storage'
 import { useRouter } from 'next/navigation'
 import { useT } from '@/i18n'
-import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionInstallGuide } from '@/components/extension'
 import { PageWriteAuthModal } from '@/components/agent/PageWriteAuthModal'
@@ -25,7 +24,7 @@ import { ServiceWorkerBridge } from '@/components/ServiceWorkerBridge'
  *
  * Extracted from WorkspaceApp's `App` component (init state machine, loading /
  * error / database-inaccessible gates) plus AppReady's non-route chrome
- * (ServiceWorkerBridge, InstallPrompt, auth modals, Toaster...). The tree only
+ * (ServiceWorkerBridge, auth modals, Toaster...). The tree only
  * renders `children` once storage init completed successfully.
  *
  * This component is client-only and must be loaded via next/dynamic with
@@ -547,7 +546,6 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
     <>
       {children}
       <ServiceWorkerBridge />
-      <InstallPrompt />
       <DatabaseRefreshDialog isOpen={false} errorMessage={null} />
       <ExtensionInstallGuide
         open={extensionGuideOpen}
