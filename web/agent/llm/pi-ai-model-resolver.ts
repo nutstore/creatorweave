@@ -146,6 +146,13 @@ function createOpenAICompatibleFallback(
       : 'openai-completions'
   const contextWindow = lookupContextWindow(providerType, modelName)
 
+  // Zhipu bigmodel.cn (GLM Coding Plan & standard API) rejects role:"developer"
+  // with error 1214 (invalid role) — it only accepts system/user/assistant/tool.
+  // pi-ai's detectCompat() only recognizes api.z.ai as "non-standard" and would
+  // emit developer-role system prompts for models missing from its native zai
+  // catalog (e.g. glm-5.2, glm-5.3-flash resolved via this fallback path).
+  const isBigmodel = /bigmodel\.cn/i.test(baseUrl)
+
   return {
     id: modelName,
     name: modelName,
@@ -167,6 +174,7 @@ function createOpenAICompatibleFallback(
     },
     contextWindow,
     maxTokens: DEFAULT_MAX_TOKENS,
+    ...(isBigmodel ? { compat: { supportsDeveloperRole: false } } : {}),
   }
 }
 
