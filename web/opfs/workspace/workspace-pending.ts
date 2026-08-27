@@ -658,27 +658,36 @@ export class WorkspacePendingManager {
       : await this.readNativeMtime(directoryHandle, nativePath)
     const baselineFsMtime = change.fsMtime || 0
 
+    // Without a captured native mtime there is no common disk baseline. We
+    // must not infer a conflict from the current disk state: OPFS-only writes
+    // (including Python-created drafts) intentionally have this form.
+    if (baselineFsMtime === 0) {
+      return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+    }
+
     if (change.type === 'create') {
-      if (currentFsMtime !== null) {
-        if (baselineFsMtime === 0 || currentFsMtime !== baselineFsMtime) {
-          // Check if disk content matches OPFS — if so, not a conflict
-          // (our own sync or Python write produced identical content).
-          const diskMatchesOpfs = await this.isNativeAlignedWithOpfs(directoryHandle, change.path, nativePath, disk)
-          if (diskMatchesOpfs) {
-            return { isConflict: false, currentFsMtime }
-          }
-          return {
-            isConflict: true,
-            reason: `检测到冲突：${change.path} 在草稿创建后已存在更新的磁盘版本。`,
-            currentFsMtime,
-          }
+      if (currentFsMtime !== null && currentFsMtime > baselineFsMtime) {
+        // Check if disk content matches OPFS — if so, not a conflict
+        // (our own sync or Python write produced identical content).
+        const diskMatchesOpfs = await this.isNativeAlignedWithOpfs(directoryHandle, change.path, nativePath, disk)
+        if (diskMatchesOpfs) {
+          return { isConflict: false, currentFsMtime }
+        }
+        return {
+          isConflict: true,
+          reason: `检测到冲突：${change.path} 在草稿创建后已存在更新的磁盘版本。`,
+          currentFsMtime,
         }
       }
-      return { isConflict: false, currentFsMtime: 0 }
+      return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
     }
 
     if (change.type === 'modify') {
-      if (baselineFsMtime > 0 && currentFsMtime !== baselineFsMtime) {
+      // fsMtime is the disk timestamp recorded at the common baseline. Only a
+      // strictly newer disk timestamp can represent a concurrent disk edit;
+      // an older timestamp is stale disk state and must not materialize a
+      // conflict against the newer OPFS draft.
+      if (baselineFsMtime > 0 && currentFsMtime !== null && currentFsMtime > baselineFsMtime) {
         // Before declaring a conflict, check if the current disk content
         // matches the OPFS pending content. If they match, the mtime drift
         // was caused by our own sync (or an external write that happened to
@@ -708,7 +717,7 @@ export class WorkspacePendingManager {
       if (
         baselineFsMtime > 0 &&
         currentFsMtime !== null &&
-        currentFsMtime !== baselineFsMtime
+        currentFsMtime > baselineFsMtime
       ) {
         const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath, disk)
         if (alignedWithBaseline) {

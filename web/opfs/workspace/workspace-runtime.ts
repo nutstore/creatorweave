@@ -1742,8 +1742,14 @@ export class WorkspaceRuntime {
           restored = await this.restorePendingModifyFromBaseline(normalizedPath)
         }
         if (!restored) {
-          restoreFailures.push(change.path)
-          continue
+          // No captured baseline means this is an OPFS-only draft, so there is
+          // no native version to restore while discarding it.
+          const hadBaseline = await this.hasBaselineFile(normalizedPath)
+          if (hadBaseline) {
+            restoreFailures.push(change.path)
+            continue
+          }
+          await this.deleteFromFilesDirIfExists(normalizedPath)
         }
         await this.deleteFromBaselineDirIfExists(normalizedPath)
       } else if (change.type === 'delete') {
@@ -1815,8 +1821,13 @@ export class WorkspaceRuntime {
             restored = await this.restorePendingModifyFromBaseline(normalizedPath)
           }
           if (!restored) {
-            failedPaths.push(change.path)
-            continue
+            // OPFS-only modify: no baseline exists, so discard the draft body.
+            const hadBaseline = await this.hasBaselineFile(normalizedPath)
+            if (hadBaseline) {
+              failedPaths.push(change.path)
+              continue
+            }
+            await this.deleteFromFilesDirIfExists(normalizedPath)
           }
           await this.deleteFromBaselineDirIfExists(normalizedPath)
         }
@@ -1853,7 +1864,14 @@ export class WorkspaceRuntime {
         restored = await this.restorePendingModifyFromBaseline(normalizedTargetPath)
       }
       if (!restored) {
-        throw new Error(`无法拒绝修改 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
+        // A modify record without any captured baseline was produced from an
+        // OPFS-only write. It has no known disk state to restore, so rejecting
+        // it must only clear the draft instead of blocking on directory access.
+        const hadBaseline = await this.hasBaselineFile(normalizedTargetPath)
+        if (hadBaseline) {
+          throw new Error(`无法拒绝修改 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
+        }
+        await this.deleteFromFilesDirIfExists(normalizedTargetPath)
       }
       await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
     } else if (existing?.type === 'delete') {
@@ -3351,8 +3369,11 @@ export class WorkspaceRuntime {
             await this.captureModifyBaseline(normalizedPath, nativeContent)
           }
         } catch {
-          // File may not exist on native FS (genuinely new file) — use OPFS mtime
-          nativeFsMtime = change.mtime
+          // No native file was readable, so no common disk baseline exists.
+          // Keep the sentinel at 0; using the OPFS change mtime here incorrectly
+          // turns a Python-created draft into a fake disk baseline and can
+          // subsequently manufacture a conflict against an older disk file.
+          nativeFsMtime = 0
         }
       } else {
         // No directoryHandle — check native-host roots via executor
@@ -3379,13 +3400,16 @@ export class WorkspaceRuntime {
                 await this.captureModifyBaseline(normalizedPath, nativeContent)
               }
             } else {
-              nativeFsMtime = change.mtime
+              // The file does not exist on disk: no common disk baseline.
+              nativeFsMtime = 0
             }
           } else {
-            nativeFsMtime = change.mtime
+            // No disk root is bound: this is an OPFS-only draft.
+            nativeFsMtime = 0
           }
         } catch {
-          nativeFsMtime = change.mtime
+          // Do not synthesize a disk baseline from the OPFS mtime.
+          nativeFsMtime = 0
         }
       }
 

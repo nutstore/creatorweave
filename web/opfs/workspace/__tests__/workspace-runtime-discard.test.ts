@@ -89,7 +89,7 @@ describe('WorkspaceRuntime discard behavior', () => {
     expect(runtime.pendingManager.removeByPath).toHaveBeenCalledWith('src/a.ts')
   })
 
-  it('discardPendingPath keeps pending when modify baseline cannot be restored', async () => {
+  it('discardPendingPath clears an OPFS-only modify with no baseline', async () => {
     const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
     runtime.initialized = true
     runtime.pendingManager = {
@@ -97,6 +97,28 @@ describe('WorkspaceRuntime discard behavior', () => {
       removeByPath: vi.fn(async () => {}),
     }
     runtime.restorePendingModifyFromNative = vi.fn(async () => false)
+    runtime.restorePendingModifyFromBaseline = vi.fn(async () => false)
+    runtime.hasBaselineFile = vi.fn(async () => false)
+    runtime.deleteFromFilesDirIfExists = vi.fn(async () => {})
+    runtime.deleteFromBaselineDirIfExists = vi.fn(async () => {})
+    runtime.saveMetadata = vi.fn(async () => {})
+
+    await runtime.discardPendingPath('src/a.ts')
+
+    expect(runtime.deleteFromFilesDirIfExists).toHaveBeenCalledWith('src/a.ts')
+    expect(runtime.pendingManager.removeByPath).toHaveBeenCalledWith('src/a.ts')
+  })
+
+  it('discardPendingPath keeps pending when a captured modify baseline cannot be restored', async () => {
+    const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
+    runtime.initialized = true
+    runtime.pendingManager = {
+      getAll: vi.fn(() => [createPending('p1', 'src/a.ts', 'modify')]),
+      removeByPath: vi.fn(async () => {}),
+    }
+    runtime.restorePendingModifyFromNative = vi.fn(async () => false)
+    runtime.restorePendingModifyFromBaseline = vi.fn(async () => false)
+    runtime.hasBaselineFile = vi.fn(async () => true)
     runtime.saveMetadata = vi.fn(async () => {})
 
     await expect(runtime.discardPendingPath('src/a.ts')).rejects.toThrow('缺少本地文件基线')

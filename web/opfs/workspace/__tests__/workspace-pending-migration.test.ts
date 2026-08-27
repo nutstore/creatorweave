@@ -27,7 +27,7 @@ describe('WorkspacePendingManager migration conflict fallback', () => {
     expect(check.isConflict).toBe(false)
   })
 
-  it('keeps modify as conflict when native content diverged from baseline', async () => {
+  it('keeps modify as conflict when native content diverged from a newer baseline', async () => {
     const manager = new WorkspacePendingManager('w1', {} as FileSystemDirectoryHandle) as any
     manager.readNativeMtime = vi.fn(async () => 200)
     manager.readBaselineBytes = vi.fn(async () => new Uint8Array([1, 2, 3]))
@@ -39,6 +39,52 @@ describe('WorkspacePendingManager migration conflict fallback', () => {
     )
 
     expect(check.isConflict).toBe(true)
+  })
+
+  it('does not treat an older disk version as a modify conflict', async () => {
+    const manager = new WorkspacePendingManager('w1', {} as FileSystemDirectoryHandle) as any
+    manager.readNativeMtime = vi.fn(async () => 100)
+    manager.isNativeAlignedWithOpfs = vi.fn()
+    manager.isNativeAlignedWithBaseline = vi.fn()
+
+    const check = await manager.checkNativeConflict(
+      {} as FileSystemDirectoryHandle,
+      createPending('src/a.ts', 'modify', 200)
+    )
+
+    expect(check.isConflict).toBe(false)
+    expect(manager.isNativeAlignedWithOpfs).not.toHaveBeenCalled()
+    expect(manager.isNativeAlignedWithBaseline).not.toHaveBeenCalled()
+  })
+
+  it('does not treat an older disk version as a delete conflict', async () => {
+    const manager = new WorkspacePendingManager('w1', {} as FileSystemDirectoryHandle) as any
+    manager.readNativeMtime = vi.fn(async () => 100)
+    manager.isNativeAlignedWithBaseline = vi.fn()
+
+    const check = await manager.checkNativeConflict(
+      {} as FileSystemDirectoryHandle,
+      createPending('src/a.ts', 'delete', 200)
+    )
+
+    expect(check.isConflict).toBe(false)
+    expect(manager.isNativeAlignedWithBaseline).not.toHaveBeenCalled()
+  })
+
+  it('does not infer a conflict when an OPFS-only modify has no disk baseline', async () => {
+    const manager = new WorkspacePendingManager('w1', {} as FileSystemDirectoryHandle) as any
+    manager.readNativeMtime = vi.fn(async () => 200)
+    manager.isNativeAlignedWithOpfs = vi.fn()
+    manager.isNativeAlignedWithBaseline = vi.fn()
+
+    const check = await manager.checkNativeConflict(
+      {} as FileSystemDirectoryHandle,
+      createPending('src/a.ts', 'modify', 0)
+    )
+
+    expect(check.isConflict).toBe(false)
+    expect(manager.isNativeAlignedWithOpfs).not.toHaveBeenCalled()
+    expect(manager.isNativeAlignedWithBaseline).not.toHaveBeenCalled()
   })
 
   it('treats delete as non-conflict when native content still equals baseline', async () => {

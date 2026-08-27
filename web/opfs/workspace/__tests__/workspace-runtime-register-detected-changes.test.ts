@@ -96,7 +96,7 @@ describe('WorkspaceRuntime.registerDetectedChanges', () => {
     expect(runtime.pendingManager.add).toHaveBeenCalledWith('creatorweave/CHANGELOG.md', 1780394111797)
   })
 
-  it('falls back to change.mtime when native file does not exist (new file)', async () => {
+  it('records no disk baseline when native file does not exist (new file)', async () => {
     const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
     runtime.initialized = true
     runtime.pendingManager = {
@@ -125,11 +125,11 @@ describe('WorkspaceRuntime.registerDetectedChanges', () => {
       {} as FileSystemDirectoryHandle
     )
 
-    // For genuinely new files, nativeFsMtime = change.mtime (OPFS mtime) is the
-    // best we can do — the file doesn't exist on disk yet.
+    // Without a native file there is no common disk timestamp. Recording the
+    // OPFS mtime here would create a fake baseline and false conflicts later.
     expect(runtime.pendingManager.markAsCreated).toHaveBeenCalledWith(
       'creatorweave/new-file.md',
-      1781687065891
+      0
     )
   })
 })
