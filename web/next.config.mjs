@@ -53,19 +53,6 @@ const nextConfig = {
       },
     ]
   },
-  // Legacy singular workspace URL → bare project URL (permanent 308 so
-  // bookmarks/external links converge on the canonical shape). The bare
-  // page resolves the workspace from store state and replaces the URL with
-  // the canonical /workspaces/:workspaceId form.
-  async redirects() {
-    return [
-      {
-        source: '/projects/:projectId/workspace',
-        destination: '/projects/:projectId',
-        permanent: true,
-      },
-    ]
-  },
   transpilePackages: [
     '@creatorweave/config',
     '@creatorweave/encryption',

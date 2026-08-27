@@ -261,10 +261,11 @@ What landed:
 - Deleted: `WorkspaceApp.tsx` (~1050 lines), `router/next-router-compat.tsx`, `router.ts`,
   `shell/ClientAppShell.tsx`, `services/webcontainer/preview-route.ts`, the standalone
   WebContainer preview page, and the 11 old thin `app/` shells.
-- `next.config.mjs`: permanent 308 `/projects/:projectId/workspace` → `/projects/:projectId`
-  (singular/plural dual form eliminated); production builds REQUIRE
+- `next.config.mjs`: production builds REQUIRE
   `NEXT_PUBLIC_DEPLOY_REGION` (`cn` | `global`, build-time inlined, separate builds per
   domain); VITE_* env fallbacks dropped; `@creatorweave/shared` transpiled.
+  (The legacy 308 `/projects/:projectId/workspace` redirect was removed on 2026-08-27 —
+  no telemetry ever indicated real legacy deep links; singular/plural dual form is gone.)
 - `@creatorweave/shared` workspace package: webapp origins + page-action authorization
   helpers shared between web and browser-extension (extension keeps a re-export shim;
   `getCwWebappBaseUrl` stays extension-local — `import.meta.env` is Vite-only).
@@ -274,8 +275,9 @@ What landed:
 
 Known follow-ups:
 
-- [ ] Legacy singular `/workspace` deep links in the wild rely on the 308 redirect — keep it
-      until telemetry (if ever added) says otherwise.
+- [x] Legacy singular `/workspace` deep links: the 308 redirect was REMOVED (2026-08-27).
+      Old bookmarks now 404 — accepted trade-off, product is local-first with no
+      evidence of legacy singular-form links in the wild.
 - [ ] Dev-mode extension zip download requires a prior `pnpm run build` / `prepare:assets`
       (the Vite-era on-demand middleware died with Vite); `wxt dev` load-unpacked remains the
       primary dev workflow.
