@@ -378,7 +378,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
                   language={getMonacoLanguage(activeFile)}
                   value={fileContent}
                   onChange={(val) => setFileContent(val ?? '')}
-                  theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+                  theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
                   options={{
                     readOnly: isReadOnly,
                     minimap: { enabled: false },
