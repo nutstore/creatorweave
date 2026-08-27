@@ -1340,6 +1340,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           conv.messages.push(message)
           conv.updatedAt = Date.now()
 
+          // A user message marks the start of a new loop: bump the
+          // conversation's sort position (lastAccessedAt) now — NOT on click.
+          if (message.role === 'user') {
+            const wsState = useConversationContextStore.getState()
+            const ws = wsState.workspaces.find((w) => w.id === conversationId)
+            if (ws) {
+              wsState.touchWorkspaceAccessTime(conversationId)
+            }
+          }
+
           if (message.role === 'user' && conv.titleMode !== 'manual' && message.content) {
             const userMessages = conv.messages.filter((m) => m.role === 'user')
             if (userMessages.length === 1) {
@@ -1375,6 +1385,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           conv.updatedAt = Date.now()
 
           const currentUserMessageCount = messages.filter((m) => m.role === 'user').length
+
+          // A new user message marks the start of a new loop: bump the
+          // conversation's sort position (lastAccessedAt) now — NOT on click.
+          if (
+            currentUserMessageCount > prevUserMessageCount &&
+            messages.some((m) => m.role === 'user')
+          ) {
+            const wsState = useConversationContextStore.getState()
+            if (wsState.workspaces.some((w) => w.id === conversationId)) {
+              wsState.touchWorkspaceAccessTime(conversationId)
+            }
+          }
+
           if (
             currentUserMessageCount === 1 &&
             prevUserMessageCount === 0 &&

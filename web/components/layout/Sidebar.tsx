@@ -1060,12 +1060,9 @@ export const Sidebar = memo(function Sidebar({
   // switchWorkspace — that would push a second navigation on top of the link.
   const handleItemSelect = useCallback((id: string) => {
     if (pendingRenameIdRef.current === id) return
-    // Clicking the already-active workspace should still bump its
-    // lastAccessedAt so it sorts to the top of the unpinned list.
-    const currentActive = useConversationContextStore.getState().activeWorkspaceId
-    if (currentActive === id) {
-      void useConversationContextStore.getState().touchActiveWorkspaceAccessTime()
-    }
+    // NOTE: clicking a conversation must NOT change its sort position.
+    // Ordering only moves to the top when the user sends a new message
+    // (a new agent loop), which bumps lastAccessedAt in the store.
     closeMobileSidebar()
   }, [closeMobileSidebar])
 

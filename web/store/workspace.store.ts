@@ -328,10 +328,17 @@ interface WorkspaceState {
 
   /**
    * Bump the active workspace's lastAccessedAt without reloading state.
-   * Used when the user clicks the already-active workspace — should still
-   * sort it to the top of the unpinned list.
+   * Deprecated for click-to-sort: clicking a conversation must NOT change
+   * its sort position. Kept for compatibility; prefer touchWorkspaceAccessTime.
    */
   touchActiveWorkspaceAccessTime: () => Promise<void>
+
+  /**
+   * Bump a specific workspace's lastAccessedAt (in-memory + SQLite).
+   * Used when the user sends a new message in that conversation — this
+   * is the ONLY path that should move it to the top of the sidebar.
+   */
+  touchWorkspaceAccessTime: (id: string) => Promise<void>
 
   /** Delete a workspace (deletes from both SQLite and OPFS) */
   deleteWorkspace: (id: string) => Promise<void>
@@ -890,7 +897,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         id,
                         name: workspaceRecord.name,
                         createdAt: workspaceRecord.createdAt,
-                        lastAccessedAt: Date.now(),
+                        // Keep the previous lastAccessedAt — switching /
+                        // clicking a conversation must not change its sort
+                        // position. The timestamp only moves when the user
+                        // sends a new message (see addMessage in
+                        // conversation.store).
+                        lastAccessedAt:
+                          get().workspaces.find((w) => w.id === id)?.lastAccessedAt ??
+                          workspaceRecord.lastAccessedAt,
                         cacheSize: 0,
                         pendingCount: newWorkspace.pendingCount,
                         modifiedFiles: 0,
@@ -910,8 +924,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               return
             }
 
-            // Update last access time in SQLite
-            await repo.updateWorkspaceAccessTime(id)
+            // Update last access time in SQLite (persisted for "restore last
+            // conversation" purposes) but do NOT bump the in-memory sort key —
+            // switching/clicking must not change the sidebar ordering. The
+            // in-memory lastAccessedAt only moves when the user sends a new
+            // message (bumped from conversation.store addMessage).
 
             // Persist per-project active workspace so switching back to this
             // project restores the workspace the user was using.
@@ -922,9 +939,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
 
             set({
-              workspaces: get().workspaces.map((w) =>
-                w.id === id ? { ...w, lastAccessedAt: Date.now() } : w
-              ),
+              workspaces: get().workspaces, // no sort-key change on switch
               activeWorkspaceId: id,
               currentPendingCount: workspace.pendingCount,
               isLoading: false,
@@ -966,6 +981,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const id = get().activeWorkspaceId
           if (!id) return
           const now = Date.now()
+          set({
+            workspaces: get().workspaces.map((w) =>
+              w.id === id ? { ...w, lastAccessedAt: now } : w
+            ),
+          })
+          // Persist to SQLite (fire-and-forget, non-critical)
+          try {
+            const repo = getWorkspaceRepository()
+            void repo.updateWorkspaceAccessTime(id)
+          } catch {
+            // Non-critical — in-memory update already applied
+          }
+        },
+
+        touchWorkspaceAccessTime: async (id) => {
+          const now = Date.now()
+          if (!get().workspaces.some((w) => w.id === id)) return
           set({
             workspaces: get().workspaces.map((w) =>
               w.id === id ? { ...w, lastAccessedAt: now } : w
