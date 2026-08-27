@@ -10,6 +10,7 @@ export interface PendingOverlayOp {
   workspaceId: string
   path: string
   type: OpType
+  deleteMode?: 'tree'
   fsMtime: number
   timestamp: number
   snapshotId?: string
@@ -473,6 +474,7 @@ export class FSOverlayRepository {
       changeset_id: string | null
       path: string
       op_type: OpType
+      delete_mode: 'tree' | null
       fs_mtime: number
       updated_at: number
       snapshot_status: 'draft' | 'committed' | 'approved' | 'rolled_back' | null
@@ -484,6 +486,7 @@ export class FSOverlayRepository {
               o.changeset_id,
               o.path,
               o.op_type,
+              o.delete_mode,
               o.fs_mtime,
               o.updated_at,
               o.review_status,
@@ -501,6 +504,7 @@ export class FSOverlayRepository {
       workspaceId: row.workspace_id,
       path: row.path,
       type: row.op_type,
+      deleteMode: row.delete_mode || undefined,
       fsMtime: row.fs_mtime,
       timestamp: row.updated_at,
       snapshotId: row.changeset_id || undefined,
@@ -565,7 +569,7 @@ export class FSOverlayRepository {
     path: string,
     type: OpType,
     fsMtime?: number,
-    options?: { forceUpdateMtime?: boolean }
+    options?: { forceUpdateMtime?: boolean; deleteMode?: 'tree' }
   ): Promise<PendingOverlayOp> {
     const db = getSQLiteDB()
     const now = Date.now()
@@ -590,15 +594,16 @@ export class FSOverlayRepository {
           : (existing.fs_mtime > 0 ? existing.fs_mtime : requestedFsMtime)
       await db.execute(
         `UPDATE fs_ops
-         SET changeset_id = ?, op_type = ?, fs_mtime = ?, updated_at = ?, error_message = NULL, review_status = 'pending'
+         SET changeset_id = ?, op_type = ?, delete_mode = ?, fs_mtime = ?, updated_at = ?, error_message = NULL, review_status = 'pending'
          WHERE id = ?`,
-        [changesetId, type, baselineFsMtime, now, existing.id]
+        [changesetId, type, options?.deleteMode ?? null, baselineFsMtime, now, existing.id]
       )
       return {
         id: existing.id,
         workspaceId,
         path,
         type,
+        deleteMode: options?.deleteMode,
         fsMtime: baselineFsMtime,
         timestamp: now,
         snapshotId: changesetId,
@@ -609,15 +614,16 @@ export class FSOverlayRepository {
     const id = generateId('op')
     await db.execute(
       `INSERT INTO fs_ops
-       (id, workspace_id, changeset_id, path, op_type, status, review_status, fs_mtime, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'pending', 'pending', ?, ?, ?)`,
-      [id, workspaceId, changesetId, path, type, requestedFsMtime, now, now]
+       (id, workspace_id, changeset_id, path, op_type, delete_mode, status, review_status, fs_mtime, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?, ?)`,
+      [id, workspaceId, changesetId, path, type, options?.deleteMode ?? null, requestedFsMtime, now, now]
     )
     return {
       id,
       workspaceId,
       path,
       type,
+      deleteMode: options?.deleteMode,
       fsMtime: requestedFsMtime,
       timestamp: now,
       snapshotId: changesetId,

@@ -186,41 +186,39 @@ export class FSAccessExecutor implements DiskExecutor {
   async delete(
     rootId: string,
     relativePath: string,
-    opts?: { pruneEmptyParents?: boolean }
+    opts?: { pruneEmptyParents?: boolean; recursive?: boolean }
   ): Promise<void> {
     assertRelativePath(relativePath)
     const handle = this.requireHandle(rootId)
     try {
       const { parent, name } = await resolveParent(handle, relativePath)
-      await parent.removeEntry(name)
+      await parent.removeEntry(name, { recursive: opts?.recursive === true })
+    } catch (error) {
+      if ((error as { name?: string })?.name === 'NotFoundError') return
+      throw error
+    }
 
-      // Prune the now-empty chain of parent directories upward
-      // (best-effort, no throw). Called after syncing a delete to disk, to
-      // avoid empty directory trees left behind on the disk side.
-      if (opts?.pruneEmptyParents) {
-        const parts = relativePath.split('/').filter(Boolean)
-        // Check level by level from the deepest parent toward the root,
-        // skipping the last level (the deleted entry itself)
-        let current = handle
-        for (let i = 0; i < parts.length - 1; i++) {
-          try {
-            const dir = await current.getDirectoryHandle(parts[i])
-            let isEmpty = true
-            for await (const _entry of dir.entries()) {
-              void _entry
-              isEmpty = false
-              break
-            }
-            if (!isEmpty) break
-            await current.removeEntry(parts[i])
-          } catch {
-            // Directory missing or removal failed — stop pruning upward
-            break
+    if (opts?.pruneEmptyParents) {
+      const parts = relativePath.split('/').filter(Boolean)
+      for (let i = parts.length - 1; i > 0; i--) {
+        const parentParts = parts.slice(0, i)
+        const name = parentParts[parentParts.length - 1]
+        let parent = handle
+        try {
+          for (const part of parentParts.slice(0, -1)) {
+            parent = await parent.getDirectoryHandle(part)
           }
+          const dir = await parent.getDirectoryHandle(name)
+          for await (const _entry of dir.entries()) {
+            void _entry
+            return
+          }
+          await parent.removeEntry(name)
+        } catch (error) {
+          if ((error as { name?: string })?.name === 'NotFoundError') continue
+          throw error
         }
       }
-    } catch {
-      // Silently succeed when missing (idempotent), mirroring deleteFromNativeIfExists
     }
   }
 

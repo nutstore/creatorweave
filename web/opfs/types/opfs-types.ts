@@ -83,6 +83,8 @@ export interface PendingChange {
   path: string
   /** Operation type */
   type: 'create' | 'modify' | 'delete'
+  /** Explicitly marks a delete as a recursive directory-tree deletion. */
+  deleteMode?: 'tree'
   /** Real file modification time (for conflict detection) */
   fsMtime: number
   /** Operation timestamp */

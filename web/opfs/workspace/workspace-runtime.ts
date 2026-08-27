@@ -1373,7 +1373,7 @@ export class WorkspaceRuntime {
 
     // Mark the directory path itself as pending deletion.
     // fsMtime = 0 → sync's conflict check is skipped for this record.
-    await this.pendingManager.markForDeletion(normalizedPath, 0)
+    await this.pendingManager.markForDeletion(normalizedPath, 0, { deleteMode: 'tree' })
 
     this.metadata.lastAccessedAt = Date.now()
     await this.saveMetadata()

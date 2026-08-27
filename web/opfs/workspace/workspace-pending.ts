@@ -108,7 +108,11 @@ export class WorkspacePendingManager {
    * Mark file for deletion
    * @param path File path
    */
-  async markForDeletion(path: string, fsMtime?: number): Promise<void> {
+  async markForDeletion(
+    path: string,
+    fsMtime?: number,
+    options?: { deleteMode?: 'tree' }
+  ): Promise<void> {
     if (!this.initialized) await this.initialize()
 
     const repo = getFSOverlayRepository()
@@ -121,7 +125,7 @@ export class WorkspacePendingManager {
       return
     }
 
-    const op = await repo.upsertPendingOp(this.workspaceId, path, 'delete', fsMtime)
+    const op = await repo.upsertPendingOp(this.workspaceId, path, 'delete', fsMtime, options)
     this.setPendingChange(op)
   }
 
@@ -216,15 +220,12 @@ export class WorkspacePendingManager {
       .filter((change) => change.reviewStatus !== 'rejected')
       .map((change) => ({ ...change }))
       .sort((a, b) => {
-        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
-        // Same-timestamp batch (e.g. deleteDir marking a whole tree within one
-        // millisecond): execute delete records deepest-path-first so child
-        // directories are removed before their parents regardless of the
-        // order SQLite returns rows with equal updated_at.
+        // All deletes execute deepest-first, independent of timestamps. This
+        // keeps parent directory records behind descendants after reloads.
         if (a.type === 'delete' && b.type === 'delete') {
-          return b.path.split('/').length - a.path.split('/').length
+          return b.path.split('/').length - a.path.split('/').length || a.timestamp - b.timestamp
         }
-        return 0
+        return a.timestamp - b.timestamp
       })
   }
 
@@ -379,9 +380,20 @@ export class WorkspacePendingManager {
 
         if (change.type === 'delete') {
           if (disk) {
+            // New directory deletes persist deleteMode='tree'. Legacy pending
+            // records created before that column existed have no marker, so
+            // detect an existing directory once at sync time for compatibility.
+            let recursive = change.deleteMode === 'tree'
+            if (!recursive) {
+              const targetStat = await disk.exec.stat(disk.rootId, nativePath)
+              recursive = targetStat !== null && !targetStat.isFile
+            }
             // pruneEmptyParents: 文件删掉后向上清理空父目录，避免磁盘侧
             // 残留空目录树（与 FS Access 路径的 deleteFile 行为对齐）。
-            await disk.exec.delete(disk.rootId, nativePath, { pruneEmptyParents: true })
+            await disk.exec.delete(disk.rootId, nativePath, {
+              pruneEmptyParents: true,
+              recursive,
+            })
           } else {
             await this.deleteFile(directoryHandle, nativePath)
           }
@@ -615,6 +627,7 @@ export class WorkspacePendingManager {
       id: op.id,
       path: op.path,
       type: op.type,
+      deleteMode: op.deleteMode,
       fsMtime: op.fsMtime,
       timestamp: op.timestamp,
       snapshotId: op.snapshotId,

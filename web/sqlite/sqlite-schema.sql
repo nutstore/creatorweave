@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 17;
+PRAGMA user_version = 18;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS fs_ops (
     changeset_id TEXT,
     path TEXT NOT NULL,
     op_type TEXT NOT NULL,          -- 'create' | 'modify' | 'delete'
+    delete_mode TEXT,               -- NULL | 'tree' (explicit recursive directory delete)
     status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'synced' | 'discarded' | 'failed'
     review_status TEXT DEFAULT 'pending',    -- 'pending' | 'approved' | 'rejected'
     fs_mtime INTEGER NOT NULL DEFAULT 0,

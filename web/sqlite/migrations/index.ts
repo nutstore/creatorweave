@@ -124,7 +124,7 @@ function verifyProjectRootSchema(db: any): void {
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 17
+export const BASE_SCHEMA_VERSION = 18
 
 // ============================================================================
 // Migration Registry
@@ -353,6 +353,14 @@ export const migrations: Migration[] = [
     version: 17,
     name: 'repair_project_root_backend_identity',
     up: repairProjectRootBackendColumns,
+  },
+  {
+    version: 18,
+    name: 'add_fs_ops_delete_mode',
+    up: `
+      ALTER TABLE fs_ops ADD COLUMN delete_mode TEXT;
+      PRAGMA user_version = 18;
+    `,
   },
 ]
 

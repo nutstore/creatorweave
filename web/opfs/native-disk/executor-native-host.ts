@@ -307,9 +307,13 @@ export class NativeHostExecutor implements DiskExecutor {
   async delete(
     rootId: string,
     relativePath: string,
-    opts?: { pruneEmptyParents?: boolean }
+    opts?: { pruneEmptyParents?: boolean; recursive?: boolean }
   ): Promise<void> {
-    const resp = await this.call('delete_file', { scope_id: rootId, relative_path: relativePath })
+    const resp = await this.call('delete_file', {
+      scope_id: rootId,
+      relative_path: relativePath,
+      recursive: opts?.recursive === true,
+    })
     if (!resp.ok) throw new Error(`delete_file failed: ${resp.error}`)
 
     // Prune the now-empty chain of parent directories upward (best-effort).

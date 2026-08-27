@@ -112,7 +112,7 @@ export class CompositeExecutor implements DiskExecutor {
   async delete(
     rootId: string,
     relativePath: string,
-    opts?: { pruneEmptyParents?: boolean }
+    opts?: { pruneEmptyParents?: boolean; recursive?: boolean }
   ): Promise<void> {
     await this.route(rootId).delete(rootId, relativePath, opts)
   }

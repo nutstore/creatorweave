@@ -135,7 +135,11 @@ export interface DiskExecutor {
    * avoid "file deleted but empty dir left behind" or even ghost
    * directories resurrected by a later flush.
    */
-  delete(rootId: string, relativePath: string, opts?: { pruneEmptyParents?: boolean }): Promise<void>
+  delete(
+    rootId: string,
+    relativePath: string,
+    opts?: { pruneEmptyParents?: boolean; recursive?: boolean }
+  ): Promise<void>
 
   /**
    * Query file/directory metadata. Returns null when it doesn't exist (no
