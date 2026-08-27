@@ -5,6 +5,8 @@
  * - welcome: shown only to first-time users (no project created + not seen)
  * - api-key: shown when no API key configured
  * - mount-folder: shown when API key ok but no folder mounted
+ *   (SKIPPED entirely in side-panel mode — sidebar users almost never
+ *    need a mounted local folder)
  * - ready: shows quick-start prompts + rich input
  *
  * Steps are conditional, so use setup labels instead of a linear step count.
@@ -25,10 +27,17 @@ import { DeviceCodeFlowDialog } from './agent/DeviceCodeFlowDialog'
 import { PageScreenshotCropDialog } from './agent/PageScreenshotCropDialog'
 import type { SettingsTab } from '@/components/settings/SettingsDialog'
 import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
+import { isSidePanelMode } from '@/agent/workspace-assistant-context'
 import { captureTab, isPageActionAvailable } from '@/agent/tools/page-action-bridge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
 
 type OnboardingStep = 'welcome' | 'api-key' | 'mount-folder' | 'ready'
+
+// Side-panel (browser sidebar) mode skips the folder-mount step: that
+// workflow is for the full workbench, not the per-tab assistant panel.
+function needsFolderMount(folderCount: number): boolean {
+  return !isSidePanelMode() && folderCount === 0
+}
 
 function getInitialStep(
   hasApiKey: boolean,
@@ -40,7 +49,7 @@ function getInitialStep(
 
   if (!hasCreatedProject && !welcomeSeen) return 'welcome'
   if (!hasApiKey) return 'api-key'
-  if (folderCount === 0) return 'mount-folder'
+  if (needsFolderMount(folderCount)) return 'mount-folder'
   return 'ready'
 }
 
@@ -98,7 +107,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
     setStep((prev) => {
       if (prev === 'welcome') return prev
       if (!hasApiKey) return 'api-key'
-      if (folderRoots.length === 0) return 'mount-folder'
+      if (needsFolderMount(folderRoots.length)) return 'mount-folder'
       return 'ready'
     })
   }, [hasApiKey, hasApiKeyLoaded, folderRoots.length])
@@ -106,7 +115,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
   const advanceFromWelcome = useCallback(() => {
     localStorage.setItem('creatorweave:onboarding:welcome-seen', 'true')
     if (!hasApiKey) setStep('api-key')
-    else if (folderRoots.length === 0) setStep('mount-folder')
+    else if (needsFolderMount(folderRoots.length)) setStep('mount-folder')
     else setStep('ready')
   }, [hasApiKey, folderRoots.length])
 
@@ -302,7 +311,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               <button
                 type="button"
                 onClick={() => {
-                  if (folderRoots.length === 0) setStep('mount-folder')
+                  if (needsFolderMount(folderRoots.length)) setStep('mount-folder')
                   else setStep('ready')
                 }}
                 className="inline-flex h-8 items-center text-xs text-neutral-500 transition-colors hover:text-foreground"
