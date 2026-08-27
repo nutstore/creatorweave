@@ -4,7 +4,7 @@
  * For multi-edit, each edit entry is rendered as a separate diff block.
  */
 
-import { Pencil } from 'lucide-react'
+import { CircleAlert, Pencil } from 'lucide-react'
 import { CopyIconButton } from '../CopyIconButton'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
@@ -85,14 +85,7 @@ registerRenderer({
   },
   Detail(ctx) {
     if (ctx.isError) {
-      const errMsg = extractError(ctx)
-      return (
-        <div className="px-3 py-2">
-          <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-2 text-xs text-red-600 dark:text-red-400">
-            {errMsg || 'Edit failed'}
-          </div>
-        </div>
-      )
+      return <ErrorDetail ctx={ctx} />
     }
 
     const path = typeof ctx.args.path === 'string' ? ctx.args.path : undefined
@@ -171,6 +164,91 @@ registerRenderer({
 })
 
 // ── Sub-components ──────────────────────────────────────────────────
+
+/** Parsed error info for the edit tool */
+interface EditErrorInfo {
+  message: string
+  /** Failing edit entry index from `edits[i]` in the error message, when present */
+  editIndex: number | null
+}
+
+function parseEditError(ctx: ToolRenderCtx): EditErrorInfo {
+  const message = extractError(ctx)
+  const rawCode = ctx.result?.error
+  const code = rawCode && typeof rawCode === 'object'
+    ? (rawCode as Record<string, unknown>).code
+    : undefined
+
+  // Match failure errors identify the offending entry as edits[i]
+  const isMatchError = code === 'old_text_not_found' || code === 'ambiguous_match' || code === 'overlapping_edits'
+  if (isMatchError && typeof message === 'string') {
+    const m = message.match(/edits\[(\d+)\]/)
+    if (m) return { message, editIndex: Number(m[1]) }
+  }
+  return { message, editIndex: null }
+}
+
+/** Rich failure rendering — shows exactly which replacement text could not be applied */
+function ErrorDetail({ ctx }: { ctx: ToolRenderCtx }) {
+  const err = parseEditError(ctx)
+  const entries = parseEditEntries(ctx.args)
+  const failedEntry = err.editIndex !== null ? entries[err.editIndex] : undefined
+  const othersFailed = err.editIndex === null || !failedEntry
+
+  const codeRaw = ctx.result?.error
+  const code = codeRaw && typeof codeRaw === 'object'
+    ? String((codeRaw as Record<string, unknown>).code ?? '')
+    : ''
+  const labelByCode: Record<string, string> = {
+    old_text_not_found: '未找到匹配文本',
+    ambiguous_match: '匹配到多处，无法确定替换位置',
+    overlapping_edits: '编辑区域重叠',
+    stale_snapshot: '文件在读取后已被修改',
+    read_required: '需要先读取文件',
+  }
+  const title = labelByCode[code] ?? '编辑失败'
+
+  return (
+    <div className="px-3 py-2 space-y-2">
+      <div className="flex items-start gap-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-2">
+        <CircleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5 text-red-500" />
+        <div className="min-w-0 space-y-1">
+          <div className="text-xs font-medium text-red-600 dark:text-red-400">{title}</div>
+          <div className="text-[11px] leading-4 text-red-500/80 dark:text-red-400/70 break-words whitespace-pre-wrap">{err.message}</div>
+        </div>
+      </div>
+
+      {!othersFailed && (
+        <div className="space-y-1">
+          <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            无法替换的第 {err.editIndex! + 1} 条内容：
+          </div>
+          <UnmatchedBlock text={failedEntry.oldText} variant={code} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Highlight the text that failed to match with line-level markers */
+function UnmatchedBlock({ text, variant }: { text: string; variant: string }) {
+  if (!text) return null
+  const lines = text.split('\n')
+  return (
+    <div className="rounded-md bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-900/40 overflow-hidden">
+      <div className="p-2 text-xs leading-5 font-mono">
+        {lines.map((line, i) => (
+          <div key={i} className="bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-400">
+            <span className="select-none mr-1 opacity-60">
+              {variant === 'ambiguous_match' ? '~' : '-'}
+            </span>
+            <span className="whitespace-pre-wrap break-all">{line || '\u00A0'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function PathHeader({ path, replaceAll }: { path: string; replaceAll: boolean }) {
   return (

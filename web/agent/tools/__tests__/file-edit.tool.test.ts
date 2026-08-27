@@ -116,7 +116,7 @@ describe('file edit tool (edits-array-only)', () => {
     resolveNativeDirectoryHandleMock.mockResolvedValue(null)
   })
 
-  it('requires file to be read before edit', async () => {
+  it('allows editing without prior read (read-before-edit is advisory)', async () => {
     resolveVfsTargetMock.mockResolvedValueOnce({
       kind: 'workspace',
       path: 'src/a.ts',
@@ -126,16 +126,16 @@ describe('file edit tool (edits-array-only)', () => {
         writeFile: writeFileMock,
       },
     })
+    readFileMock.mockResolvedValueOnce({ content: 'line1\n' })
 
     const result = await editExecutor(
-      { path: 'src/a.ts', edits: [{ old_text: '1', new_text: '2' }] },
+      { path: 'src/a.ts', edits: [{ old_text: 'line1', new_text: 'line2' }] },
       makeContext({ readFileState: new Map() })
     )
-    const error = unwrapError(result)
-    expect(error.code).toBe('read_required')
-    expect(error.message).toContain('Read the full file first')
-    expect(readFileMock).not.toHaveBeenCalled()
-    expect(writeFileMock).not.toHaveBeenCalled()
+    const data = unwrapOk(result)
+    expect(data.appliedCount).toBe(1)
+    expect(readFileMock).toHaveBeenCalled()
+    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'line2\n')
   })
 
   it('rejects old_text/new_text parameters with descriptive error', async () => {
@@ -479,22 +479,21 @@ describe('file edit tool (edits-array-only)', () => {
     expect(writeFileMock).toHaveBeenCalled()
   })
 
-  it('rejects edit when snapshot is partial view', async () => {
+  it('allows editing after only a partial view (advisory, not enforced)', async () => {
     resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
     const readFileState = new Map([
       ['workspace:src/a.ts', { content: 'const x = old\n', timestamp: Date.now(), isPartialView: true }],
     ])
+    readFileMock.mockResolvedValueOnce({ content: 'const x = old\n' })
 
     const result = await editExecutor(
       { path: 'src/a.ts', edits: [{ old_text: 'old', new_text: 'new' }] },
       makeContext({ readFileState })
     )
-    const error = unwrapError(result)
+    const data = unwrapOk(result)
 
-    expect(error.code).toBe('read_required')
-    expect(error.message).toContain('Read the full file first')
-    expect(readFileMock).not.toHaveBeenCalled()
-    expect(writeFileMock).not.toHaveBeenCalled()
+    expect(data.appliedCount).toBe(1)
+    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const x = new\n', null, 'ws-1')
   })
 
   it('allows no-op edits when old_text equals new_text', async () => {

@@ -197,7 +197,7 @@ export const editDefinition: ToolDefinition = {
       'DO NOT use write() for targeted changes to existing files. Always prefer edit() for modifications.',
       '',
       'WORKFLOW:',
-      '1. Call read(path) if you need to see current file contents (skip if you already know the content)',
+      '1. If the edit fails because old_text was not found, call read(path) to see current contents and retry',
       '2. Identify the exact text to change',
       '3. Call edit(path, edits=[{old_text=<exact snippet>, new_text=<replacement>}])',
       '',
@@ -360,20 +360,11 @@ async function executeEdits(
     const readStateKey = getReadStateKey(target)
     const snapshot = readFileState.get(readStateKey)
 
-    if (!snapshot) {
-      return toolErrorJson(
-        'edit',
-        'read_required',
-        'Read file before editing. Read the full file first, then retry edit.'
-      )
-    }
-
-    if (snapshot?.isPartialView) {
-      return toolErrorJson(
-        'edit',
-        'read_required',
-        'Cannot edit a partial file view. Read the full file first, then retry edit.'
-      )
+    // Read-before-edit is advisory, not enforced: edit() always re-reads the real
+    // file content below and matching failures already guide the model to read first.
+    if (!snapshot || snapshot?.isPartialView) {
+      // No reliable prior read state — drop any stale full-read guard so edits proceed.
+      readFileState.delete(readStateKey)
     }
 
     let fileContent: string
