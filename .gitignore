@@ -55,6 +55,7 @@ logs/
 *.log
 
 # Temporary files
+tmp/
 *.tmp
 *.temp
 .cache/
