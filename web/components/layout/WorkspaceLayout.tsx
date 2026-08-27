@@ -722,6 +722,12 @@ export function WorkspaceLayout({
   // Live preview width during drag (visual feedback before committing to store).
   // Also serves as the "is dragging" signal: non-null = dragging.
   const [dragPreviewWidth, setDragPreviewWidth] = useState<number | null>(null)
+  // Mirror of `dragPreviewWidth` so the drag cleanup can read the final value
+  // synchronously without abusing the setState updater as a side-effect carrier.
+  // Reading via the ref avoids React invoking an updater with side effects
+  // during the render phase (which would trigger a "setState during render"
+  // error in any sibling store consumer like Sidebar).
+  const dragPreviewWidthRef = useRef<number | null>(null)
 
   const startPreviewResize = useCallback(
     (e: React.MouseEvent) => {
@@ -737,14 +743,19 @@ export function WorkspaceLayout({
         const percent = (previewWidth / rect.width) * 100
         // Clamp locally during drag for smooth visual feedback
         const clamped = Math.max(30, Math.min(80, percent))
+        dragPreviewWidthRef.current = clamped
         setDragPreviewWidth(clamped)
       }
       const cleanup = () => {
-        // Commit final ratio to store once
-        setDragPreviewWidth((finalPercent) => {
-          if (finalPercent != null) setPreviewRatio(finalPercent)
-          return null
-        })
+        // Commit final ratio to store BEFORE clearing local drag state.
+        // The ref lets us read the value synchronously and call the Zustand
+        // action directly, instead of nesting it inside a setState updater
+        // (which React invokes during render and would schedule a Sidebar
+        // re-render while WorkspaceLayout is still rendering).
+        const finalPercent = dragPreviewWidthRef.current
+        if (finalPercent != null) setPreviewRatio(finalPercent)
+        dragPreviewWidthRef.current = null
+        setDragPreviewWidth(null)
         document.removeEventListener('mousemove', onMove)
         document.removeEventListener('mouseup', onUp)
         document.body.style.cursor = ''
