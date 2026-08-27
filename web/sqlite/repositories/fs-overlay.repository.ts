@@ -856,6 +856,61 @@ export class FSOverlayRepository {
     }
   }
 
+  /**
+   * Find the most recent committed snapshot file record for a path in this
+   * workspace. Returns null if the path has never been part of a committed
+   * snapshot.
+   *
+   * Used as a fallback when a `write` finds neither the file on native disk
+   * nor in OPFS cache — in that case we still know whether the file existed
+   * (and what its content was) from history. A non-null result with a
+   * non-`delete` op means the write is an overwrite and should be classified
+   * as `modify`, not `create`.
+   *
+   * Excludes 'draft' and 'rolled_back' changesets so we only consider real
+   * historical state. Tie-break by `sf.id DESC` so two rows with the same
+   * `created_at` (e.g. create + delete within one snapshot) get a stable
+   * order — the LAST touched state wins.
+   */
+  async findLatestSnapshotFileForPath(
+    workspaceId: string,
+    path: string
+  ): Promise<{
+    snapshotId: string
+    opType: OpType
+    afterContentKind: 'text' | 'binary' | 'none'
+    afterContentText: string | null
+    afterContentBlob: Uint8Array | null
+  } | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<{
+      snapshot_id: string
+      op_type: OpType
+      after_content_kind: 'text' | 'binary' | 'none'
+      after_content_text: string | null
+      after_content_blob: Uint8Array | null
+    }>(
+      `SELECT sf.snapshot_id, sf.op_type,
+              sf.after_content_kind, sf.after_content_text, sf.after_content_blob
+       FROM fs_snapshot_files sf
+       JOIN fs_changesets c ON c.id = sf.snapshot_id
+       WHERE sf.workspace_id = ?
+         AND sf.path = ?
+         AND c.status IN ('committed', 'approved')
+       ORDER BY sf.created_at DESC, sf.id DESC
+       LIMIT 1`,
+      [workspaceId, path]
+    )
+    if (!row) return null
+    return {
+      snapshotId: row.snapshot_id,
+      opType: row.op_type,
+      afterContentKind: row.after_content_kind,
+      afterContentText: row.after_content_text,
+      afterContentBlob: row.after_content_blob,
+    }
+  }
+
   async markSnapshotRolledBack(workspaceId: string, snapshotId: string): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(

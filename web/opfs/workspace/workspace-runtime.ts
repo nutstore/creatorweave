@@ -534,6 +534,47 @@ export class WorkspaceRuntime {
   }
 
   /**
+   * Look up the most recent committed snapshot's `after` content for a path.
+   * Used by `writeFile` as a final fallback when neither native disk nor
+   * the OPFS filesIndex has the file - in that case we still know from
+   * history whether the file existed. A non-null result means the write is
+   * an overwrite (must be classified as `modify`); `null` means the file
+   * is genuinely new to this workspace.
+   *
+   * Skips snapshots whose last op for this path was `delete` - a deleted
+   * file is gone from the user's POV, so writing it again is a fresh create.
+   */
+  private async tryLoadFromSnapshotHistory(path: string): Promise<FileContent | null> {
+    const repo = getFSOverlayRepository()
+    let prior
+    try {
+      prior = await repo.findLatestSnapshotFileForPath(this.workspaceId, path)
+    } catch (err) {
+      // SQLite may not be initialized in test contexts (pure-OPFS tests
+      // mock the workspace and skip DB setup). History lookup is a
+      // best-effort signal — if it fails for any reason, fall back to
+      // the legacy behavior (treat as new file) rather than breaking the
+      // write.
+      console.warn(`[WorkspaceRuntime] snapshot-history lookup failed for ${path}:`, err)
+      return null
+    }
+    if (!prior) return null
+    if (prior.opType === 'delete') return null
+    if (prior.afterContentKind === 'none') return null
+    if (prior.afterContentKind === 'text' && prior.afterContentText !== null) {
+      return prior.afterContentText
+    }
+    if (prior.afterContentKind === 'binary' && prior.afterContentBlob !== null) {
+      // FileContent allows ArrayBuffer; convert Uint8Array -> ArrayBuffer slice.
+      return prior.afterContentBlob.buffer.slice(
+        prior.afterContentBlob.byteOffset,
+        prior.afterContentBlob.byteOffset + prior.afterContentBlob.byteLength,
+      ) as ArrayBuffer
+    }
+    return null
+  }
+
+  /**
    * Restore a modified file from OPFS baseline snapshot.
    */
   private async restorePendingModifyFromBaseline(path: string): Promise<boolean> {
@@ -1094,12 +1135,33 @@ export class WorkspaceRuntime {
             baselineContent = fromFiles.content
           } else {
             // Index hit but read failed — rare (index/file/dir out of sync).
-            // Baseline stays unset; downstream should treat as no-prior-content.
-            console.warn(`[WorkspaceRuntime] hasFileInIndex hit but readFromFilesDir returned null for ${normalizedPath}`)
+            // Fall back to snapshot history before giving up: if this path
+            // existed in any prior committed snapshot, the write is an
+            // overwrite and must be classified as `modify`, not `create`.
+            const fromHistory = await this.tryLoadFromSnapshotHistory(normalizedPath)
+            if (fromHistory !== null) {
+              baselineContent = fromHistory
+              // isNewFile is already false (we got here from the !isNewFile
+              // branch above), but be explicit for clarity.
+              isNewFile = false
+            } else {
+              console.warn(`[WorkspaceRuntime] hasFileInIndex hit but readFromFilesDir returned null for ${normalizedPath}`)
+            }
           }
         } else {
-          isNewFile = true
-          baselineFsMtime = 0
+          // Not in OPFS cache AND not on native disk. Default assumption is
+          // "new file", BUT first check the workspace's snapshot history:
+          // if this path existed in any prior committed snapshot, the write
+          // is an overwrite (modify) and the snapshot's after-content is
+          // the real baseline.
+          const fromHistory = await this.tryLoadFromSnapshotHistory(normalizedPath)
+          if (fromHistory !== null) {
+            baselineContent = fromHistory
+            isNewFile = false
+          } else {
+            isNewFile = true
+            baselineFsMtime = 0
+          }
         }
       } else {
         throw err
