@@ -1,36 +1,47 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Web Application",
-  "extends": "@creatorweave/config/tsconfig/react",
-  "compilerOptions": {
-    /* Path aliases */
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"],
-      "@wasm/*": ["./public/wasm/*"]
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "display": "Web Application",
+    "extends": "@creatorweave/config/tsconfig/react",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": [
+                "./*"
+            ],
+            "@wasm/*": [
+                "./public/wasm/*"
+            ]
+        },
+        "types": [
+            "@types/react",
+            "@types/react-dom"
+        ],
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ],
+        "noEmit": true,
+        "incremental": true,
+        "isolatedModules": true,
+        "jsx": "preserve"
     },
-    /* WASM support */
-    "types": [
-      "@types/react",
-      "@types/react-dom"
+    "include": [
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next/types/**/*.ts"
     ],
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "noEmit": true,
-    "incremental": true,
-    "isolatedModules": true,
-    "jsx": "preserve"
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": ["node_modules", "tests/e2e", "playwright.config.ts"]
+    "exclude": [
+        "node_modules",
+        "tests/e2e",
+        "playwright.config.ts",
+        "cloud-functions",
+        "node-functions",
+        "edge-functions",
+        "agents",
+        "functions"
+    ]
 }
