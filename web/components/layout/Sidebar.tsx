@@ -17,9 +17,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { projectWorkspacePath } from '@/lib/route-paths'
+import { newDraftPath, projectWorkspacePath } from '@/lib/route-paths'
 import { createPortal } from 'react-dom'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -98,15 +98,23 @@ interface ConversationItemProps extends ConversationItemData {
 const NewWorkspaceButton = memo(function NewWorkspaceButton({
   onClick,
   label,
+  isActive = false,
 }: {
   onClick: () => void
   label: string
+  /** Highlighted when in draft state (?new=1) — the draft "is" the new conversation */
+  isActive?: boolean
 }) {
   return (
     <div className="px-2 pb-1">
       <BrandButton
         variant="ghost"
-        className="h-7 w-full justify-start gap-1.5 bg-muted px-2 text-xs"
+        aria-current={isActive ? 'true' : undefined}
+        className={`h-7 w-full justify-start gap-1.5 px-2 text-xs ${
+          isActive
+            ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
+            : 'bg-muted'
+        }`}
         onClick={onClick}
       >
         <Plus className="h-3 w-3" />
@@ -645,6 +653,11 @@ export const Sidebar = memo(function Sidebar({
   const t = useT()
   const navigate = useRouter()
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
+  // Draft mode: URL is /projects/:id?new=1 (user clicked 新对话, conversation
+  // not yet created). Used to highlight the 新对话 button.
+  const pathname = usePathname()
+  const isDraftMode =
+    useSearchParams().get('new') === '1' && pathname === `/projects/${activeProjectId}`
 
   // Use selectors to avoid re-rendering on every streaming delta.
   // Sidebar only needs id/title for the list — not streamingContent/toolCalls/etc.
@@ -656,8 +669,6 @@ export const Sidebar = memo(function Sidebar({
       s.conversations.map((c) => ({ id: c.id, title: c.title }))
     )
   )
-  const createNew = useConversationStore((s) => s.createNew)
-  const setActive = useConversationStore((s) => s.setActive)
   const deleteConversation = useConversationStore((s) => s.deleteConversation)
   const deleteConversations = useConversationStore((s) => s.deleteConversations)
   const updateTitle = useConversationStore((s) => s.updateTitle)
@@ -1014,13 +1025,19 @@ export const Sidebar = memo(function Sidebar({
     [conversationRatio, setConversationRatio]
   )
 
-  // Stable callback for "新会话" button
+  // Stable callback for "新对话" button.
+  // Deferred creation: do NOT create a conversation here. Navigate to the
+  // draft URL (bare project + ?new=1); the conversation is only created when
+  // the user actually sends the first message (see draft-send flow).
   const handleCreateNewWorkspace = useCallback(() => {
-    const conv = createNew()
-    void setActive(conv.id)
-    navigate.push(projectWorkspacePath(activeProjectId, conv.id))
+    const currentPath = window.location.pathname + window.location.search
+    if (currentPath === newDraftPath(activeProjectId)) {
+      closeMobileSidebar()
+      return
+    }
+    navigate.replace(newDraftPath(activeProjectId))
     closeMobileSidebar()
-  }, [createNew, setActive, activeProjectId, navigate, closeMobileSidebar])
+  }, [activeProjectId, navigate, closeMobileSidebar])
 
   // Stable callback for editing title change
   const handleEditingTitleChange = useCallback((title: string) => setEditingTitle(title), [])
@@ -1234,6 +1251,7 @@ export const Sidebar = memo(function Sidebar({
             <NewWorkspaceButton
               onClick={handleCreateNewWorkspace}
               label={t('sidebar.newWorkspace')}
+              isActive={isDraftMode}
             />
           )}
 

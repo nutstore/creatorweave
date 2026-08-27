@@ -78,6 +78,14 @@ interface WorkspaceLayoutProps {
   onManageProjects?: () => void
   /** Navigate to a workspace within the current project (updates URL) */
   onSelectWorkspace?: (workspaceId: string) => void
+  /**
+   * Replace the URL after a draft conversation is materialized (first message
+   * sent from WelcomeScreen / bare project URL). Use router.replace so the
+   * draft → conversation transition doesn't add a history entry.
+   */
+  onDraftConversationCreated?: (workspaceId: string) => void
+  /** Enter draft state (bare project URL) without creating a conversation. */
+  onNewDraft?: () => void
 }
 
 export function WorkspaceLayout({
@@ -89,6 +97,8 @@ export function WorkspaceLayout({
   onCreateProject,
   onManageProjects,
   onSelectWorkspace,
+  onDraftConversationCreated,
+  onNewDraft,
 }: WorkspaceLayoutProps) {
   const waitForWorkspaceReady = useCallback(async (workspaceId: string, timeoutMs = 30000) => {
     const manager = await getWorkspaceManager()
@@ -271,8 +281,10 @@ export function WorkspaceLayout({
       const conv = createNew(text.slice(0, 30))
       setActive(conv.id)
       setPendingMessage(text)
+      // Draft → real conversation: replace bare URL with canonical one
+      onDraftConversationCreated?.(conv.id)
     },
-    [createNew, setActive]
+    [createNew, setActive, onDraftConversationCreated]
   )
 
   const handleInitialMessageConsumed = useCallback(() => {
@@ -348,8 +360,16 @@ export function WorkspaceLayout({
   const commands: Command[] = buildEnhancedCommands({
     // Conversations
     onNewConversation: () => {
-      const newConv = createNew('New conversation')
-      onSelectWorkspace?.(newConv.id)
+      // Deferred creation: enter draft state (bare project URL). The
+      // conversation is created only when the first message is sent
+      // (handleStartConversation). If no draft callback was provided
+      // (non-router usage), fall back to creating directly.
+      if (onNewDraft) {
+        onNewDraft()
+      } else {
+        const newConv = createNew('New conversation')
+        onSelectWorkspace?.(newConv.id)
+      }
     },
     onContinueLast: () => {
       const { conversations } = useConversationStore.getState()

@@ -50,6 +50,15 @@ export function projectWorkspacePath(projectId: string, workspaceId?: string): s
   return base
 }
 
+/**
+ * Draft (new conversation) path: bare project URL + ?new=1.
+ * Marks the "no conversation created yet" state — the conversation is
+ * materialized only when the user sends the first message.
+ */
+export function newDraftPath(projectId: string): string {
+  return `${projectWorkspacePath(projectId)}?new=1`
+}
+
 /** Build a docs path from optional segments. */
 export function docsPath(language?: string, category?: string, page?: string): string {
   const parts = ['docs', language, category, page].filter(Boolean)
