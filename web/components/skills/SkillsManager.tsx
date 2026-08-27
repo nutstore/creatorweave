@@ -492,30 +492,38 @@ function SkillSection({
           </span>
         </button>
 
-        {action && (
-          <button
-            type="button"
-            onClick={action.onClick}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              action.primary
-                ? 'ml-auto text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30'
-                : 'ml-auto text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800',
+        {/* Group action buttons as one right-aligned cluster so a single
+            `ml-auto` pushes the whole pair to the right (otherwise two
+            `ml-auto`s would split the free space and push the primary
+            action to the middle of the row). */}
+        {(action || secondaryAction) && (
+          <div className="ml-auto flex items-center gap-2">
+            {secondaryAction && (
+              <button
+                type="button"
+                onClick={secondaryAction.onClick}
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              >
+                {secondaryAction.icon}
+                {secondaryAction.label}
+              </button>
             )}
-          >
-            {action.icon}
-            {action.label}
-          </button>
-        )}
-        {secondaryAction && (
-          <button
-            type="button"
-            onClick={secondaryAction.onClick}
-            className="ml-auto flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
-          >
-            {secondaryAction.icon}
-            {secondaryAction.label}
-          </button>
+            {action && (
+              <button
+                type="button"
+                onClick={action.onClick}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  action.primary
+                    ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30'
+                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800',
+                )}
+              >
+                {action.icon}
+                {action.label}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
