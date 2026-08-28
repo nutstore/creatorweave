@@ -172,6 +172,28 @@ describe('WorkspaceRuntime baseline mtime', () => {
     expect(runtime.pendingManager.markForDeletion).toHaveBeenCalledWith('src/a.ts', 0)
   })
 
+  it('immediately deletes an ignored file instead of recording a pending delete', async () => {
+    const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
+    runtime.initialized = true
+    runtime.metadata = { lastAccessedAt: 0 }
+    runtime.hasAnyNativeDirectoryHandle = vi.fn(async () => true)
+    runtime.getNativeDirectoryHandleForPath = vi.fn(async () => null)
+    runtime.resolvePath = vi.fn(async () => ({ relativePath: 'node_modules/pkg/index.js', rootId: 'root-1' }))
+    runtime.isGitIgnoredPath = vi.fn(async () => true)
+    runtime.deleteIgnoredPathImmediately = vi.fn(async () => {})
+    runtime.pendingManager = {
+      getAll: vi.fn(() => []),
+      markForDeletion: vi.fn(async () => {}),
+    }
+
+    await runtime.deleteFile('rootName/node_modules/pkg/index.js')
+
+    expect(runtime.deleteIgnoredPathImmediately).toHaveBeenCalledWith(
+      'rootName/node_modules/pkg/index.js', 'node_modules/pkg/index.js', null, false, 'root-1'
+    )
+    expect(runtime.pendingManager.markForDeletion).not.toHaveBeenCalled()
+  })
+
   it('does not capture baseline when deleting a file created in current pending cycle', async () => {
     const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
     runtime.initialized = true

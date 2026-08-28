@@ -26,7 +26,9 @@ describe('WorkspaceRuntime deleteDirPending', () => {
     await runtime.deleteDirPending('rootName/web/src')
 
     // fsMtime=0 → sync 冲突检查天然跳过；路径保持原样（normalizeWorkspacePath）
-    expect(runtime.pendingManager.markForDeletion).toHaveBeenCalledWith('rootName/web/src', 0)
+    expect(runtime.pendingManager.markForDeletion).toHaveBeenCalledWith(
+      'rootName/web/src', 0, { deleteMode: 'tree' }
+    )
     expect(runtime.saveMetadata).toHaveBeenCalled()
   })
 
@@ -77,6 +79,24 @@ describe('WorkspaceRuntime deleteDirPending', () => {
     await expect(runtime.deleteDirPending('web/src')).resolves.toBeUndefined()
   })
 
+  it('immediately deletes an ignored directory instead of adding a pending record', async () => {
+    const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
+    runtime.initialized = true
+    runtime.hasAnyNativeDirectoryHandle = vi.fn(async () => true)
+    runtime.resolvePath = vi.fn(async () => ({ relativePath: 'node_modules', rootId: 'root-1' }))
+    runtime.getNativeDirectoryHandleForPath = vi.fn(async () => null)
+    runtime.isGitIgnoredPath = vi.fn(async () => true)
+    runtime.deleteIgnoredPathImmediately = vi.fn(async () => {})
+    runtime.pendingManager = { markForDeletion: vi.fn(async () => {}) }
+
+    await runtime.deleteDirPending('rootName/node_modules')
+
+    expect(runtime.deleteIgnoredPathImmediately).toHaveBeenCalledWith(
+      'rootName/node_modules', 'node_modules', null, true, 'root-1'
+    )
+    expect(runtime.pendingManager.markForDeletion).not.toHaveBeenCalled()
+  })
+
   it('cancels out when the directory already has a pending create record', async () => {
     const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
     runtime.initialized = true
@@ -95,6 +115,8 @@ describe('WorkspaceRuntime deleteDirPending', () => {
     // markForDeletion 内部对 create→delete 的抵消逻辑在真实 manager 中，
     // 这里 mock 之外验证 runtime 侧不会崩溃即可
     await runtime.deleteDirPending('rootName/web/src')
-    expect(runtime.pendingManager.markForDeletion).toHaveBeenCalledWith('rootName/web/src', 0)
+    expect(runtime.pendingManager.markForDeletion).toHaveBeenCalledWith(
+      'rootName/web/src', 0, { deleteMode: 'tree' }
+    )
   })
 })

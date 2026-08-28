@@ -31,6 +31,7 @@ import { getRuntimeDirectoryHandle, getRuntimeHandlesForProject, buildHandleKey 
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
 import type { DiskExecutor } from '../native-disk/executor'
 import { FSAccessExecutor } from '../native-disk/executor-fsaccess'
+import { isGitIgnored, parseGitIgnore, type GitIgnoreRule } from '../native-disk/gitignore-policy'
 
 const WORKSPACE_METADATA_FILE = 'workspace.json'
 const FILES_DIR = 'files'
@@ -1273,11 +1274,13 @@ export class WorkspaceRuntime {
     // Multi-root: resolve the correct native handle for this path
     let nativeHandle: FileSystemDirectoryHandle | null
     let nativePath = normalizedPath
+    let rootId: string | null = null
     if (directoryHandle) {
       nativeHandle = directoryHandle
       try {
         const resolved = await this.resolvePath(normalizedPath, projectId)
         nativePath = resolved.relativePath || normalizedPath
+        rootId = resolved.rootId
       } catch {
         nativePath = normalizedPath
       }
@@ -1285,11 +1288,17 @@ export class WorkspaceRuntime {
       nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
       const resolved = await this.resolvePath(normalizedPath, projectId)
       nativePath = resolved.relativePath || normalizedPath
+      rootId = resolved.rootId
     }
 
     const pendingEntry = this.pendingManager
       .getAll()
       .find((change) => this.normalizeWorkspacePath(change.path) === normalizedPath)
+
+    if (await this.isGitIgnoredPath(nativePath, nativeHandle, rootId)) {
+      await this.deleteIgnoredPathImmediately(normalizedPath, nativePath, nativeHandle, false, rootId)
+      return
+    }
 
     // Get baseline mtime for conflict detection
     let baselineFsMtime = 0
@@ -1368,6 +1377,15 @@ export class WorkspaceRuntime {
       } catch {
         // Directory has no files/ representation — expected, ignore.
       }
+      return
+    }
+
+    const resolved = await this.resolvePath(normalizedPath, _projectId)
+    const nativeHandle = directoryHandle ?? await this.getNativeDirectoryHandleForPath(normalizedPath, _projectId)
+    const nativePath = resolved.relativePath || normalizedPath
+
+    if (await this.isGitIgnoredPath(nativePath, nativeHandle, resolved.rootId)) {
+      await this.deleteIgnoredPathImmediately(normalizedPath, nativePath, nativeHandle, true, resolved.rootId)
       return
     }
 
@@ -2333,6 +2351,98 @@ export class WorkspaceRuntime {
     const snapshots = await repo.listSnapshots(this.workspaceId, 500)
     const current = snapshots.find((item) => item.status === 'approved' || item.status === 'committed')
     await repo.setCurrentSnapshotId(this.workspaceId, current?.id || null)
+  }
+
+  /** Read applicable .gitignore files from an FS Access root, root-first. */
+  private async collectGitIgnoreRules(
+    nativePath: string,
+    directoryHandle: FileSystemDirectoryHandle
+  ): Promise<GitIgnoreRule[]> {
+    const segments = nativePath.split('/').filter(Boolean)
+    const directories = segments.slice(0, -1)
+    const rules: GitIgnoreRule[] = []
+    let current = directoryHandle
+    let baseDir = ''
+
+    for (let i = 0; i <= directories.length; i++) {
+      try {
+        const ignoreHandle = await current.getFileHandle('.gitignore')
+        const ignoreFile = await ignoreHandle.getFile()
+        rules.push(...parseGitIgnore(await ignoreFile.text(), baseDir))
+      } catch {
+        // A .gitignore at this level is optional.
+      }
+
+      const segment = directories[i]
+      if (!segment) continue
+      try {
+        current = await current.getDirectoryHandle(segment)
+        baseDir = baseDir ? `${baseDir}/${segment}` : segment
+      } catch {
+        break
+      }
+    }
+
+    return rules
+  }
+
+  /** Whether a root-relative path matches its applicable .gitignore rules. */
+  private async isGitIgnoredPath(
+    nativePath: string,
+    directoryHandle: FileSystemDirectoryHandle | null,
+    rootId: string | null
+  ): Promise<boolean> {
+    if (!nativePath) return false
+    if (directoryHandle) {
+      return isGitIgnored(nativePath, await this.collectGitIgnoreRules(nativePath, directoryHandle))
+    }
+    if (!rootId) return false
+
+    const directories = nativePath.split('/').filter(Boolean).slice(0, -1)
+    const rules: GitIgnoreRule[] = []
+    let baseDir = ''
+    for (let i = 0; i <= directories.length; i++) {
+      const ignorePath = baseDir ? `${baseDir}/.gitignore` : '.gitignore'
+      try {
+        const result = await this.diskExec.read(rootId, ignorePath)
+        if (typeof result.content === 'string') {
+          rules.push(...parseGitIgnore(result.content, baseDir))
+        }
+      } catch {
+        // A .gitignore at this level is optional or unreadable.
+      }
+      const segment = directories[i]
+      if (segment) baseDir = baseDir ? `${baseDir}/${segment}` : segment
+    }
+    return isGitIgnored(nativePath, rules)
+  }
+
+  /**
+   * Bypass the overlay for ignored build/dependency paths. Delete the local
+   * disk entry first; only then remove its OPFS mirror and pending record.
+   */
+  private async deleteIgnoredPathImmediately(
+    workspacePath: string,
+    nativePath: string,
+    directoryHandle: FileSystemDirectoryHandle | null,
+    recursive: boolean,
+    resolvedRootId?: string | null
+  ): Promise<void> {
+    if (!directoryHandle && !resolvedRootId) {
+      throw new Error(`Cannot immediately delete ignored path without disk access: ${workspacePath}`)
+    }
+
+    const rootId = resolvedRootId ?? await this.resolveRootIdForHandle(directoryHandle!)
+    await this.diskExec.delete(rootId, nativePath, {
+      pruneEmptyParents: true,
+      recursive,
+    })
+
+    await this.deleteFromFilesDirIfExists(workspacePath)
+    this.filesIndex.delete(workspacePath)
+    await this.pendingManager.removeByPath(workspacePath)
+    this.metadata.lastAccessedAt = Date.now()
+    await this.saveMetadata()
   }
 
   private async deleteFromNativeIfExists(
@@ -3565,7 +3675,9 @@ export class WorkspaceRuntime {
         const nativePath = resolved.relativePath || change.path
 
         if (change.type === 'delete') {
-          await this.diskExec.delete(rootId, nativePath)
+          await this.diskExec.delete(rootId, nativePath, {
+            recursive: change.deleteMode === 'tree',
+          })
         } else {
           await this.copyToNativeDiskRoot(rootId, filesDir, change.path, nativePath)
         }
@@ -3652,7 +3764,7 @@ export class WorkspaceRuntime {
         const nativePath = resolved.relativePath || change.path
 
         if (change.type === 'delete') {
-          await this.deleteFromNative(directoryHandle, nativePath)
+          await this.deleteFromNative(directoryHandle, nativePath, change.deleteMode === 'tree')
         } else {
           await this.copyToNative(directoryHandle, filesDir, change.path)
         }
@@ -3785,10 +3897,11 @@ export class WorkspaceRuntime {
    */
   private async deleteFromNative(
     nativeDir: FileSystemDirectoryHandle,
-    path: string
+    path: string,
+    recursive?: boolean
   ): Promise<void> {
     const rootId = await this.resolveRootIdForHandle(nativeDir)
-    await this.diskExec.delete(rootId, path)
+    await this.diskExec.delete(rootId, path, { recursive: recursive === true })
   }
 
   //=============================================================================
