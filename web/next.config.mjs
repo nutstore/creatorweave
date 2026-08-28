@@ -49,6 +49,10 @@ const nextConfig = {
   // runtime App Router routes. Do not use `output: 'export'`: arbitrary local
   // IDs cannot be enumerated at build time.
   outputFileTracingRoot: path.resolve(dirname, '..'),
+  // Produce a self-contained Node server for the overseas AKS image. This
+  // preserves the normal `.next` output used by the domestic EdgeOne build,
+  // while adding `.next/standalone` for Docker/Kubernetes packaging.
+  output: 'standalone',
   reactStrictMode: true,
   // Linting remains an explicit repository check. The existing application has
   // a broader legacy ESLint baseline, so it must not prevent runtime builds.

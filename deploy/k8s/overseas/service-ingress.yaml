@@ -1,0 +1,57 @@
+# Service — routes the F5 ingress to the standalone Next server (port 3000).
+apiVersion: v1
+kind: Service
+metadata:
+  name: weave-web
+  labels:
+    app.kubernetes.io/name: weave-web
+    app.kubernetes.io/component: web
+    app.kubernetes.io/part-of: creatorweave
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: weave-web
+    creatorweave.io/deploy-region: global
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# Overseas public entry point — F5 NGINX Ingress Controller OSS.
+#
+# Mandatory ops rules for the new F5 ingress, followed here:
+#   1. New resource name has the -f5 suffix (do not overwrite legacy ingress).
+#   2. Only spec.ingressClassName is used; the deprecated
+#      kubernetes.io/ingress.class annotation is forbidden.
+#   3. nginx-ce-public is the external F5 controller class (not legacy nginx).
+#   4. Do not use VirtualServer for this simple new service.
+#
+# Before DNS changes: deploy, resolve the F5 ingress address, map it locally in
+# /etc/hosts for weave.eo2suite.com, validate HTTPS/app/probes, then notify
+# ops. AKS-US new F5 ingress IP: 130.213.171.133.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: weave-web-f5
+  labels:
+    app.kubernetes.io/name: weave-web
+    app.kubernetes.io/component: web
+    app.kubernetes.io/part-of: creatorweave
+spec:
+  ingressClassName: nginx-ce-public
+  tls:
+    - hosts:
+        - weave.eo2suite.com
+      secretName: eo2suite-com-tls
+  rules:
+    - host: weave.eo2suite.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: weave-web
+                port:
+                  number: 80

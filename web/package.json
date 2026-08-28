@@ -8,7 +8,7 @@
     "prepare:pwa": "node scripts/prepare-pwa.mjs",
     "build:extension": "cd ../browser-extension && pnpm install && pnpm run build",
     "prepare:assets": "node scripts/prepare-static-assets.mjs",
-    "pack:skills": "cd .. && bash scripts/pack-skills.sh skill-store web/public/skills",
+    "pack:skills": "node scripts/pack-skills.mjs ../skill-store public/skills",
     "preview": "next start --hostname 0.0.0.0 --port 3000",
     "preview:prod": "pnpm build && pnpm preview",
     "test": "vitest",

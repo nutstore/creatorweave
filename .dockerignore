@@ -1,0 +1,46 @@
+# Runtime-image build context (see Dockerfile — the app is BUILT on the
+# Jenkins agent; docker only packages the prebuilt output). Keep the context
+# small but make sure the three trees the Dockerfile COPYies are present:
+#   web/.next/standalone  (includes its own traced node_modules)
+#   web/.next/static
+#   web/public
+
+# Env files — NEXT_PUBLIC_* are inlined at build time on the agent; the
+# generated web/.env must never ship inside the image.
+**/.env
+**/.env.local
+**/.env.*.local
+
+# VCS / editor state
+.git
+.github
+.vscode
+.idea
+**/.DS_Store
+
+# Build outputs NOT needed by the runtime image (standalone/static are
+# re-included below; caches and the full build tree stay out)
+web/.next/cache
+web/.next/server
+web/.next/types
+web/out
+browser-extension/dist
+browser-extension/.wxt
+browser-extension/dist-dev
+target
+test-results
+playwright-report
+coverage
+
+# Source dependency trees (repo root / packages / web dev node_modules) are
+# huge and not needed — but NEVER exclude anything under .next/standalone,
+# whose traced node_modules IS the runtime dependency set.
+node_modules
+packages/*/node_modules
+web/node_modules
+browser-extension/node_modules
+
+# Dev tooling / local artifacts
+native-host-builds
+*.log
+npm-debug.log*

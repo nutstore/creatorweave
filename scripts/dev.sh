@@ -22,7 +22,7 @@ trap 'echo -e "\n${YELLOW}🛑 Stopping all servers...${NC}"; pkill -f "pnpm run
 
 # Package skills first (generates dist/skills/manifest.json for SkillDiscover)
 echo -e "${BLUE}📦 Packaging skills (manifest + zip)...${NC}"
-cd "$PROJECT_ROOT" && bash scripts/pack-skills.sh
+cd "$PROJECT_ROOT/web" && node scripts/pack-skills.mjs
 
 # Start web (port 5173)
 echo -e "${BLUE}🌐 Starting web (http://localhost:5173)...${NC}"
