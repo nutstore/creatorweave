@@ -3,16 +3,21 @@ import { BASE_SCHEMA_VERSION, initializeSchema } from './index'
 
 class SchemaDatabase {
   statements: string[] = []
+  /** When true, simulated ALTER TABLE repairs never register the column. */
+  blockFsOpsRepair = false
   private missingConversationColumns: Set<string>
   private missingProjectRootColumns: Set<string>
+  private missingFsOpsColumns: Set<string>
 
   constructor(
     public userVersion = 0,
     missingConversationColumns: string[] = [],
     missingProjectRootColumns: string[] = [],
+    missingFsOpsColumns: string[] = [],
   ) {
     this.missingConversationColumns = new Set(missingConversationColumns)
     this.missingProjectRootColumns = new Set(missingProjectRootColumns)
+    this.missingFsOpsColumns = new Set(missingFsOpsColumns)
   }
 
   exec(sql: string): Array<{ values: number[][] }> {
@@ -37,6 +42,14 @@ class SchemaDatabase {
       throw new Error(`no such column: ${missingProjectRootColumn}`)
     }
 
+    const selectedFsOpsColumns = [...sql.matchAll(/\bdelete_mode\b/g)].map((match) => match[0])
+    const missingFsOpsColumn = selectedFsOpsColumns.find((column) =>
+      this.missingFsOpsColumns.has(column)
+    )
+    if (sql.includes('FROM fs_ops LIMIT 0') && missingFsOpsColumn) {
+      throw new Error(`no such column: ${missingFsOpsColumn}`)
+    }
+
     const addedColumn = sql.match(/ALTER TABLE conversations ADD COLUMN (compressed_context_\w+)/)
     if (addedColumn) {
       this.missingConversationColumns.delete(addedColumn[1])
@@ -44,6 +57,10 @@ class SchemaDatabase {
     const addedProjectRootColumn = sql.match(/ALTER TABLE project_roots\s+ADD COLUMN (backend|scope_id)/)
     if (addedProjectRootColumn) {
       this.missingProjectRootColumns.delete(addedProjectRootColumn[1])
+    }
+    const addedFsOpsColumn = sql.match(/ALTER TABLE fs_ops\s+ADD COLUMN (\w+)/)
+    if (addedFsOpsColumn && !this.blockFsOpsRepair) {
+      this.missingFsOpsColumns.delete(addedFsOpsColumn[1])
     }
 
     this.statements.push(sql)
@@ -83,7 +100,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(17)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements).toContainEqual(
       expect.stringContaining('CREATE TABLE IF NOT EXISTS flow_templates')
     )
@@ -103,7 +120,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(17)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements).toContainEqual(
       expect.stringContaining('ADD COLUMN compressed_context_summary')
     )
@@ -123,7 +140,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(17)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements).toContainEqual(
       expect.stringContaining("ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
     )
@@ -137,7 +154,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(17)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements).toContainEqual(
       expect.stringContaining("ALTER TABLE project_roots ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
     )
@@ -151,12 +168,53 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(17)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements).toContainEqual(
       expect.stringContaining("ALTER TABLE project_roots ADD COLUMN backend TEXT NOT NULL DEFAULT 'fsaccess'")
     )
     expect(db.statements).toContainEqual(
       expect.stringContaining('ALTER TABLE project_roots ADD COLUMN scope_id TEXT')
     )
+  })
+
+  it('runs the v18 fs_ops migration when upgrading a v17 database', async () => {
+    const db = new SchemaDatabase(17, [], [], ['delete_mode'])
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(18)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ALTER TABLE fs_ops ADD COLUMN delete_mode')
+    )
+  })
+
+  it('repairs the fs_ops delete_mode column when a v18 database is missing physical DDL', async () => {
+    const db = new SchemaDatabase(18, [], [], ['delete_mode'])
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(18)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ALTER TABLE fs_ops ADD COLUMN delete_mode')
+    )
+  })
+
+  it('rejects a database whose declared schema still lacks the fs_ops delete_mode column', async () => {
+    const db = new SchemaDatabase(18, [], [], ['delete_mode'])
+    // Simulate an unfixable database: even the repair ALTER cannot add the column.
+    db.blockFsOpsRepair = true
+
+    await expect(initializeSchema(db)).rejects.toThrow('SCHEMA_INCOMPATIBLE')
+  })
+
+  it('does not downgrade the version when repair functions run on a fresh database', async () => {
+    const db = new SchemaDatabase()
+
+    await initializeSchema(db)
+
+    // Repairs raise the floor but never regress the base schema version.
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
+    expect(db.statements.filter((sql) => sql === 'PRAGMA user_version = 17')).toHaveLength(0)
+    expect(db.statements.filter((sql) => sql === 'PRAGMA user_version = 18')).toHaveLength(0)
   })
 })

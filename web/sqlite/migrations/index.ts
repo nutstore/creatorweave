@@ -68,7 +68,40 @@ function repairConversationCompressionColumns(db: any): void {
     }
   }
 
-  db.exec('PRAGMA user_version = 15')
+  bumpUserVersionFloor(db, 15)
+}
+
+/**
+ * Synchronous read of PRAGMA user_version (the async getCurrentVersion helper
+ * is unavailable inside the synchronous repair functions).
+ */
+function readUserVersion(db: any): number {
+  try {
+    const result = db.exec('PRAGMA user_version')
+    const versionFromValues = result?.[0]?.values?.[0]?.[0]
+    if (typeof versionFromValues === 'number') return versionFromValues
+
+    const versionFromArray = result?.[0]?.[0]
+    if (typeof versionFromArray === 'number') return versionFromArray
+  } catch {
+    // Treat unreadable version as 0 so repair functions still raise the floor.
+  }
+  return 0
+}
+
+/**
+ * Raise PRAGMA user_version to `version` without ever downgrading it.
+ *
+ * Repair helpers run on every startup — including fresh databases whose base
+ * schema already carries a higher version. An unconditional write would
+ * regress those databases (e.g. 18 → 17), causing the next launch to re-run a
+ * migration whose DDL is already present and log a recoverable
+ * "duplicate column name" conflict on every startup.
+ */
+function bumpUserVersionFloor(db: any, version: number): void {
+  if (readUserVersion(db) < version) {
+    db.exec(`PRAGMA user_version = ${version}`)
+  }
 }
 
 /**
@@ -109,7 +142,7 @@ function repairProjectRootBackendColumns(db: any): void {
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_roots_project_scope
       ON project_roots(project_id, scope_id) WHERE scope_id IS NOT NULL`
   )
-  db.exec('PRAGMA user_version = 17')
+  bumpUserVersionFloor(db, 17)
 }
 
 function verifyProjectRootSchema(db: any): void {
@@ -122,6 +155,39 @@ function verifyProjectRootSchema(db: any): void {
   }
 }
 
+
+function fsOpsColumnExists(db: any, column: string): boolean {
+  try {
+    db.exec(`SELECT ${column} FROM fs_ops LIMIT 0`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Ensure the physical fs_ops.delete_mode column exists.
+ *
+ * Runs unconditionally after pending migrations (and inside the v18 migration)
+ * so a database whose user_version raced ahead of its DDL gets the column
+ * created regardless of which version it reports.
+ */
+function repairFsOpsDeleteModeColumn(db: any): void {
+  if (!fsOpsColumnExists(db, 'delete_mode')) {
+    db.exec('ALTER TABLE fs_ops ADD COLUMN delete_mode TEXT')
+  }
+  bumpUserVersionFloor(db, 18)
+}
+
+function verifyFsOpsDeleteModeSchema(db: any): void {
+  try {
+    db.exec('SELECT delete_mode FROM fs_ops LIMIT 0')
+  } catch (error) {
+    throw new Error(
+      `SCHEMA_INCOMPATIBLE: fs_ops is missing the delete_mode column. ${getErrorMessage(error)}`
+    )
+  }
+}
 
 // Base schema version
 export const BASE_SCHEMA_VERSION = 18
@@ -357,10 +423,7 @@ export const migrations: Migration[] = [
   {
     version: 18,
     name: 'add_fs_ops_delete_mode',
-    up: `
-      ALTER TABLE fs_ops ADD COLUMN delete_mode TEXT;
-      PRAGMA user_version = 18;
-    `,
+    up: repairFsOpsDeleteModeColumn,
   },
 ]
 
@@ -530,11 +593,17 @@ export async function initializeSchema(
   // scheduling so this remains safe even when there is no newer version to run.
   repairProjectRootBackendColumns(db)
 
+  // Same guard for the v18 fs_ops.delete_mode column: a database can report a
+  // version >= 18 while the physical column is absent (DDL raced user_version),
+  // so repair it on every startup before verifying.
+  repairFsOpsDeleteModeColumn(db)
+
   // Version numbers alone are not enough: validate the physical columns after
   // migration so the app fails safely with an exportable database instead of
   // later rendering an empty conversation list.
   verifyConversationSchema(db)
   verifyProjectRootSchema(db)
+  verifyFsOpsDeleteModeSchema(db)
 
   // Report completion
   onProgress?.({
