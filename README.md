@@ -37,7 +37,6 @@ The project is also exploring multi-agent collaboration workflows for content cr
 - **Code Intelligence**: Understand, analyze, and manipulate code with 30+ intelligent tools
 - **Python Integration**: Execute Python code in the browser with Pyodide (pandas, numpy, matplotlib support)
 - **Privacy First**: All processing happens locally - your data never leaves your browser
-- **Remote Control**: Control your workspace from mobile devices via encrypted relay server
 
 ## Features
 
@@ -152,7 +151,6 @@ creatorweave/
 │   │   ├── workers/       # Web Workers (file discovery, plugins)
 │   │   └── export/        # Data export functionality
 │   └── package.json
-├── relay-server/           # Socket.IO relay server for remote sessions
 ├── wasm/                   # Rust + WebAssembly modules
 │   └── crates/            # Core logic, WASM bindings, plugin API/SDK
 ├── packages/               # Monorepo shared packages
@@ -175,10 +173,6 @@ creatorweave/
 pnpm -C web run dev
 pnpm -C web run build
 pnpm -C web run preview
-
-# Relay Server (relay-server/)
-pnpm -C relay-server run dev
-pnpm -C relay-server run build
 
 # Quality (web/)
 pnpm -C web run lint

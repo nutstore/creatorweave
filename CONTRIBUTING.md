@@ -48,7 +48,6 @@ Look for issues labeled [`good first issue`](https://github.com/nutstore/creator
 | **Documentation** | Markdown | Write guides, translate docs, improve API docs |
 | **i18n** | TypeScript | Add or improve language translations |
 | **Data Analysis** | Python + TypeScript | Improve Pyodide integration, add visualization features |
-| **Mobile Web** | React | Build mobile remote control features |
 | **DevOps** | GitHub Actions | Improve CI/CD, add automated releases |
 
 ### 💬 Not Sure Where to Start?
@@ -108,7 +107,6 @@ creatorweave/
 │   ├── src/python/        # Pyodide Python integration
 │   ├── src/workers/       # Web Workers (7 workers)
 │   └── src/export/        # Data export
-├── relay-server/          # Socket.IO relay server
 ├── wasm/                  # Rust + WebAssembly (6 crates)
 ├── packages/              # Shared packages (ui, conversation, encryption, i18n)
 ├── plugins/               # Example plugins

@@ -12,16 +12,15 @@ order: 201
 仓库是一个 `pnpm workspace` 单体仓（monorepo），核心运行单元如下：
 
 1. `web/`：桌面端主应用（React + Vite + Zustand + SQLite WASM + OPFS）。
-2. `relay-server/`：中继服务器（Express + Socket.IO），负责会话转发与会话同步 API。
-3. `packages/*`：共享能力包（`ui`、`conversation`、`encryption`、`i18n`、`config`）。
-4. `wasm/`：Rust/WASM 模块（由 `web` 构建流程调用）。
+2. `packages/*`：共享能力包（`ui`、`conversation`、`encryption`、`i18n`、`config`）。
+3. `wasm/`：Rust/WASM 模块（由 `web` 构建流程调用）。
 
 ## 2. 前端主应用（web）分层
 
 `web/src` 的核心分层可以按“UI -> Store -> 服务/运行时 -> 持久化/外部协议”理解：
 
 1. UI 层：`components/`、`hooks/`、`styles/`。
-2. 状态层：`store/`（Zustand），包含会话、工作区、设置、远程状态等。
+2. 状态层：`store/`（Zustand），包含对话、工作区、设置等。
 3. 运行时层：
    `agent/`：AgentLoop、上下文管理、工具系统、LLM provider。
    `mcp/`：MCP manager、tool bridge、elicitation 处理。
@@ -42,9 +41,8 @@ order: 201
 1. `initStorage()` 初始化 SQLite（优先 OPFS，失败可回退）。
 2. `setupAutoSave()` 注册存储收尾逻辑。
 3. `workspace.store.initialize()` 加载工作区上下文。
-4. `remote.store.attemptReconnect()` 尝试恢复远程会话。
-5. `settings.store.checkHasApiKey()` 预热 API key 状态。
-6. 首次用户交互后触发：
+4. `settings.store.checkHasApiKey()` 预热 API key 状态。
+5. 首次用户交互后触发：
    申请 Persistent Storage。
    如存在待恢复目录句柄，触发权限恢复。
 
@@ -93,17 +91,7 @@ order: 201
 2. 构建阶段 `web` 会将 pyodide 资源复制到产物目录。
 3. Agent 工具可通过桥接调用 Python 计算与文件处理能力。
 
-## 6. 远程会话（Desktop <-> Relay <-> Mobile）
-
-1. 桌面端通过 `RemoteSession` 创建/恢复会话。
-2. 双端使用 `@creatorweave/encryption` 做密钥交换与消息加密封装。
-3. `relay-server` 仅转发和会话管理，不承载业务解密。
-4. `relay-server` 暴露：
-   `GET /health` 健康检查。
-   `/api/*` 会话同步接口。
-   `GET /join/:sessionId` 跳转到移动端页面。
-
-## 7. 数据持久化与回退策略
+## 6. 数据持久化与回退策略
 
 当前存储模式（`storage/init.ts`）：
 
@@ -124,7 +112,7 @@ Native 目录句柄作用域约束（强约束）：
 3. 同一 `project` 下所有 workspace 共享同一个本地目录句柄。
 4. 释放 `project` 目录句柄后，该 project 的所有 workspace 都必须视为“无本地目录”。
 
-## 8. 开发与质量门禁
+## 7. 开发与质量门禁
 
 以 `web` 为主的日常质量命令：
 
@@ -138,20 +126,19 @@ pnpm -C web test:e2e
 跨工程常用命令：
 
 ```bash
-pnpm -C relay-server dev
 make lint
 make test
 ```
 
-## 9. 设计约束与建议
+## 8. 设计约束与建议
 
 1. 新能力优先走 `services/` + `store/`，避免在组件层堆业务逻辑。
-2. 涉及跨模块协议（Remote/MCP/Plugin）必须先定义类型，再实现传输。
+2. 涉及跨模块协议（MCP/Plugin）必须先定义类型，再实现传输。
 3. 任何持久化变更优先走 `sqlite/repositories`，不要在 UI 层直接拼 SQL。
 4. 对话运行态不入库，防止流式中间态污染历史记录。
 5. Worker 边界优先用于高频 CPU 密集任务（diff、遍历、插件执行）。
 
-## 10. 结构演进（已落地）
+## 9. 结构演进（已落地）
 
 Project / Workspace 双层结构已随多根工作区（multi-root）支持落地，设计细节见内部仓库 `weave-docs`（`design/multi-root-project.md`）。
 

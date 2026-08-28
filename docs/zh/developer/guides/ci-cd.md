@@ -17,7 +17,6 @@ order: 103
 1. `pnpm -C web run typecheck`
 2. `pnpm -C web run lint`
 3. `pnpm -C web run test:run`（或针对性测试）
-5. `pnpm -C relay-server run typecheck`
 
 ## 本地验证
 

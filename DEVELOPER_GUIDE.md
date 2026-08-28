@@ -208,7 +208,6 @@ creatorweave/
 │   ├── encryption/              # Encryption utilities
 │   ├── i18n/                    # Internationalization
 │   └── ui/                      # Shared UI components
-├── relay-server/                # Remote session server
 ```
 
 ---

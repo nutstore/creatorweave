@@ -13,8 +13,7 @@ For the system-level runtime flow, also read the [Architecture Overview](./archi
 The workspace currently consists of:
 
 1. `web`: the desktop main app.
-2. `relay-server`: the session relay service.
-3. `packages/*`: shared packages.
+2. `packages/*`: shared packages.
 
 `pnpm-workspace.yaml` stays consistent with the root `package.json`; everything is developed together through the workspace, with no independent release process required.
 
@@ -37,8 +36,8 @@ The workspace currently consists of:
 
 ### 2.4 `packages/encryption`
 
-1. Remote-session encryption protocol capabilities (key exchange, encryption/decryption wrappers).
-2. `web` is the only protocol consumer; protocol changes must stay compatible with it.
+1. Encryption utility capabilities (key exchange, encryption/decryption wrappers).
+2. Keep protocol changes compatible with their consumers.
 
 ### 2.5 `packages/i18n`
 
@@ -52,16 +51,11 @@ The workspace currently consists of:
 1. Business core: Agent, MCP, plugin system, SQLite/OPFS, file and session management.
 2. Principle: business state goes into `store/`; heavy computation sinks into `services/` or `workers/`.
 
-### 3.2 `relay-server`
-
-1. Handles session routing, message relay, and the session sync API.
-2. Carries no business decryption logic; no direct coupling with frontend stores.
-
 ## 4. Dependency Direction Constraints
 
 Allowed directions:
 
-1. `web/relay-server` -> `packages/*`
+1. `web` -> `packages/*`
 2. Inside `web`: `components` -> `store` -> `services`/`agent`/`mcp` -> `sqlite`/`opfs`
 
 Directions to avoid:
@@ -80,8 +74,6 @@ pnpm -C web dev
 pnpm -C web lint
 pnpm -C web typecheck
 
-# Relay
-pnpm -C relay-server dev
 ```
 
 For cross-project commands use the root `Makefile` (e.g. `make lint`, `make test`).
@@ -89,7 +81,7 @@ For cross-project commands use the root `Makefile` (e.g. `make lint`, `make test
 ## 6. Documentation Index
 
 1. System flow: [`docs/zh/developer/architecture/overview.md`](https://github.com/nutstore/creatorweave/blob/main/docs/zh/developer/architecture/overview.md)
-2. Remote session, plugin system and other internal design docs: see the separate `weave-docs` repository (`relay-server/`, `plugin-system/`)
+2. Plugin system and other internal design docs: see the separate `weave-docs` repository (`plugin-system/`)
 
 ---
 

@@ -9,11 +9,10 @@ import { welcome } from './welcome'
 import { skills, discover, skillCard, skillEditor, skillUpload, skillDetail, skillFileEditor } from './skills'
 import { webContainer } from './webContainer'
 import { workflowEditor, customWorkflowManager, workflowEditorDialog, workflow } from './workflow'
-import { remote, session } from './remote'
+import { conversation, toolCallDisplay, questionCard, runChanges, session } from './conversation'
 import { fileViewer, standalonePreview, filePreview, recentFiles, officePreview } from './fileViewer'
 import { storageStatusBanner, pendingSync, conversationStorage, workspaceStorage } from './storage'
 import { themeToggle } from './themeToggle'
-import { conversation, toolCallDisplay, questionCard, runChanges } from './conversation'
 import { mobile, offlineQueue } from './mobile'
 import { activityHeatmap } from './activityHeatmap'
 import { errorBoundary } from './errorBoundary'
@@ -54,7 +53,6 @@ export const koKR = {
   workflowEditor,
   customWorkflowManager,
   workflowEditorDialog,
-  remote,
   session,
   fileViewer,
   standalonePreview,

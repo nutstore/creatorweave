@@ -29,11 +29,6 @@ echo -e "${BLUE}🌐 Starting web (http://localhost:5173)...${NC}"
 cd "$PROJECT_ROOT/web" && pnpm run dev &
 WEB_PID=$!
 
-# Start relay-server (port 3000)
-echo -e "${BLUE}🔌 Starting relay-server (http://localhost:3000)...${NC}"
-cd "$PROJECT_ROOT/relay-server" && pnpm run dev &
-RELAY_PID=$!
-
 # Ensure browser-extension dependencies are installed
 if [ ! -d "$PROJECT_ROOT/browser-extension/node_modules" ]; then
   echo -e "${BLUE}📦 Installing browser-extension dependencies...${NC}"
@@ -59,11 +54,10 @@ echo -e "${GREEN}✅ All dev servers started!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  🌐 Web:       ${BLUE}http://localhost:5173${NC}"
-echo -e "  🔌 Relay:     ${BLUE}http://localhost:3000${NC}"
 echo -e "  🧩 Extension: ${BLUE}wxt dev → dist/chrome-mv3 (DEV)${NC}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all servers${NC}"
 echo ""
 
 # Wait for all background processes
-wait $WEB_PID $RELAY_PID $EXTENSION_PID
+wait $WEB_PID $EXTENSION_PID

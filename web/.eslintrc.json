@@ -36,15 +36,11 @@
             "message": "Use @creatorweave/i18n"
           },
           {
-            "name": "@encryption",
-            "message": "Use @creatorweave/encryption"
-          },
-          {
             "name": "@conversation",
             "message": "Use @creatorweave/conversation"
           }
         ],
-        "patterns": ["@ui/*", "@i18n/*", "@encryption/*", "@conversation/*"]
+        "patterns": ["@ui/*", "@i18n/*", "@conversation/*"]
       }
     ],
     "prefer-const": "error",

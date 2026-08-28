@@ -98,4 +98,3 @@ AI 执行操作后会展示：
 
 - [快速入门](getting-started.md) - 基础使用教程
 - [对话功能](conversation.md) - 与 AI 对话
-- [同步功能](sync.md) - 远程控制和同步

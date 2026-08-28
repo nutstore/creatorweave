@@ -122,12 +122,6 @@ export {
   BrandDialogDescription,
 } from './modals/dialog'
 
-export {
-  RemoteDialog,
-  RemoteDialogContent,
-} from './dialogs/remote-dialog'
-export type { RemoteDialogProps } from './dialogs/remote-dialog'
-
 // ========== Accordions ==========
 export {
   BrandAccordion,

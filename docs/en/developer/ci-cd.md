@@ -21,7 +21,6 @@ If you want remote quality gates on PR/push, add a workflow file first.
   - `pnpm -C web run typecheck`
   - `pnpm -C web run lint`
   - `pnpm -C web run test:run` (or targeted test commands)
-  - `pnpm -C relay-server run typecheck`
   - `cargo -C wasm test` (when Rust code is touched)
 
 ### If You Add CI

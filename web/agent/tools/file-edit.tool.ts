@@ -7,7 +7,6 @@
 
 import { structuredPatch } from 'diff'
 import { useOPFSStore } from '@/store/opfs.store'
-import { useRemoteStore } from '@/store/remote.store'
 import type { ToolContext, ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
@@ -558,12 +557,6 @@ async function executeEdits(
       context: 3,
     })
     const diffText = formatHunksToDiff(patchResult.hunks)
-
-    const session = useRemoteStore.getState().session
-    if (session) {
-      const preview = `Edited: ${path} (${appliedCount} regions, ${edits.length - noopCount} edits applied)`
-      session.broadcastFileChange(path, 'modify', preview)
-    }
 
     return toolOkJson('edit', {
       noop: appliedCount === 0,

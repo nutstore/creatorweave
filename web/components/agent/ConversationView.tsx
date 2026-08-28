@@ -276,35 +276,7 @@ export function ConversationView({
         })
 
       try {
-        // --- Remote/Host mode: use fileTree from remote store ---
-        const { useRemoteStore } = await import('@/store/remote.store')
-        const remoteStore = useRemoteStore.getState()
-        const fileTree = remoteStore.fileTree
-
-        if (fileTree) {
-          if (!normalizedQuery) {
-            const rootEntries = (fileTree.children ?? []).slice(0, 12)
-            if (reqId !== searchReqIdRef.current) return []
-            return rootEntries
-              .map((c: any) => ({
-                path: c.path,
-                name: c.name,
-                extension: c.extension,
-                isDirectory: c.type === 'directory',
-              }))
-              .sort((a, b) => compareItems(a, b, normalizedQuery))
-          }
-
-          const { fileDiscoveryService } = await import('@/services/file-discovery.service')
-          const results = await fileDiscoveryService.search(query, [fileTree], { limit: 30 })
-          if (reqId !== searchReqIdRef.current) return []
-          return results
-            .map((r) => ({ path: r.path, name: r.name, extension: r.extension, isDirectory: r.type === 'directory' }))
-            .sort((a, b) => compareItems(a, b, normalizedQuery))
-            .slice(0, 10)
-        }
-
-        // --- Local mode: use shared file path cache from folder-access.store ---
+        // Use the shared local file path cache from folder-access.store.
         const { useFolderAccessStore } = await import('@/store/folder-access.store')
         let allPaths = await useFolderAccessStore.getState().ensureFilePaths()
 

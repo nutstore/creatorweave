@@ -380,9 +380,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         // Reload roots so sidebar FileTreePanel picks up the new handle
         await get().loadRoots()
 
-        // Notify file tree to refresh + clear file path cache (lazy reload on next search)
+        // Clear file path cache so the local file tree reloads on next search.
         get().clearFilePaths()
-        get().notifyFileTreeRefresh()
 
         return true
       } catch (error) {
@@ -464,9 +463,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       // Reload roots so sidebar FileTreePanel picks up the new handle
       await get().loadRoots()
 
-      // Notify file tree to refresh + clear file path cache
+      // Clear file path cache so the local file tree reloads on next search.
       get().clearFilePaths()
-      get().notifyFileTreeRefresh()
     },
 
     /**
@@ -507,7 +505,6 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
           toast.success('Folder permission restored')
           get().clearFilePaths()
-          get().notifyFileTreeRefresh()
           return true
         } else {
           toast.error('Permission denied')
@@ -780,22 +777,6 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     // ========================================================================
-    // Helpers
-    // ========================================================================
-
-    notifyFileTreeRefresh: async () => {
-      try {
-        const { useRemoteStore } = await import('./remote.store')
-        const remoteStore = useRemoteStore.getState()
-        if (remoteStore.session && remoteStore.getRole() === 'host') {
-          remoteStore.refreshFileTree()
-        }
-      } catch (error) {
-        console.error('[FolderAccessStore] Failed to notify file tree refresh:', error)
-      }
-    },
-
-    // ========================================================================
     // Multi-root actions
     // ========================================================================
 
@@ -991,9 +972,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         })
       } catch { /* ignore */ }
 
-      // Trigger file tree refresh
+      // Clear the local file path cache after adding a root.
       get().clearFilePaths()
-      get().notifyFileTreeRefresh()
 
       toast.success(`Added root "${rootName}"`)
       return true
@@ -1025,7 +1005,6 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           ;(await getWorkspaceManager()).invalidateRootMapCache(projectId)
         } catch { /* manager not ready */ }
         get().clearFilePaths()
-        get().notifyFileTreeRefresh()
         toast.success(i18nText('projectRoots.nativeRootAdded', `Added "${root.displayName}" through local connection`, { name: root.displayName }))
         return true
       } catch (error) {
@@ -1120,9 +1099,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         }
       } catch { /* ignore */ }
 
-      // Trigger file tree refresh
+      // Clear the local file path cache after removing a root.
       get().clearFilePaths()
-      get().notifyFileTreeRefresh()
 
       toast.success(`Removed root "${root.name}"`)
     },

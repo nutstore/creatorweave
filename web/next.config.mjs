@@ -71,7 +71,6 @@ const nextConfig = {
   },
   transpilePackages: [
     '@creatorweave/config',
-    '@creatorweave/encryption',
     '@creatorweave/i18n',
     '@creatorweave/shared',
     '@creatorweave/skills-system',

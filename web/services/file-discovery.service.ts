@@ -1,12 +1,21 @@
 /**
- * File Discovery Service - Host side
+ * File Discovery Service
  *
- * Provides file search and recent files tracking for Remote sessions.
- * Heavy operations are delegated to a worker to avoid blocking the main thread.
+ * Provides file search and recent-file tracking. Heavy operations are delegated
+ * to a worker to avoid blocking the main thread.
  */
 
-import { type FileEntry } from '@/remote/remote-protocol'
 import type { FileMetadata as TraversalFileMetadata } from '@/services/traversal.service'
+
+export interface FileEntry {
+  path: string
+  name: string
+  type: 'file' | 'directory'
+  size?: number
+  modified?: number
+  extension?: string
+  children?: FileEntry[]
+}
 
 // Re-export FileMetadata type for convenience
 export type FileMetadata = TraversalFileMetadata

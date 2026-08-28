@@ -14,7 +14,6 @@
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
-import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import { withToolTimeout, isToolTimeoutError } from './tool-utils'
@@ -270,18 +269,6 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
 
             deleted.push(...result.deletedFiles)
             deletedDirs.push(...result.deletedDirs)
-
-            const session = useRemoteStore.getState().session
-            if (session) {
-              // Broadcast each deleted file
-              for (const filePath of result.deletedFiles) {
-                session.broadcastFileChange(filePath, 'delete', `Deleted: ${filePath}`)
-              }
-              // Broadcast directory removal
-              if (result.deletedDirs.length > 0) {
-                session.broadcastFileChange(target, 'delete', `Deleted: ${target}`)
-              }
-            }
           } catch (error) {
             failed.push({
               path: target,

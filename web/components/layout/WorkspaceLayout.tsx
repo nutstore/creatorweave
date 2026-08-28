@@ -24,7 +24,6 @@ import { useProjectStore } from '@/store/project.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
-import { useRemoteStore, registerRemoteCallbacks } from '@/store/remote.store'
 import { useMobile } from '@/components/mobile/useMobile'
 import { useUnloadGuard } from '@/hooks/useUnloadGuard'
 import { TopBar } from './TopBar'
@@ -41,7 +40,6 @@ import { scanProjectSkills, syncResourcesToOPFS, syncProjectSkillsToActiveWorksp
 import type { Skill, SkillResource } from '@/skills/skill-types'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useSkillsStore } from '@/store/skills.store'
-import { createUserMessage } from '@/agent/message-types'
 import {
   CommandPalette,
   KeyboardShortcutsHelp,
@@ -119,9 +117,6 @@ export function WorkspaceLayout({
   )
   const createNew = useConversationStore((s) => s.createNew)
   const setActive = useConversationStore((s) => s.setActive)
-  const runAgent = useConversationStore((s) => s.runAgent)
-  const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
-  const updateMessages = useConversationStore((s) => s.updateMessages)
   const loaded = useConversationStore((s) => s.loaded)
   const loadFromDB = useConversationStore((s) => s.loadFromDB)
   const directoryHandle = useAgentStore((s) => s.directoryHandle)
@@ -157,12 +152,9 @@ export function WorkspaceLayout({
   const skillsScanVersion = useSkillsStore((s) => s.skillsScanVersion)
   const providerType = useSettingsStore((s) => s.providerType)
   const modelName = useSettingsStore((s) => s.modelName)
-  const maxTokens = useSettingsStore((s) => s.maxTokens)
   const hasApiKey = useSettingsStore((s) => s.hasApiKey)
-  const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
-  const role = useRemoteStore((s) => s.role)
   // `showPreview` is a boolean state field controlling the sync preview drawer.
   // `showPreviewPanel` is the action that toggles it (used elsewhere).
   // Earlier the boolean was aliased to `showPreview`, which clashed with the
@@ -619,82 +611,6 @@ export function WorkspaceLayout({
     setSidebarCollapsed,
     setActiveResourceTab,
     closeWebContainerPanel,
-  ])
-
-  // Register callbacks for remote messages (Host mode)
-  useEffect(() => {
-    if (role !== 'host') {
-      return
-    }
-
-    const handleRemoteMessage = async (content: string, messageId: string) => {
-      // Guard against the initial `hasApiKey=false` state — wait until the
-      // async SQLite check completes before deciding whether to accept the
-      // remote message.
-      if (!hasApiKeyLoaded || !hasApiKey) {
-        return
-      }
-
-      // Use existing conversation or create new one
-      let targetConvId = activeConversationId
-      if (!targetConvId) {
-        const newConv = createNew(content.slice(0, 30))
-        setActive(newConv.id)
-        targetConvId = newConv.id
-        // Wait for state to update
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      } else {
-        // Check if already running
-        if (isConversationRunning(targetConvId)) {
-          return
-        }
-      }
-
-      // Add user message
-      const userMsg = createUserMessage(content)
-      const currentConv = useConversationStore
-        .getState()
-        .conversations.find((c) => c.id === targetConvId)
-      const currentMessages = currentConv ? [...currentConv.messages, userMsg] : [userMsg]
-      updateMessages(targetConvId, currentMessages)
-
-      // Run agent
-      await runAgent(targetConvId, providerType, modelName, maxTokens, directoryHandle)
-
-      // Send acknowledgment
-      const { sendMessage } = useRemoteStore.getState()
-      sendMessage('', messageId)
-    }
-
-    const handleRemoteCancel = () => {
-      if (activeConversationId) {
-        const { cancelAgent } = useConversationStore.getState()
-        cancelAgent(activeConversationId)
-      }
-    }
-
-    registerRemoteCallbacks(handleRemoteMessage, handleRemoteCancel)
-
-    return () => {
-      // Unregister callbacks on unmount or when role changes
-      useRemoteStore.setState({
-        _onRemoteMessage: null,
-        _onRemoteCancel: null,
-      })
-    }
-  }, [
-    role,
-    activeConversationId,
-    hasApiKey,
-    providerType,
-    modelName,
-    maxTokens,
-    directoryHandle,
-    createNew,
-    setActive,
-    updateMessages,
-    runAgent,
-    isConversationRunning,
   ])
 
   // hasActiveConversation is computed via store selector above (avoids re-renders)

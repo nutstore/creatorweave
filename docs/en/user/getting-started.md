@@ -35,4 +35,3 @@ Open `http://localhost:5173`.
 
 - [Workspace](./workspace.md)
 - [Conversations](./conversation.md)
-- [Sync and Remote Control](./sync.md)

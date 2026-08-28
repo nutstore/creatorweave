@@ -38,14 +38,7 @@ The application will be available at **http://localhost:5173**
 
 **Note**: The development server requires COOP/COEP headers for SQLite WASM support, which are automatically configured in `vite.config.ts`.
 
-### Step 3: (Optional) Start Remote Session
-
-Then:
-1. Open **http://localhost:5173** (Desktop)
-2. Click "Remote Session" → "Create Session"
-3. Open **http://localhost:3000/join/:sessionId** on the mobile device
-
-### Step 4: Build for Production
+### Step 3: Build for Production
 
 ```bash
 # Build WASM modules (if modified)
@@ -99,15 +92,6 @@ pnpm run typecheck        # Type check package
 ```
 
 
-### Relay Server (relay-server/)
-
-```bash
-cd relay-server
-pnpm run dev              # Start relay server (default port 3001)
-pnpm run build            # Build TypeScript
-pnpm run start            # Start production server
-```
-
 ## 🏗️ Project Structure
 
 ```
@@ -127,9 +111,6 @@ creatorweave/
 │   │   ├── workers/       # Web Workers
 │   │   └── export/        # Data export
 │   └── package.json
-│
-├── relay-server/          # Socket.IO relay server
-│   └── src/index.ts
 │
 ├── packages/              # Monorepo shared packages
 │   ├── ui/                # Shared UI components (Radix UI)

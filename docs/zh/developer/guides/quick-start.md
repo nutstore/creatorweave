@@ -70,7 +70,6 @@ cd web && pnpm dev
 ```
 creatorweave/
 ├── web/              # React 前端应用
-├── relay-server/     # WebSocket 中继服务
 ├── packages/         # 共享包
 ├── wasm/            # Rust WASM 模块
 └── docs/           # 开发文档

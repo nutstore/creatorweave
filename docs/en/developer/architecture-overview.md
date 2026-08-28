@@ -12,16 +12,15 @@ order: 201
 The repository is a `pnpm workspace` monorepo. The core runtime units are:
 
 1. `web/`: the desktop main app (React + Vite + Zustand + SQLite WASM + OPFS).
-2. `relay-server/`: relay server (Express + Socket.IO) handling session forwarding and the session sync API.
-3. `packages/*`: shared capability packages (`ui`, `conversation`, `encryption`, `i18n`, `config`).
-4. `wasm/`: Rust/WASM modules (invoked by the `web` build pipeline).
+2. `packages/*`: shared capability packages (`ui`, `conversation`, `encryption`, `i18n`, `config`).
+3. `wasm/`: Rust/WASM modules (invoked by the `web` build pipeline).
 
 ## 2. Frontend Main App (web) Layering
 
 The core layering of `web/src` can be understood as "UI -> Store -> services/runtime -> persistence/external protocols":
 
 1. UI layer: `components/`, `hooks/`, `styles/`.
-2. State layer: `store/` (Zustand) — sessions, workspace, settings, remote state, etc.
+2. State layer: `store/` (Zustand) — conversations, workspace, settings, etc.
 3. Runtime layer:
    `agent/`: AgentLoop, context management, tool system, LLM providers.
    `mcp/`: MCP manager, tool bridge, elicitation handling.
@@ -42,9 +41,8 @@ Initialization order (critical path):
 1. `initStorage()` initializes SQLite (OPFS preferred, fallback available on failure).
 2. `setupAutoSave()` registers storage finalization logic.
 3. `workspace.store.initialize()` loads the workspace context.
-4. `remote.store.attemptReconnect()` tries to restore remote sessions.
-5. `settings.store.checkHasApiKey()` warms up API key state.
-6. Triggered after the first user interaction:
+4. `settings.store.checkHasApiKey()` warms up API key state.
+5. Triggered after the first user interaction:
    Request Persistent Storage.
    Restore pending directory handles if any exist.
 
@@ -93,17 +91,7 @@ Key facts:
 2. During build, `web` copies pyodide assets into the output directory.
 3. Agent tools can invoke Python computation and file processing through the bridge.
 
-## 6. Remote Sessions (Desktop <-> Relay <-> Mobile)
-
-1. The desktop creates/restores sessions via `RemoteSession`.
-2. Both ends use `@creatorweave/encryption` for key exchange and message encryption.
-3. `relay-server` only forwards and manages sessions; it never performs business decryption.
-4. `relay-server` exposes:
-   `GET /health` health check.
-   `/api/*` session sync endpoints.
-   `GET /join/:sessionId` redirect to the mobile page.
-
-## 7. Data Persistence and Fallback Strategy
+## 6. Data Persistence and Fallback Strategy
 
 Current storage modes (`storage/init.ts`):
 
@@ -124,7 +112,7 @@ Native directory-handle scope constraints (hard rules):
 3. All workspaces under the same `project` share the same local directory handle.
 4. After a `project` directory handle is released, all of its workspaces must be treated as "no local directory".
 
-## 8. Development and Quality Gates
+## 7. Development and Quality Gates
 
 Daily quality commands (mostly `web`):
 
@@ -138,20 +126,19 @@ pnpm -C web test:e2e
 Common cross-project commands:
 
 ```bash
-pnpm -C relay-server dev
 make lint
 make test
 ```
 
-## 9. Design Constraints and Recommendations
+## 8. Design Constraints and Recommendations
 
 1. New capabilities should go through `services/` + `store/` first; avoid piling business logic into components.
-2. Cross-module protocols (Remote/MCP/Plugin) must define types before implementing transport.
+2. Cross-module protocols (MCP/Plugin) must define types before implementing transport.
 3. Any persistence change should go through `sqlite/repositories`; do not build SQL in the UI layer.
 4. Conversation runtime state stays out of the database to keep streaming intermediates out of history.
 5. Worker boundaries are preferred for high-frequency CPU-intensive tasks (diff, traversal, plugin execution).
 
-## 10. Structural Evolution (Landed)
+## 9. Structural Evolution (Landed)
 
 The Project / Workspace two-layer structure has landed together with multi-root workspace support. Design details live in the internal `weave-docs` repository (`design/multi-root-project.md`).
 

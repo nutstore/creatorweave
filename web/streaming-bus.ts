@@ -2,8 +2,7 @@
 /**
  * Streaming EventBus - 避免循环依赖的事件总线
  *
- * 用于 conversation.store → remote.store 的流式事件传递
- * conversation.store 发送事件，remote.store 监听并广播给 Remote 端
+ * 用于 conversation.store（SQLite 变体）→ conversation.store 之间的流式事件传递
  */
 
 type StreamingEventType =

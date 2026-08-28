@@ -1,5 +1,4 @@
 packages:
   - 'packages/*'
   - 'web'
-  - 'relay-server'
   - 'browser-extension'

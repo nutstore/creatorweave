@@ -182,12 +182,8 @@ creatorweave/
 │   │   ├── components/      # React components
 │   │   ├── store/           # Zustand stores
 │   │   ├── services/        # Business logic
-│   │   ├── remote/          # Remote sessions
 │   │   └── wasm/            # WASM integration
 │   └── package.json
-│
-├── relay-server/            # Socket.IO relay server
-│   └── src/
 │
 ├── packages/                # Monorepo shared packages
 │   ├── ui/                  # Shared UI components

@@ -132,9 +132,6 @@ export interface FolderAccessStore extends FolderAccessActions {
   getCurrentHandle: () => FileSystemDirectoryHandle | null
   /** Whether the current project is ready */
   isReady: () => boolean
-  /** Notify file tree to refresh */
-  notifyFileTreeRefresh: () => Promise<void>
-
   /** Ensure file path cache is loaded (traverses directory on first call, returns cache on subsequent calls) */
   ensureFilePaths: () => Promise<string[]>
   /** Refresh file path cache (forces re-traversal) */

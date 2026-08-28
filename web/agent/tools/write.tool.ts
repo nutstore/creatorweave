@@ -7,7 +7,6 @@
 
 import type { ToolDefinition, ToolExecutor, ToolContext, ToolPromptDoc } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
-import { useRemoteStore } from '@/store/remote.store'
 import { useConversationStore } from '@/store/conversation.store'
 import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
@@ -222,12 +221,6 @@ async function executeSingleWrite(
       pendingCount = getPendingChanges().length
       status = 'saved'
       message = isNew ? `File "${path}" created.` : `File "${path}" updated.`
-    }
-
-    const session = useRemoteStore.getState().session
-    if (session) {
-      const preview = isNew ? `New file: ${path}` : `Modified: ${path} (${safeContent.length} bytes)`
-      session.broadcastFileChange(path, isNew ? 'create' : 'modify', preview)
     }
 
     // Refresh timestamp after successful write to avoid false staleness on consecutive edits

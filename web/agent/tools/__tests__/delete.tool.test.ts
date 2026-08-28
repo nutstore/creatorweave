@@ -20,24 +20,12 @@ const readFileMock = vi.fn<
 >()
 const getPendingChangesMock = vi.fn<() => Array<{ id: string }>>()
 
-const broadcastFileChangeMock = vi.fn()
-
 vi.mock('@/store/opfs.store', () => ({
   useOPFSStore: {
     getState: () => ({
       deleteFile: deleteFileMock,
       readFile: readFileMock,
       getPendingChanges: getPendingChangesMock,
-    }),
-  },
-}))
-
-vi.mock('@/store/remote.store', () => ({
-  useRemoteStore: {
-    getState: () => ({
-      session: {
-        broadcastFileChange: broadcastFileChangeMock,
-      },
     }),
   },
 }))
@@ -99,7 +87,6 @@ describe('delete tool', () => {
 
     expect(deleteFileMock).toHaveBeenCalledTimes(1)
     expect(deleteFileMock).toHaveBeenCalledWith('src/a.ts', null, undefined, null)
-    expect(broadcastFileChangeMock).toHaveBeenCalledWith('src/a.ts', 'delete', 'Deleted: src/a.ts')
   })
 
   it('handles partial failures in batch mode', async () => {
@@ -117,7 +104,6 @@ describe('delete tool', () => {
     expect(parsed.status).toBe('pending')
 
     expect(deleteFileMock).toHaveBeenCalledTimes(2)
-    expect(broadcastFileChangeMock).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -30,17 +30,6 @@ vi.mock('../folder-access.store', () => ({
   },
 }))
 
-// Mock remote.store
-vi.mock('../remote.store', () => ({
-  useRemoteStore: {
-    getState: vi.fn(() => ({
-      session: null,
-      getRole: vi.fn(() => 'participant'),
-      refreshFileTree: vi.fn(() => Promise.resolve()),
-    })),
-  },
-}))
-
 // Mock sonner toast
 vi.mock('sonner', () => ({
   toast: {

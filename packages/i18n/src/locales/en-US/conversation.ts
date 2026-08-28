@@ -208,6 +208,36 @@ export const conversation = {
     },
 } as const
 
+export const session = {
+    current: "Current Conversation",
+    switch: "Switch Conversation",
+    new: "New Conversation",
+    delete: "Delete Conversation",
+    deleteConfirm: "Are you sure you want to delete this conversation?",
+    storageLocation: "Storage Location",
+    notInitialized: "Not Initialized",
+    unknownSession: "Unknown Conversation",
+    initializing: "Initializing...",
+    noSession: "No Conversation",
+    pendingCount: "{count} pending",
+    undoCount: "{count} undo",
+    pendingChanges: "{count} pending changes",
+    undoOperations: "{count} undo operations",
+    noChanges: "No changes",
+    conversationSwitcher: {
+      deleteConfirm:
+        "Are you sure you want to delete this workspace cache? All file caches, pending syncs, and undo records will be deleted.",
+      selectConversation: "Select Conversation",
+      unknownConversation: "Unknown Conversation",
+      conversationList: "Conversation List ({count})",
+      noConversations: "No conversations",
+      pendingSync: "{count} pending",
+      noChanges: "No changes",
+      deleteCache: "Delete conversation cache",
+      newConversation: "New Conversation",
+    },
+} as const
+
 export const toolCallDisplay = {
     executing: "Executing...",
     arguments: "Arguments",

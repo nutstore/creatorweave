@@ -26,14 +26,6 @@ vi.mock('@/store/opfs.store', () => ({
   },
 }))
 
-vi.mock('@/store/remote.store', () => ({
-  useRemoteStore: {
-    getState: () => ({
-      session: null,
-    }),
-  },
-}))
-
 vi.mock('@/store/workspace.store', () => ({
   useWorkspaceStore: {
     getState: () => ({ activeWorkspaceId: null }),

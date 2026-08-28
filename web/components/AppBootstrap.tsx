@@ -6,7 +6,6 @@ import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { applyServiceWorkerUpdate } from '@/pwa/register-service-worker'
 import { StorageLoading } from '@/components/StorageLoading'
 import { DatabaseRefreshDialog } from '@/components/DatabaseRefreshDialog'
-import { attemptReconnect } from '@/store/remote.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useProjectStore } from '@/store/project.store'
 import { useOPFSStore } from '@/store/opfs.store'
@@ -285,8 +284,6 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
       } catch (err) {
         console.error('[App] Failed to initialize projects/workspaces:', err)
       }
-
-      attemptReconnect()
 
       try {
         const { useSettingsStore } = await import('@/store/settings.store')

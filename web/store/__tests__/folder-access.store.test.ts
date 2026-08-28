@@ -65,16 +65,6 @@ vi.mock('sonner', () => ({
   },
 }))
 
-vi.mock('@/store/remote.store', () => ({
-  useRemoteStore: {
-    getState: vi.fn(() => ({
-      session: null,
-      getRole: vi.fn(() => 'participant'),
-      refreshFileTree: vi.fn(),
-    })),
-  },
-}))
-
 vi.mock('../workspace.store', () => ({
   useWorkspaceStore: {
     getState: () => ({

@@ -5,8 +5,7 @@
   "packageManager": "pnpm@10.21.0",
   "workspaces": [
     "packages/*",
-    "web",
-    "relay-server"
+    "web"
   ],
   "resolutions": {
     "esbuild": "^0.21.5"

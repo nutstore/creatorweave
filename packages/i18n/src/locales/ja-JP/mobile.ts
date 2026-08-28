@@ -4,41 +4,6 @@ export const mobile = {
     back: "戻る",
     home: "ホーム",
     profile: "プロフィール",
-    settings: {
-      connectionStatus: "接続状態",
-      status: "ステータス",
-      statusConnected: "接続済み",
-      statusConnecting: "接続中...",
-      statusDisconnected: "未接続",
-      directory: "ディレクトリ",
-      encryption: "暗号化",
-      encryptionReady: "エンドツーエンド暗号化が有効",
-      encryptionExchanging: "鍵交換中...",
-      encryptionError: "暗号化エラー",
-      encryptionNone: "暗号化なし",
-      sessionId: "Session ID",
-      sessionManagement: "セッション管理",
-      clearLocalData: "ローカルセッションデータをクリア",
-      clearDataConfirm:
-        "ローカルセッションデータをクリアしてもよろしいですか？",
-      about: "について",
-      disconnect: "切断",
-    },
-    sessionInput: {
-      title: "リモートセッションに参加",
-      subtitle: "PC に表示されているセッション ID を入力してください",
-      placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-      inputLabel: "セッション ID 入力欄",
-      joinSession: "セッションに参加",
-      connecting: "接続中...",
-      reconnecting: "再接続中...",
-      cancel: "キャンセル",
-      errorRequired: "セッション ID を入力してください",
-      errorInvalidFormat:
-        "無効なセッション ID 形式、UUID 形式である必要があります (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)",
-      formatHint: "セッション ID 形式: UUID (8-4-4-4-12)",
-      qrHint: "または iOS カメラで QR コードをスキャンして自動参加",
-    },
 } as const
 
 // オフラインキュー

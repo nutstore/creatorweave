@@ -13,8 +13,7 @@ order: 204
 当前 workspace 由以下目录组成：
 
 1. `web`：桌面主应用。
-2. `relay-server`：会话中继服务。
-3. `packages/*`：共享包。
+2. `packages/*`：共享包。
 
 `pnpm-workspace.yaml` 与根 `package.json` 保持一致，全部通过 workspace 协同开发，不要求独立发布流程。
 
@@ -37,8 +36,8 @@ order: 204
 
 ### 2.4 `packages/encryption`
 
-1. 远程会话加密协议能力（密钥交换、加解密封装）。
-2. `web` 是唯一协议消费方，协议改动需与其保持兼容。
+1. 加密工具能力（密钥交换、加解密封装）。
+2. 协议改动需与其消费者保持兼容。
 
 ### 2.5 `packages/i18n`
 
@@ -52,16 +51,11 @@ order: 204
 1. 业务核心：Agent、MCP、插件系统、SQLite/OPFS、文件与会话管理。
 2. 原则：业务状态统一进入 `store/`，重计算优先下沉到 `services/` 或 `workers/`。
 
-### 3.2 `relay-server`
-
-1. 负责会话路由、消息中继、会话同步 API。
-2. 不承载业务解密逻辑，不与前端 store 发生直接耦合。
-
 ## 4. 依赖方向约束
 
 允许方向：
 
-1. `web/relay-server` -> `packages/*`
+1. `web` -> `packages/*`
 2. `web` 内部：`components` -> `store` -> `services`/`agent`/`mcp` -> `sqlite`/`opfs`
 
 避免方向：
@@ -80,8 +74,6 @@ pnpm -C web dev
 pnpm -C web lint
 pnpm -C web typecheck
 
-# Relay
-pnpm -C relay-server dev
 ```
 
 跨工程统一命令可使用根 `Makefile`（如 `make lint`、`make test`）。
@@ -89,7 +81,7 @@ pnpm -C relay-server dev
 ## 6. 文档索引
 
 1. 系统链路：[`docs/architecture/overview.md`](./overview.md)
-2. 远程会话、插件系统等内部设计文档：见独立仓库 `weave-docs`（`relay-server/`、`plugin-system/`）
+2. 插件系统等内部设计文档：见独立仓库 `weave-docs`（`plugin-system/`）
 
 ---
 
