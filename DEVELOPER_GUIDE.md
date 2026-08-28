@@ -209,7 +209,6 @@ creatorweave/
 │   ├── i18n/                    # Internationalization
 │   └── ui/                      # Shared UI components
 ├── relay-server/                # Remote session server
-└── mobile-web/                  # Mobile web interface
 ```
 
 ---

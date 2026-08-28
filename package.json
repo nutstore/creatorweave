@@ -6,7 +6,6 @@
   "workspaces": [
     "packages/*",
     "web",
-    "mobile-web",
     "relay-server"
   ],
   "resolutions": {

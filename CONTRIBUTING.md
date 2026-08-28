@@ -108,7 +108,6 @@ creatorweave/
 │   ├── src/python/        # Pyodide Python integration
 │   ├── src/workers/       # Web Workers (7 workers)
 │   └── src/export/        # Data export
-├── mobile-web/            # React frontend (Mobile Remote Control)
 ├── relay-server/          # Socket.IO relay server
 ├── wasm/                  # Rust + WebAssembly (6 crates)
 ├── packages/              # Shared packages (ui, conversation, encryption, i18n)

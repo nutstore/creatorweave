@@ -34,11 +34,6 @@ echo -e "${BLUE}🔌 Starting relay-server (http://localhost:3000)...${NC}"
 cd "$PROJECT_ROOT/relay-server" && pnpm run dev &
 RELAY_PID=$!
 
-# Start mobile-web (port 5174)
-echo -e "${BLUE}📱 Starting mobile-web (http://localhost:5174)...${NC}"
-cd "$PROJECT_ROOT/mobile-web" && pnpm run dev --port 5174 &
-MOBILE_PID=$!
-
 # Ensure browser-extension dependencies are installed
 if [ ! -d "$PROJECT_ROOT/browser-extension/node_modules" ]; then
   echo -e "${BLUE}📦 Installing browser-extension dependencies...${NC}"
@@ -65,11 +60,10 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo ""
 echo -e "  🌐 Web:       ${BLUE}http://localhost:5173${NC}"
 echo -e "  🔌 Relay:     ${BLUE}http://localhost:3000${NC}"
-echo -e "  📱 Mobile:    ${BLUE}http://localhost:5174${NC}"
 echo -e "  🧩 Extension: ${BLUE}wxt dev → dist/chrome-mv3 (DEV)${NC}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all servers${NC}"
 echo ""
 
 # Wait for all background processes
-wait $WEB_PID $RELAY_PID $MOBILE_PID $EXTENSION_PID
+wait $WEB_PID $RELAY_PID $EXTENSION_PID

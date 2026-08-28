@@ -13,9 +13,8 @@ For the system-level runtime flow, also read the [Architecture Overview](./archi
 The workspace currently consists of:
 
 1. `web`: the desktop main app.
-2. `mobile-web`: the mobile remote-control app.
-3. `relay-server`: the session relay service.
-4. `packages/*`: shared packages.
+2. `relay-server`: the session relay service.
+3. `packages/*`: shared packages.
 
 `pnpm-workspace.yaml` stays consistent with the root `package.json`; everything is developed together through the workspace, with no independent release process required.
 
@@ -39,7 +38,7 @@ The workspace currently consists of:
 ### 2.4 `packages/encryption`
 
 1. Remote-session encryption protocol capabilities (key exchange, encryption/decryption wrappers).
-2. Depends on both `web` and `mobile-web`; protocol changes must stay compatible with both ends.
+2. `web` is the only protocol consumer; protocol changes must stay compatible with it.
 
 ### 2.5 `packages/i18n`
 
@@ -53,12 +52,7 @@ The workspace currently consists of:
 1. Business core: Agent, MCP, plugin system, SQLite/OPFS, file and session management.
 2. Principle: business state goes into `store/`; heavy computation sinks into `services/` or `workers/`.
 
-### 3.2 `mobile-web`
-
-1. Handles remote-control interaction only; does not duplicate desktop business logic.
-2. Aligns with the desktop via remote protocol + encryption.
-
-### 3.3 `relay-server`
+### 3.2 `relay-server`
 
 1. Handles session routing, message relay, and the session sync API.
 2. Carries no business decryption logic; no direct coupling with frontend stores.
@@ -67,14 +61,14 @@ The workspace currently consists of:
 
 Allowed directions:
 
-1. `web/mobile-web/relay-server` -> `packages/*`
+1. `web/relay-server` -> `packages/*`
 2. Inside `web`: `components` -> `store` -> `services`/`agent`/`mcp` -> `sqlite`/`opfs`
 
 Directions to avoid:
 
 1. `packages/*` depending backwards on application-layer code.
 2. UI components calling low-level repositories or protocol layers directly.
-3. `mobile-web` copying `web` business implementations instead of reusing protocols/shared packages.
+3. Application-layer code duplicating shared package implementations instead of reusing protocols/shared packages.
 
 ## 5. Development Command Conventions
 
@@ -85,9 +79,6 @@ Prefer `pnpm -C <workspace>` to scope commands explicitly:
 pnpm -C web dev
 pnpm -C web lint
 pnpm -C web typecheck
-
-# Mobile
-pnpm -C mobile-web dev -- --port 3002
 
 # Relay
 pnpm -C relay-server dev

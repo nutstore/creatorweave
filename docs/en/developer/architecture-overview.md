@@ -12,10 +12,9 @@ order: 201
 The repository is a `pnpm workspace` monorepo. The core runtime units are:
 
 1. `web/`: the desktop main app (React + Vite + Zustand + SQLite WASM + OPFS).
-2. `mobile-web/`: the mobile remote-control page (join/control remote sessions).
-3. `relay-server/`: relay server (Express + Socket.IO) handling session forwarding and the session sync API.
-4. `packages/*`: shared capability packages (`ui`, `conversation`, `encryption`, `i18n`, `config`).
-5. `wasm/`: Rust/WASM modules (invoked by the `web` build pipeline).
+2. `relay-server/`: relay server (Express + Socket.IO) handling session forwarding and the session sync API.
+3. `packages/*`: shared capability packages (`ui`, `conversation`, `encryption`, `i18n`, `config`).
+4. `wasm/`: Rust/WASM modules (invoked by the `web` build pipeline).
 
 ## 2. Frontend Main App (web) Layering
 
@@ -140,7 +139,6 @@ Common cross-project commands:
 
 ```bash
 pnpm -C relay-server dev
-pnpm -C mobile-web dev -- --port 3002
 make lint
 make test
 ```

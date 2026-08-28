@@ -186,9 +186,6 @@ creatorweave/
 │   │   └── wasm/            # WASM integration
 │   └── package.json
 │
-├── mobile-web/              # React frontend (mobile remote control)
-│   └── src/
-│
 ├── relay-server/            # Socket.IO relay server
 │   └── src/
 │

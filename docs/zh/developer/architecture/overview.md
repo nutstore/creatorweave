@@ -12,10 +12,9 @@ order: 201
 仓库是一个 `pnpm workspace` 单体仓（monorepo），核心运行单元如下：
 
 1. `web/`：桌面端主应用（React + Vite + Zustand + SQLite WASM + OPFS）。
-2. `mobile-web/`：移动端遥控页面（加入/控制远程会话）。
-3. `relay-server/`：中继服务器（Express + Socket.IO），负责会话转发与会话同步 API。
-4. `packages/*`：共享能力包（`ui`、`conversation`、`encryption`、`i18n`、`config`）。
-5. `wasm/`：Rust/WASM 模块（由 `web` 构建流程调用）。
+2. `relay-server/`：中继服务器（Express + Socket.IO），负责会话转发与会话同步 API。
+3. `packages/*`：共享能力包（`ui`、`conversation`、`encryption`、`i18n`、`config`）。
+4. `wasm/`：Rust/WASM 模块（由 `web` 构建流程调用）。
 
 ## 2. 前端主应用（web）分层
 
@@ -140,7 +139,6 @@ pnpm -C web test:e2e
 
 ```bash
 pnpm -C relay-server dev
-pnpm -C mobile-web dev -- --port 3002
 make lint
 make test
 ```

@@ -55,7 +55,6 @@ make format
 ```
 packages/          # Shared packages (ui, config, i18n, encryption)
 web/              # Main React application
-mobile-web/       # Mobile web interface
 relay-server/     # Remote control relay server
 wasm/             # Rust WebAssembly modules
 ```

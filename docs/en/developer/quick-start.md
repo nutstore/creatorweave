@@ -40,20 +40,10 @@ The application will be available at **http://localhost:5173**
 
 ### Step 3: (Optional) Start Remote Session
 
-To enable mobile remote control:
-
-```bash
-# Terminal 1: Start relay server
-cd relay-server && pnpm run dev
-
-# Terminal 2: Start mobile web
-cd mobile-web && pnpm run dev --port 3002
-```
-
 Then:
 1. Open **http://localhost:5173** (Desktop)
 2. Click "Remote Session" → "Create Session"
-3. Scan QR code with mobile device at **http://localhost:3002**
+3. Open **http://localhost:3000/join/:sessionId** on the mobile device
 
 ### Step 4: Build for Production
 
@@ -108,14 +98,6 @@ cd packages/[package-name]
 pnpm run typecheck        # Type check package
 ```
 
-### Mobile Web (mobile-web/)
-
-```bash
-cd mobile-web
-pnpm run dev -- --port 3002  # Start dev server on 3002 (recommended for remote flow)
-pnpm run build            # Build for production
-pnpm run typecheck        # Run TypeScript type checker
-```
 
 ### Relay Server (relay-server/)
 
@@ -145,12 +127,6 @@ creatorweave/
 │   │   ├── workers/       # Web Workers
 │   │   └── export/        # Data export
 │   └── package.json
-│
-├── mobile-web/            # React frontend (Mobile Remote)
-│   └── src/
-│       ├── components/    # Mobile-optimized components
-│       ├── pages/         # Mobile pages
-│       └── contexts/      # React contexts
 │
 ├── relay-server/          # Socket.IO relay server
 │   └── src/index.ts

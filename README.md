@@ -152,8 +152,6 @@ creatorweave/
 │   │   ├── workers/       # Web Workers (file discovery, plugins)
 │   │   └── export/        # Data export functionality
 │   └── package.json
-├── mobile-web/             # React frontend (Mobile Remote Control)
-│   └── src/               # Mobile-optimized UI for remote sessions
 ├── relay-server/           # Socket.IO relay server for remote sessions
 ├── wasm/                   # Rust + WebAssembly modules
 │   └── crates/            # Core logic, WASM bindings, plugin API/SDK
@@ -177,10 +175,6 @@ creatorweave/
 pnpm -C web run dev
 pnpm -C web run build
 pnpm -C web run preview
-
-# Mobile Web (mobile-web/)
-pnpm -C mobile-web run dev -- --port 3002
-pnpm -C mobile-web run typecheck
 
 # Relay Server (relay-server/)
 pnpm -C relay-server run dev

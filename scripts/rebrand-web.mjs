@@ -25,14 +25,6 @@ rep('web/public/manifest.webmanifest.json', [
 rep('web/sw.ts', [
   ["title: 'CreatorWeave',", "title: 'EO2Weave',"],
 ])
-rep('mobile-web/index.html', [
-  ['content="CreatorWeave 移动端 - 远程控制你的 AI 创作工作台"',
-   'content="怡氧知知（EO2Weave）移动端 - 远程控制你的 AI 创作工作台"'],
-  ['<title>CreatorWeave</title>', '<title>EO2Weave</title>'],
-])
-rep('mobile-web/src/pages/SettingsPage.tsx', [
-  ['CreatorWeave Remote v1.0.0', 'EO2Weave Remote v1.0.0'],
-])
 
 // ── 簇3 AI 提示词/错误文案 ──
 rep('web/agent/prompts/universal-system-prompt.ts', [
