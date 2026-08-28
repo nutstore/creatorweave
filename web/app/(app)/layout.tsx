@@ -5,6 +5,10 @@ import { useEffect, useState } from 'react'
 import { registerServiceWorker } from '@/pwa/register-service-worker'
 import { RootErrorBoundary } from '@/components/error/RootErrorBoundary'
 import { APP_BUILD_ID, IS_DEVELOPMENT } from '@/app-build'
+// Side effect import is deliberately eager: the module synchronously captures
+// side-panel launch query parameters before child route effects can redirect
+// `/` to `/projects`. A useEffect import is too late under the App Router.
+import '@/agent/workspace-assistant-context'
 
 // The whole app is browser-only (OPFS, web workers, monaco-editor...). Load it
 // via dynamic(ssr:false) so the server/prerender pass never evaluates the
@@ -32,7 +36,6 @@ export default function AppGroupLayout({ children }: { children: React.ReactNode
   useEffect(() => {
     setMounted(true)
     document.documentElement.dataset.creatorweave = 'true'
-    void import('@/agent/workspace-assistant-context')
     if (IS_DEVELOPMENT) void import('react-grab')
 
     registerServiceWorker({

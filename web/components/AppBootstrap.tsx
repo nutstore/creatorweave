@@ -477,11 +477,15 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
   const router = useRouter()
   const initialized = useProjectStore((s) => s.initialized)
   useEffect(() => {
-    if (!initialized) return
-    import('@/agent/workspace-assistant-context').then(({ handleWorkspaceAssistantOnReady }) => {
-      handleWorkspaceAssistantOnReady((path: string) => router.push(path))
+    // Project initialization completes before all storage gates finish. Wait
+    // until the app can render the target Next.js route, then consume the
+    // one-shot side-panel request; this also gives RootPage a deterministic
+    // pending marker to defer its ordinary / → /projects redirect.
+    if (!initialized || !isStorageReady) return
+    void import('@/agent/workspace-assistant-context').then(({ handleWorkspaceAssistantOnReady }) => {
+      return handleWorkspaceAssistantOnReady((path: string) => router.replace(path))
     })
-  }, [initialized, router])
+  }, [initialized, isStorageReady, router])
 
   // --- Service Worker update prompt (was in AppReady) ---
   const swUpdateToastShownRef = useRef(false)

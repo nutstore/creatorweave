@@ -81,6 +81,16 @@ describe('(app)/page.tsx first-run redirect', () => {
     expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 
+  it('defers the root redirect while a side-panel hostname route is pending', async () => {
+    sessionStorage.setItem('__cw_workspace_assistant_pending', '1')
+    localStorage.setItem('creatorweave:auto-default-project-created', '1')
+    setupStore({ initialized: true, projects: [makeProject('project-fresh')] })
+    render(<App />)
+
+    await new Promise((r) => setTimeout(r, 30))
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
   it('redirects into the auto-created default project for first-time users', async () => {
     localStorage.setItem('creatorweave:auto-default-project-created', '1')
     setupStore({ initialized: true, projects: [makeProject('project-fresh')] })

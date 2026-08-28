@@ -73,6 +73,20 @@ export function getSidePanelHostname(): string | null {
   return _sidePanelHostname
 }
 
+/**
+ * Whether this page load still has a one-shot hostname → project routing
+ * request waiting to be consumed. This intentionally reads sessionStorage
+ * rather than module state so the root App Router page can defer its ordinary
+ * redirect even while the storage bootstrap is still in progress.
+ */
+export function hasPendingSidePanelProjectRoute(): boolean {
+  try {
+    return sessionStorage.getItem(SIDE_PANEL_FLAG_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 
 //=============================================================================
 // Recovery from sessionStorage

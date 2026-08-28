@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProjectStore } from '@/store/project.store'
 import { projectWorkspacePath, projectsPath } from '@/lib/route-paths'
+import { hasPendingSidePanelProjectRoute } from '@/agent/workspace-assistant-context'
 
 /**
  * Root page (`/`). The legacy client router's catch-all redirected `/` to
@@ -28,6 +29,11 @@ export default function RootPage() {
   useEffect(() => {
     if (!initialized) return
     if (projects.length === 0) return
+    // A side-panel launch carries a one-shot routing request. Let
+    // AppBootstrap consume it after storage is ready; redirecting the root
+    // route here first would race that handler and leave the panel at the
+    // generic projects list instead of its per-hostname project.
+    if (hasPendingSidePanelProjectRoute()) return
     const JUST_REDIRECTED_KEY = 'creatorweave:auto-default-redirected'
     if (sessionStorage.getItem(JUST_REDIRECTED_KEY)) {
       // First-run redirect already happened this session (or user is a
