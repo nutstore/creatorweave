@@ -202,10 +202,18 @@ export function getFileContentType(path: string): 'text' | 'binary' {
     '.npmrc',
     '.nvmrc',
     '.dockerignore',
+    '.dockerfile',
+    '.jenkinsfile',
     '.cmake',
     '.make',
     '.gradle',
     '.mvn',
+    // Script / shell / log
+    '.bazelrc',
+    '.nix',
+    '.cfg',
+    '.conf',
+    '.log',
   ])
 
   const ext = path.substring(path.lastIndexOf('.')).toLowerCase()
@@ -216,6 +224,7 @@ export function getFileContentType(path: string): 'text' | 'binary' {
   const textBasenames = new Set([
     'Makefile',
     'Dockerfile',
+    'Jenkinsfile',
     'Vagrantfile',
     'Gemfile',
     'Rakefile',

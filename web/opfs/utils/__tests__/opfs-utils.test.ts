@@ -143,10 +143,18 @@ describe('opfs-utils', () => {
     it('should handle files without extension', () => {
       expect(getFileContentType('Makefile')).toBe('text')
       expect(getFileContentType('Dockerfile')).toBe('text')
+      expect(getFileContentType('Jenkinsfile')).toBe('text')
+      expect(getFileContentType('ci/Jenkinsfile')).toBe('text')
       expect(getFileContentType('Gemfile')).toBe('text')
       expect(getFileContentType('README')).toBe('text')
       expect(getFileContentType('LICENSE')).toBe('text')
       expect(getFileContentType('src/Makefile')).toBe('text')
+    })
+
+    it('should detect dockerfile/jenkinsfile alias extensions as text', () => {
+      expect(getFileContentType('app.Dockerfile')).toBe('text')
+      expect(getFileContentType('app.dockerfile')).toBe('text')
+      expect(getFileContentType('pipeline.jenkinsfile')).toBe('text')
     })
   })
 

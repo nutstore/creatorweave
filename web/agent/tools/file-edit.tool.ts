@@ -14,6 +14,7 @@ import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import { getFormatHandler, buildFormatWriteContext } from './format-registry'
 import { withToolTimeout, isToolTimeoutError } from './tool-utils'
+import { tryDecodeAsText } from './io-shared'
 
 // Ensure format handlers are registered before first use
 import './formats'
@@ -384,28 +385,49 @@ async function executeEdits(
             ? backendResult.content
             : null
         if (!rawData) {
-          return toolErrorJson(
-            'edit',
-            'binary_not_supported',
-            `Cannot edit binary file: ${path}. Use write to replace the entire file.`
-          )
+          // Shouldn't happen (we asked for binary encoding), but if the
+          // backend returned a string anyway, use it directly.
+          if (typeof backendResult.content !== 'string') {
+            return toolErrorJson(
+              'edit',
+              'binary_not_supported',
+              `Cannot edit binary file: ${path}. Use write to replace the entire file.`
+            )
+          }
+          fileContent = backendResult.content
+        } else {
+          const readResult = await formatHandler.read(rawData, path)
+          fileContent = readResult.content
         }
-        const readResult = await formatHandler.read(rawData, path)
-        fileContent = readResult.content
       } else {
+        // Explicitly request text encoding: backends honoring VfsReadOptions
+        // will convert binary-classified payloads to text (WorkspaceBackend
+        // does). Extension-less text files (Dockerfile, Jenkinsfile, ...)
+        // may still be misclassified as binary by a backend's classifier,
+        // so additionally try decoding raw bytes before giving up.
         const backendResult = await withToolTimeout(
-          target.backend.readFile(target.path),
+          target.backend.readFile(target.path, { encoding: 'text' }),
           timeoutMs,
           'edit',
         )
-        if (typeof backendResult.content !== 'string') {
-          return toolErrorJson(
-            'edit',
-            'binary_not_supported',
-            `Cannot edit binary file: ${path}. Use write to replace the entire file.`
-          )
+        if (typeof backendResult.content === 'string') {
+          fileContent = backendResult.content
+        } else {
+          const bytes = backendResult.content instanceof ArrayBuffer
+            ? new Uint8Array(backendResult.content)
+            : backendResult.content instanceof Uint8Array
+              ? backendResult.content
+              : null
+          const decoded = bytes ? tryDecodeAsText(bytes) : null
+          if (decoded === null) {
+            return toolErrorJson(
+              'edit',
+              'binary_not_supported',
+              `Cannot edit binary file: ${path}. Use write to replace the entire file.`
+            )
+          }
+          fileContent = decoded
         }
-        fileContent = backendResult.content
       }
     } catch (error) {
       if (error instanceof Error && error.message?.includes('not found')) {

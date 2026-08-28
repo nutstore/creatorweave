@@ -17,6 +17,7 @@ import type {
   DiskReadResult,
   DiskWriteContent,
 } from './executor'
+import { getFileContentType } from '../utils/opfs-utils'
 
 const CHUNK_SIZE = 512 * 1024
 const INLINE_THRESHOLD = 512 * 1024
@@ -382,19 +383,11 @@ export class NativeHostExecutor implements DiskExecutor {
   // —— Helpers ——————————————————————————————————————————————
 
   private guessContentType(path: string): 'text' | 'binary' {
-    // Delegate to the shared util for consistency
-    // (imported lazily to avoid circular deps in some bundler configs)
-    const textExtensions = [
-      '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts',
-      '.json', '.jsonc', '.md', '.markdown', '.txt', '.text',
-      '.html', '.htm', '.css', '.scss', '.sass', '.less',
-      '.xml', '.svg', '.vue', '.svelte', '.yaml', '.yml', '.toml',
-      '.py', '.rb', '.go', '.rs', '.java', '.kt', '.c', '.cpp', '.h', '.hpp',
-      '.sh', '.bash', '.zsh', '.fish', '.ps1',
-      '.sql', '.graphql', '.gql', '.env', '.gitignore', '.dockerignore',
-      '.editorconfig', '.csv', '.tsv', '.log', '.conf', '.ini', '.cfg',
-    ]
-    const lower = path.toLowerCase()
-    return textExtensions.some((ext) => lower.endsWith(ext)) ? 'text' : 'binary'
+    // Delegate to the shared util so extension-less files (Dockerfile,
+    // Jenkinsfile, Makefile, ...) are classified consistently with the
+    // OPFS/backend paths. Previously this was a duplicated extension-only
+    // list, which misclassified extension-less text files as binary and
+    // made the edit tool reject them with binary_not_supported.
+    return getFileContentType(path)
   }
 }
