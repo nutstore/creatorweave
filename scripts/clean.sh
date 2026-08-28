@@ -9,12 +9,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "🧹 Cleaning build artifacts..."
 echo ""
 
-# Clean Rust
-echo "🦀 Cleaning Rust artifacts..."
-cd "$PROJECT_ROOT/wasm"
-cargo clean
-rm -rf pkg/
-
 # Clean frontend
 echo "⚛️  Cleaning frontend artifacts..."
 cd "$PROJECT_ROOT/web"

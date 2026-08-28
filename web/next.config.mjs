@@ -144,7 +144,6 @@ const nextConfig = {
 
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      '@wasm': path.join(dirname, 'public/wasm'),
       'node:zlib': path.join(dirname, 'shims/node-zlib.ts'),
       zlib: path.join(dirname, 'shims/node-zlib.ts'),
       '@mongodb-js/zstd': false,

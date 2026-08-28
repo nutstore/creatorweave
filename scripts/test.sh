@@ -9,12 +9,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "🧪 Running tests..."
 echo ""
 
-# Rust tests
-echo "🦀 Running Rust tests..."
-cd "$PROJECT_ROOT/wasm/crates/core"
-cargo test
-
-echo ""
 echo "⚛️  Running frontend tests..."
 cd "$PROJECT_ROOT/web"
 npm test

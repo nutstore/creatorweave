@@ -9,16 +9,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "🔨 Building CreatorWeave..."
 echo ""
 
-# Build WASM module
-echo "📦 Building WASM module..."
-cd "$PROJECT_ROOT/wasm"
-if [ -f "scripts/build-wasm.sh" ]; then
-    bash scripts/build-wasm.sh
-else
-    echo "❌ WASM build script not found"
-    exit 1
-fi
-
 # Build browser extension
 echo "📦 Building browser extension..."
 cd "$PROJECT_ROOT/browser-extension"

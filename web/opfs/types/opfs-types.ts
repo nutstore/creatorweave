@@ -271,6 +271,8 @@ export interface FileChange {
   snapshotSummary?: string
   /** Optional review status for change-review workflow */
   reviewStatus?: 'pending' | 'approved' | 'rejected'
+  /** Explicitly marks a delete as a recursive directory-tree deletion. */
+  deleteMode?: 'tree'
 }
 
 /**

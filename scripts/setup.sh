@@ -12,15 +12,6 @@ echo ""
 echo "This script will set up your development environment."
 echo ""
 
-# Check Rust installation
-echo "📦 Checking Rust installation..."
-if ! command -v rustc &> /dev/null; then
-    echo "❌ Rust is not installed."
-    echo "   Please install Rust from: https://rustup.rs/"
-    exit 1
-fi
-echo "✅ Rust $(rustc --version)"
-
 # Check Node.js installation
 echo "📦 Checking Node.js installation..."
 if ! command -v node &> /dev/null; then
@@ -29,19 +20,6 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 echo "✅ Node.js $(node --version)"
-
-# Install wasm-pack if not present
-echo "📦 Checking wasm-pack..."
-if ! command -v wasm-pack &> /dev/null; then
-    echo "   Installing wasm-pack..."
-    cargo install wasm-pack
-fi
-echo "✅ wasm-pack $(wasm-pack --version)"
-
-# Add WASM target
-echo "📦 Adding WASM target..."
-rustup target add wasm32-unknown-unknown
-echo "✅ WASM target added"
 
 # Install pnpm dependencies
 echo "📦 Installing pnpm dependencies..."
@@ -52,11 +30,6 @@ if [ ! -d "node_modules" ]; then
 else
     echo "✅ pnpm dependencies already installed"
 fi
-
-# Create WASM output directory
-echo "📦 Creating WASM output directory..."
-mkdir -p "$PROJECT_ROOT/web/public/wasm"
-echo "✅ Directory created"
 
 # Install pre-commit hooks
 echo ""

@@ -6,7 +6,6 @@
  */
 
 import type { ToolDefinition, ToolExecutor, ToolEntry, ToolContext, ToolPromptDoc } from './tools/tool-types'
-import type { PluginMetadata } from '@/types/plugin'
 import { formatErrorForUser, withAutoRetry } from './error-handling'
 import { isToolAllowedInMode, type AgentMode } from './agent-mode'
 import { useSettingsStore } from '@/store/settings.store'
@@ -20,7 +19,6 @@ import { editDefinition, editExecutor, editPromptDoc } from './tools/file-edit.t
 import { searchDefinition, searchExecutor, searchPromptDoc } from './tools/search.tool'
 import { lsDefinition, lsExecutor, lsPromptDoc } from './tools/ls.tool'
 import { pythonDefinition, pythonToolExecutor, pythonPromptDoc } from './tools/execute.tool'
-import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 // Bash shell tool (just-bash sandbox)
 import { bashDefinition, bashToolExecutor, bashPromptDoc } from './tools/bash.tool'
 
@@ -402,18 +400,6 @@ export class ToolRegistry {
     this.registerImageGenTool()
   }
 
-  /** Register a WASM plugin as an Agent tool */
-  registerPlugin(metadata: PluginMetadata): void {
-    const definition = pluginToToolDefinition(metadata)
-    const executor = createPluginBridgeExecutor(metadata.id)
-    this.register(definition, executor)
-  }
-
-  /** Unregister a WASM plugin tool */
-  unregisterPlugin(pluginId: string): boolean {
-    return this.unregister(`wasm_plugin_${pluginId}`)
-  }
-
   //=============================================================================
   // Web Bridge Tools (Browser Extension)
   //=============================================================================
@@ -664,22 +650,6 @@ export class ToolRegistry {
   unregisterSkillTools(): void {
     this.unregister('read_skill')
     this.unregister('read_skill_resource')
-  }
-
-  /** Register all currently loaded plugins */
-  async registerLoadedPlugins(): Promise<void> {
-    try {
-      const { getPluginLoader } = await import('@/services/plugin-loader.service')
-      const loader = getPluginLoader()
-      const plugins = loader.getAllPlugins()
-      for (const [, instance] of plugins) {
-        if (instance.state === 'Loaded' || instance.state === 'Active') {
-          this.registerPlugin(instance.metadata)
-        }
-      }
-    } catch {
-      // Plugin loader may not be available
-    }
   }
 }
 

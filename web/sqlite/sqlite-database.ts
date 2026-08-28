@@ -5,7 +5,6 @@
  * Unified storage using official SQLite WASM (@sqlite.org/sqlite-wasm) for:
  * - Conversations (chat history)
  * - Skills (skill definitions)
- * - Plugins (WASM plugin metadata)
  * - API Keys (encrypted)
  * - Sessions (OPFS workspace metadata)
  *
@@ -63,21 +62,6 @@ export interface SkillRow {
   enabled: number // BOOLEAN (0 or 1)
   created_at: number
   updated_at: number
-}
-
-export interface PluginRow {
-  id: string
-  name: string
-  version: string
-  api_version: string
-  description: string | null
-  author: string | null
-  capabilities_json: string // JSON object
-  resource_limits_json: string // JSON object
-  state: string
-  wasm_bytes: Uint8Array | null
-  loaded_at: number
-  created_at: number
 }
 
 export interface ApiKeyRow {

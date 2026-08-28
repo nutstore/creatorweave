@@ -1,5 +1,5 @@
 #!/bin/bash
-# Main pre-commit hook that runs both Rust and frontend checks
+# Main pre-commit hook that runs frontend checks
 
 set -e
 
@@ -17,17 +17,6 @@ echo ""
 
 # Track if any check failed
 FAILED=0
-
-# Run Rust checks
-if [ -f "$SCRIPT_DIR/pre-commit-rust.sh" ]; then
-    if ! bash "$SCRIPT_DIR/pre-commit-rust.sh"; then
-        echo ""
-        echo -e "${RED}❌ Rust pre-commit checks failed${NC}"
-        FAILED=1
-    fi
-else
-    echo -e "${YELLOW}⚠️  Rust pre-commit script not found, skipping${NC}"
-fi
 
 # Run frontend checks if there are TypeScript files
 if [ -d "$PROJECT_ROOT/web/app" ]; then

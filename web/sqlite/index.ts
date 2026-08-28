@@ -4,7 +4,6 @@
  * Unified SQLite WASM-based storage for:
  * - Conversations (chat history)
  * - Skills (skill definitions)
- * - Plugins (WASM plugin metadata)
  * - API Keys (encrypted)
  * - Workspaces (OPFS workspace metadata)
  *
@@ -27,7 +26,6 @@ export {
 export type {
   ConversationRow,
   SkillRow,
-  PluginRow,
   ApiKeyRow,
   WorkspaceRow,
   FileMetadataRow,
@@ -63,9 +61,6 @@ export { ProjectRootRepository, getProjectRootRepository } from './repositories/
 export type { ProjectRoot } from './repositories/project-root.repository'
 
 export { ApiKeyRepository, getApiKeyRepository } from './repositories/api-key.repository'
-
-export { PluginRepository, getPluginRepository } from './repositories/plugin.repository'
-export type { StoredPlugin } from './repositories/plugin.repository'
 
 export { MCPRepository, getMCPRepository } from './repositories/mcp.repository'
 export type { StoredMCPServer } from './repositories/mcp.repository'
