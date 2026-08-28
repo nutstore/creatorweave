@@ -7,7 +7,6 @@
     "build": "pnpm run prepare:assets && pnpm run prepare:pwa && next build",
     "prepare:pwa": "node scripts/prepare-pwa.mjs",
     "build:extension": "cd ../browser-extension && pnpm install && pnpm run build",
-    "build:vercel": "pnpm run build",
     "prepare:assets": "node scripts/prepare-static-assets.mjs",
     "pack:skills": "cd .. && bash scripts/pack-skills.sh skill-store web/public/skills",
     "preview": "next start --hostname 0.0.0.0 --port 3000",
