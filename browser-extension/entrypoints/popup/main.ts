@@ -93,7 +93,9 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     //    call stack instead of inside a promise callback.
     chrome.sidePanel.setOptions({
       tabId: tabId,
-      path: cwBase + '/#/?' + params.toString(),
+      // Use a normal query for the Next.js App Router. A fragment launch URL
+      // (`/#/?…`) races the root-page redirect during initial hydration.
+      path: cwBase + '/?' + params.toString(),
       enabled: true,
     }).catch(function (err: any) {
       // eslint-disable-next-line no-console

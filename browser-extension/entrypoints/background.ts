@@ -1125,7 +1125,11 @@ export default defineBackground(() => {
     // Site (.cn/.com) is chosen at runtime by browser language; dev builds
     // target the local Vite server (handled inside getCwWebappBaseUrl).
     const cwBase = getCwWebappBaseUrl()
-    const cwUrl = `${cwBase}/#/?${params.toString()}`
+    // Next.js App Router owns pathname routing. Put launch metadata in the
+    // real query string rather than the fragment: `/#/?…` is not a route in
+    // Next, and its root-page redirect can win the startup race before the
+    // side-panel routing handler consumes the metadata.
+    const cwUrl = `${cwBase}/?${params.toString()}`
     // eslint-disable-next-line no-console
     console.log('[CreatorWeave][bg] opening side panel', {
       tabId,
