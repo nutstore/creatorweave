@@ -1,8 +1,24 @@
 import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || process.env.npm_package_version || 'dev'
+
+// ─── Browser extension "latest version" ────────────────────────────────────
+// The web build ships the browser extension (prepare-static-assets.mjs builds
+// browser-extension and copies dist/chrome-mv3 into public/extension), so the
+// extension's package.json version IS the latest installable version. Read it
+// directly instead of requiring EXTENSION_LATEST_VERSION to be set manually in
+// every build environment (it never was, so the settings page showed "0.0.0"
+// and the outdated-extension banner could never trigger). The env var still
+// wins when explicitly set (e.g. to pin a different version during rollout).
+const extensionLatestVersion =
+  process.env.EXTENSION_LATEST_VERSION ||
+  JSON.parse(
+    readFileSync(path.resolve(dirname, '..', 'browser-extension', 'package.json'), 'utf8'),
+  ).version ||
+  '0.0.0'
 
 // ─── Deployment region (build-time required) ─────────────────────────────
 // The domestic (weave.eo2suite.cn) and international (weave.eo2suite.com)
@@ -64,7 +80,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_BUILD_ID: buildId,
     NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version || '0.0.0',
-    NEXT_PUBLIC_EXTENSION_LATEST_VERSION: process.env.EXTENSION_LATEST_VERSION || '0.0.0',
+    NEXT_PUBLIC_EXTENSION_LATEST_VERSION: extensionLatestVersion,
     NEXT_PUBLIC_JIANGUOYUN_AI_BASE_URL:
       process.env.NEXT_PUBLIC_JIANGUOYUN_AI_BASE_URL || '',
     NEXT_PUBLIC_JIANGUOYUN_AI_CLIENT_ID:
