@@ -914,6 +914,7 @@ export function WorkspaceLayout({
             revealTargetPath={revealTargetPath}
             onRevealComplete={handleRevealComplete}
             onSelectWorkspace={onSelectWorkspace}
+            onNewDraft={onNewDraft}
           />
         )}
         {isMobile && isSidebarOpen && (
@@ -927,6 +928,7 @@ export function WorkspaceLayout({
               revealTargetPath={revealTargetPath}
               onRevealComplete={handleRevealComplete}
               onSelectWorkspace={onSelectWorkspace}
+              onNewDraft={onNewDraft}
             />
           </div>
         )}

@@ -63,12 +63,10 @@ export default function WorkspaceRouteView() {
         router.replace(projectWorkspacePath(projectId, wsId))
       }}
       onNewDraft={() => {
-        // "New conversation": enter draft state (bare URL + ?new=1, no
-        // conversation created until the first message is sent). No-op if
-        // already in draft.
-        if (params.workspaceId) {
-          router.replace(projectWorkspacePath(projectId))
-        } else if (!isNewDraft) {
+        // Use the route params as the source of truth. Going straight to the
+        // draft URL avoids both a stale project-store id and the bare-route
+        // synchronizer redirect that could otherwise restore the prior chat.
+        if (!isNewDraft || workspaceId) {
           router.replace(newDraftPath(projectId))
         }
       }}

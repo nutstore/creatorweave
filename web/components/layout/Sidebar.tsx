@@ -17,9 +17,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { newDraftPath, projectWorkspacePath } from '@/lib/route-paths'
+import { projectWorkspacePath } from '@/lib/route-paths'
 import { createPortal } from 'react-dom'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -341,6 +341,8 @@ interface SidebarProps {
   onRevealComplete?: () => void
   /** Called when user selects a workspace from the sidebar. Should navigate URL. */
   onSelectWorkspace?: (workspaceId: string) => void
+  /** Enter the route owner's draft state without creating a conversation. */
+  onNewDraft?: () => void
 }
 
 /** Memoized wrapper for FileTreePanel with stable callbacks per root */
@@ -649,9 +651,9 @@ export const Sidebar = memo(function Sidebar({
   revealTargetPath,
   onRevealComplete,
   onSelectWorkspace,
+  onNewDraft,
 }: SidebarProps) {
   const t = useT()
-  const navigate = useRouter()
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   // Draft mode: URL is /projects/:id?new=1 (user clicked 新对话, conversation
   // not yet created). Used to highlight the 新对话 button.
@@ -1025,19 +1027,13 @@ export const Sidebar = memo(function Sidebar({
     [conversationRatio, setConversationRatio]
   )
 
-  // Stable callback for "新对话" button.
-  // Deferred creation: do NOT create a conversation here. Navigate to the
-  // draft URL (bare project + ?new=1); the conversation is only created when
-  // the user actually sends the first message (see draft-send flow).
+  // The route owner derives the target from URL params rather than this
+  // sidebar's potentially stale project-store state (notably during project
+  // switches). A conversation is still materialized only after first send.
   const handleCreateNewWorkspace = useCallback(() => {
-    const currentPath = window.location.pathname + window.location.search
-    if (currentPath === newDraftPath(activeProjectId)) {
-      closeMobileSidebar()
-      return
-    }
-    navigate.replace(newDraftPath(activeProjectId))
+    onNewDraft?.()
     closeMobileSidebar()
-  }, [activeProjectId, navigate, closeMobileSidebar])
+  }, [onNewDraft, closeMobileSidebar])
 
   // Stable callback for editing title change
   const handleEditingTitleChange = useCallback((title: string) => setEditingTitle(title), [])
