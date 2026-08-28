@@ -10,7 +10,11 @@ const publicDir = path.join(webDir, 'public')
 async function copy(source, destination) {
   await rm(destination, { recursive: true, force: true })
   await mkdir(path.dirname(destination), { recursive: true })
-  await cp(source, destination, { recursive: true })
+  // dereference: pnpm installs packages (e.g. node_modules/pyodide) as symlinks
+  // into the .pnpm store. With fs.cp's default (dereference: false) the copied
+  // public/ asset would stay a symlink, which deployment packaging does not
+  // follow — the files never reach production and /assets/pyodide/* 404s.
+  await cp(source, destination, { recursive: true, dereference: true })
 }
 
 await copy(path.join(webDir, 'node_modules', 'pyodide'), path.join(publicDir, 'assets', 'pyodide'))
