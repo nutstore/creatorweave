@@ -20,7 +20,8 @@ import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
 import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExtension'
-import { Paperclip, X, ImageIcon, FileIcon, FolderIcon } from 'lucide-react'
+import { Paperclip, X, ImageIcon, FileIcon, FolderIcon, Loader2 } from 'lucide-react'
+import { extractDroppedFiles } from '@/lib/dragdrop'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -219,6 +220,8 @@ export function InlineMessageEditor({
   submitLabel,
 }: InlineMessageEditorProps) {
   const [isDragOver, setIsDragOver] = useState(false)
+  /** True while dropped folders are being expanded into files. */
+  const [isExtractingDropped, setIsExtractingDropped] = useState(false)
   const [pendingAssets, setPendingAssets] = useState<LocalPendingAsset[]>([])
   const pendingAssetsRef = useRef<LocalPendingAsset[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -613,7 +616,17 @@ export function InlineMessageEditor({
       e.preventDefault()
       e.stopPropagation()
       setIsDragOver(false)
-      if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files)
+      // Folders cannot be read via dataTransfer.files — expand any dropped
+      // directory into its contained files first (see lib/dragdrop.ts).
+      setIsExtractingDropped(true)
+      extractDroppedFiles(e.dataTransfer)
+        .then(({ files }) => {
+          if (files.length > 0) handleFiles(files)
+        })
+        .catch((err) => {
+          console.error('[InlineMessageEditor] failed to extract dropped files', err)
+        })
+        .finally(() => setIsExtractingDropped(false))
     },
     [handleFiles]
   )
@@ -635,6 +648,18 @@ export function InlineMessageEditor({
           <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-700">
             <Paperclip className="h-8 w-8" />
             <span className="text-sm font-medium">Drop files here</span>
+          </div>
+        </div>
+      )}
+      {isExtractingDropped && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/80 dark:bg-primary-100/30"
+        >
+          <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-700">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="text-sm font-medium">Extracting files…</span>
           </div>
         </div>
       )}

@@ -59,6 +59,7 @@ export const conversation = {
         shortcutsHint: "↑↓ 기록  Shift+Enter 줄바꿈",
       },
       dropFilesHere: "여기에 파일을 드롭하세요",
+      extractingFolder: "폴더 내 파일을 추출하는 중…",
       attachFiles: "파일 첨부",
       previewMarkdown: "Markdown 미리보기",
       agentIdPlaceholder: "agent-id",

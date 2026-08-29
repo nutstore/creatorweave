@@ -60,6 +60,7 @@ export const conversation = {
         shortcutsHint: "{arrow} history  Shift+Enter newline",
       },
       dropFilesHere: "Drop files here",
+      extractingFolder: "Extracting files from folder…",
       attachFiles: "Attach files",
       previewMarkdown: "Preview Markdown",
       agentIdPlaceholder: "agent-id",

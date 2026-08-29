@@ -59,6 +59,7 @@ export const conversation = {
         shortcutsHint: "↑↓ 履歴  Shift+Enter 改行",
       },
       dropFilesHere: "ここにファイルをドロップ",
+      extractingFolder: "フォルダ内のファイルを展開中…",
       attachFiles: "ファイルを添付",
       previewMarkdown: "Markdown をプレビュー",
       agentIdPlaceholder: "agent-id",

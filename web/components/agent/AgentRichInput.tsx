@@ -11,6 +11,7 @@ import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExte
 import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon, Loader2, FileText } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
+import { extractDroppedFiles } from '@/lib/dragdrop'
 import { Lightbox } from './Lightbox'
 import { MarkdownContent } from './MarkdownContent'
 
@@ -344,6 +345,8 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const [newAgentInput, setNewAgentInput] = useState('')
   const [agentSelection, setAgentSelection] = useState(0)
   const [isDragOver, setIsDragOver] = useState(false)
+  /** True while dropped folders are being expanded into files. */
+  const [isExtractingDropped, setIsExtractingDropped] = useState(false)
 
   // ---- Input history navigation (↑/↓) ------------------------------------
   const [inputHistory, setInputHistory] = useState<string[]>(() => loadInputHistory())
@@ -1101,9 +1104,21 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
       e.stopPropagation()
       setIsDragOver(false)
       if (disabled) return
-      if (e.dataTransfer.files.length > 0) {
-        handleFiles(e.dataTransfer.files)
-      }
+      // Folders cannot be read via dataTransfer.files (the browser only hands
+      // over an empty placeholder). extractDroppedFiles snapshots FileSystem
+      // handles synchronously and expands directories into their files.
+      setIsExtractingDropped(true)
+      extractDroppedFiles(e.dataTransfer)
+        .then(({ files, truncated }) => {
+          if (files.length > 0) handleFiles(files)
+          if (truncated) {
+            console.warn('[AgentRichInput] dropped folder had more than 200 files; only the first 200 were attached')
+          }
+        })
+        .catch((err) => {
+          console.error('[AgentRichInput] failed to extract dropped files', err)
+        })
+        .finally(() => setIsExtractingDropped(false))
     },
     [disabled, handleFiles],
   )
@@ -1115,16 +1130,19 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Drag overlay */}
-      {isDragOver && (
+      {/* Drag overlay — stays visible (with spinner) while dropped folders
+          are being expanded into files. */}
+      {(isDragOver || isExtractingDropped) && (
         <div
           role="status"
           aria-live="polite"
           className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/80 dark:bg-primary-100/30"
         >
           <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-700">
-            <Paperclip className="h-8 w-8" />
-            <span className="text-sm font-medium">{t('conversation.input.dropFilesHere')}</span>
+            {isExtractingDropped ? <Loader2 className="h-8 w-8 animate-spin" /> : <Paperclip className="h-8 w-8" />}
+            <span className="text-sm font-medium">
+              {isExtractingDropped ? t('conversation.input.extractingFolder') : t('conversation.input.dropFilesHere')}
+            </span>
           </div>
         </div>
       )}

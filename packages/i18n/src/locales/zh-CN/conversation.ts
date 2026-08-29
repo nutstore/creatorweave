@@ -60,6 +60,7 @@ export const conversation = {
         shortcutsHint: "↑↓ 历史  Shift+Enter 换行",
       },
       dropFilesHere: "拖拽文件到此处",
+      extractingFolder: "正在展开文件夹中的文件…",
       attachFiles: "添加附件",
       previewMarkdown: "预览 Markdown",
       agentIdPlaceholder: "agent-id",
