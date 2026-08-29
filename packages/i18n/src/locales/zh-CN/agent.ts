@@ -19,7 +19,7 @@ export const agent = {
         actDescription: "完全访问模式。Agent 可以读取、写入和修改文件。",
         planShort: "只读分析",
         actShort: "完全访问已启用",
-        yoloShort: "写操作自动放行",
+        yoloShort: "自动批准所有需确认的操作（外部调用、磁盘写入等；仅本对话）",
         planLabel: "只读分析模式",
         actLabel: "完整读写权限",
         switchTo: "切换到",

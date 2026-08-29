@@ -12,6 +12,7 @@ import {
   setCurrentWorkspaceAgentMode,
 } from '@/store/workspace-preferences.store'
 import { usePageActionSessionStore } from '@/store/page-action-session.store'
+import { useYoloModeStore, syncLegacyPageActionYolo } from '@/store/yolo-mode.store'
 
 export const switchAgentModeDefinition: ToolDefinition = {
   type: 'function',
@@ -69,6 +70,11 @@ export function createSwitchModeExecutor(opts?: {
 
     // YOLO is an explicit user choice. An LLM-initiated mode switch may
     // disable it, but must never preserve or enable it implicitly.
+    // PR-4: clears the conversation-scoped yolo across ALL conversations
+    // (the safety valve is global — the LLM must never be able to leave any
+    // conversation in auto-approve), plus the legacy shim.
+    useYoloModeStore.getState().clearAll()
+    syncLegacyPageActionYolo(false)
     usePageActionSessionStore.getState().setPageActionYolo(false)
 
     if (mode === currentMode) {

@@ -16,6 +16,7 @@ export const agent = {
         actDescription: "フルアクセスモード。エージェントはファイルの読み取り、書き込み、変更が可能です。",
         planShort: "読み取り専用分析",
         actShort: "フルアクセス有効",
+        yoloShort: "確認が必要な操作をすべて自動承認（外部呼び出し・ディスク書き込みなど。この会話のみ）",
         planLabel: "読み取り専用分析モード",
         actLabel: "フル読み書きアクセス",
         switchTo: "切り替え",

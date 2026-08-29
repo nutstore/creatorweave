@@ -3,7 +3,7 @@ import type { ToolContext } from '../tool-types'
 import { syncToDiskExecutor } from '../sync-to-disk.tool'
 import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
-import { usePageActionSessionStore } from '@/store/page-action-session.store'
+import { useYoloModeStore } from '@/store/yolo-mode.store'
 
 /**
  * sync-to-disk is the authorized disk-flush entry point. These tests pin the
@@ -45,7 +45,7 @@ describe('sync-to-disk tool', () => {
     vi.clearAllMocks()
     useToolAuthStore.getState().clear()
     useSessionAllowStore.getState().clearAll()
-    usePageActionSessionStore.setState({ pageActionYolo: false })
+    useYoloModeStore.getState().clearAll()
     createSnapshotMock.mockResolvedValue({ snapshotId: 'snap_1' })
     markSyncedMock.mockResolvedValue(undefined)
   })
@@ -53,7 +53,7 @@ describe('sync-to-disk tool', () => {
   afterEach(() => {
     useToolAuthStore.getState().clear()
     useSessionAllowStore.getState().clearAll()
-    usePageActionSessionStore.setState({ pageActionYolo: false })
+    useYoloModeStore.getState().clearAll()
   })
 
   it('queues an authorization modal BEFORE touching the disk (prompt level)', async () => {
@@ -156,8 +156,8 @@ describe('sync-to-disk tool', () => {
     expect(createSnapshotMock).not.toHaveBeenCalled()
   })
 
-  it('yolo mode auto-allows the disk flush (documented exemption behavior)', async () => {
-    usePageActionSessionStore.setState({ pageActionYolo: true })
+  it('yolo mode auto-allows the disk flush (generalized prompt skip)', async () => {
+    useYoloModeStore.getState().setYolo('conv-1', true)
     mockRuntime.getPendingChanges.mockReturnValue([
       { path: 'a.ts', type: 'modify' },
     ])

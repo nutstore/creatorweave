@@ -24,7 +24,7 @@
 
 import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
-import { usePageActionSessionStore } from '@/store/page-action-session.store'
+import { isYoloOn } from '@/store/yolo-mode.store'
 
 export type ToolPolicyLevel = 'auto' | 'prompt' | 'forbidden'
 
@@ -96,7 +96,8 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
   }
 
   // 3. yolo mode — skips every prompt-level modal (still not forbidden).
-  if (usePageActionSessionStore.getState().pageActionYolo) {
+  // Conversation-scoped (yolo-mode.store): switches conversation → off.
+  if (isYoloOn(req.conversationId)) {
     return { decision: 'allow', via: 'yolo' }
   }
 

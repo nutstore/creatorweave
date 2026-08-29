@@ -15,6 +15,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { usePageActionSessionStore } from '@/store/page-action-session.store'
+import { useYoloModeStore, syncLegacyPageActionYolo } from '@/store/yolo-mode.store'
 import { isSidePanelMode } from '@/agent/workspace-assistant-context'
 import { useT } from '@/i18n'
 
@@ -87,6 +88,20 @@ function ModeOption({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
+
+/**
+ * Read the active conversation id non-reactively (indicator positioning only).
+ * Import is lazy so the component module stays loadable in isolation (tests).
+ */
+function useConversationStoreSafeId(): string | null {
+  try {
+    const { useConversationStoreSQLite } = require('@/store/conversation.store.sqlite') as typeof import('@/store/conversation.store.sqlite')
+    return useConversationStoreSQLite.getState().activeConversationId
+  } catch {
+    return null
+  }
+}
+
 export function AgentModeSelect({
   mode,
   onModeChange,
@@ -96,6 +111,8 @@ export function AgentModeSelect({
   const t = useT()
   const pageActionYolo = usePageActionSessionStore((s) => s.pageActionYolo)
   const setPageActionYolo = usePageActionSessionStore((s) => s.setPageActionYolo)
+  const yoloByConversation = useYoloModeStore((s) => s.yoloByConversation)
+  const setYolo = useYoloModeStore((s) => s.setYolo)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -103,10 +120,15 @@ export function AgentModeSelect({
   // In a normal tab, hide it entirely — YOLO has no effect without page tools.
   const showYolo = isSidePanelMode()
 
-  // Derive the visible mode from the two underlying states.
-  // When not in side-panel mode, YOLO is never shown even if the flag is on.
+  // Derive the visible mode from the underlying states. YOLO is now
+  // conversation-scoped (yolo-mode.store); the legacy global flag is kept as
+  // a shim and used only when no conversation is known.
+  const activeConvId = useConversationStoreSafeId()
+  const conversationYoloOn = activeConvId
+    ? Boolean(yoloByConversation[activeConvId])
+    : pageActionYolo
   const visibleMode: VisibleMode =
-    mode === 'plan' ? 'plan' : (showYolo && pageActionYolo) ? 'yolo' : 'act'
+    mode === 'plan' ? 'plan' : (showYolo && conversationYoloOn) ? 'yolo' : 'act'
 
   // Close on outside click
   useEffect(() => {
@@ -121,17 +143,27 @@ export function AgentModeSelect({
   }, [open])
 
   const handleSelect = (target: VisibleMode) => {
+    // YOLO is conversation-scoped (PR-4). Both stores are kept in sync: the
+    // yolo-mode store is authoritative, the legacy page-action flag stays
+    // updated so older UI consumers keep rendering correctly.
+    const applyYolo = (on: boolean) => {
+      setYolo(activeConvId, on)
+      syncLegacyPageActionYolo(on)
+    }
     if (target === 'plan') {
       // Switching to Plan: disable page writes and clear any prior YOLO approval.
       onModeChange('plan')
+      applyYolo(false)
       setPageActionYolo(false)
     } else if (target === 'act') {
       // Switching to Act (confirmed): agentMode=act, yolo off
       onModeChange('act')
+      applyYolo(false)
       setPageActionYolo(false)
     } else {
-      // Switching to YOLO: agentMode=act, yolo on
+      // Switching to YOLO: agentMode=act, yolo on (this conversation only)
       onModeChange('act')
+      applyYolo(true)
       setPageActionYolo(true)
     }
     setOpen(false)

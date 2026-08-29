@@ -19,7 +19,7 @@ export const agent = {
         actDescription: "Full-access mode. Agent can read, write, and modify files.",
         planShort: "Read-only analysis",
         actShort: "Full access enabled",
-        yoloShort: "Writes auto-allowed",
+        yoloShort: "Auto-approves all confirmations (external calls, disk writes, etc.; this conversation only)",
         planLabel: "Read-only analysis mode",
         actLabel: "Full read/write access",
         switchTo: "Switch to",

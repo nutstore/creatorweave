@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
+import { useYoloModeStore } from '@/store/yolo-mode.store'
 import { authorize, getToolPolicy } from '../policy-engine'
 
 describe('tool-auth.store (unified FIFO queue)', () => {
@@ -250,6 +251,63 @@ describe('policy table', () => {
 
   it('unregistered tools default to auto (PR-1 behavior freeze)', () => {
     expect(getToolPolicy('totally_unknown_tool').level).toBe('auto')
+  })
+})
+
+describe('policy-engine: yolo generalization (PR-4)', () => {
+  beforeEach(() => {
+    useYoloModeStore.getState().clearAll()
+    useSessionAllowStore.getState().clearAll()
+    useToolAuthStore.getState().clear()
+  })
+  afterEach(() => {
+    useYoloModeStore.getState().clearAll()
+    useSessionAllowStore.getState().clearAll()
+    useToolAuthStore.getState().clear()
+  })
+
+  it('yolo auto-allows the disk flush (prompt level) in its conversation', async () => {
+    useYoloModeStore.getState().setYolo('conv-1', true)
+    const result = await authorize({
+      toolName: 'sync-to-disk',
+      args: { count: 2 },
+      conversationId: 'conv-1',
+    })
+    expect(result).toEqual({ decision: 'allow', via: 'yolo' })
+    expect(useToolAuthStore.getState().queue).toHaveLength(0)
+  })
+
+  it('yolo does NOT leak into other conversations', async () => {
+    useYoloModeStore.getState().setYolo('conv-1', true)
+    const pending = authorize({
+      toolName: 'sync-to-disk',
+      args: { count: 2 },
+      conversationId: 'conv-2',
+    })
+    // conv-2 gets a modal — the grant never crosses conversations.
+    expect(useToolAuthStore.getState().queue).toHaveLength(1)
+    useToolAuthStore.getState().deny()
+    expect((await pending).decision).toBe('deny')
+  })
+
+  it('yolo never covers forbidden tools', async () => {
+    useYoloModeStore.getState().setYolo('conv-1', true)
+    const result = await authorize({
+      toolName: 'switch_agent_mode',
+      conversationId: 'conv-1',
+    })
+    expect(result.decision).toBe('deny')
+  })
+
+  it('yolo covers external calls (call_tool) in its conversation', async () => {
+    useYoloModeStore.getState().setYolo('conv-1', true)
+    const result = await authorize({
+      toolName: 'call_tool',
+      args: { full_tool_name: 'github:create_issue' },
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    expect(result).toEqual({ decision: 'allow', via: 'yolo' })
   })
 })
 

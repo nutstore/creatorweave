@@ -16,6 +16,7 @@ export const agent = {
         actDescription: "전체 접근 모드. 에이전트가 파일을 읽고, 쓰고, 수정할 수 있습니다.",
         planShort: "읽기 전용 분석",
         actShort: "전체 접근 활성화",
+        yoloShort: "확인이 필요한 모든 작업 자동 승인(외부 호출, 디스크 쓰기 등. 이 대화만)",
         planLabel: "읽기 전용 분석 모드",
         actLabel: "전체 읽기/쓰기 접근",
         switchTo: "전환",
