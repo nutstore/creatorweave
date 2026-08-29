@@ -2595,22 +2595,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               console.warn('[conversation.store] Auto-apply after completed run failed:', error)
             }
 
-            // === Exec auto-flush snapshots ===
-            // exec tool calls may have already flushed + snapshotted pending
-            // changes mid-run (so a command could run against current code).
-            // Those paths are no longer pending, so auto-apply above skipped
-            // them — drain their snapshot ids here and anchor the run's
-            // changes card on the latest flushed snapshot so the files stay
-            // visible + rollback-able.
-            try {
-              const { drainExecFlushSnapshotIds } = await import('@/agent/tools/exec.tool')
-              const flushIds = drainExecFlushSnapshotIds(conversationId)
-              if (flushIds.length > 0) {
-                runApplyResult = { snapshotId: flushIds[flushIds.length - 1] }
-              }
-            } catch (error) {
-              console.warn('[conversation.store] Exec flush snapshot drain failed:', error)
-            }
+            // === Exec auto-flush snapshots (REMOVED in PR-3) ===
+            // The exec tool no longer flushes pending changes to disk before
+            // running commands (that was an authorization bypass). Disk sync
+            // now happens exclusively through sync-to-disk (authorized) or
+            // the run-level auto-apply below. Nothing to drain here anymore.
 
             // === Favicon handling ===
             // Always reset to idle when the loop ends — the user will see

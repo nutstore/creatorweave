@@ -157,7 +157,7 @@ function createPolicyTable(): Map<string, ToolPolicy> {
     'ask_user_question', 'delegate_to',
     'spawn_subagent', 'batch_spawn', 'send_message_to_subagent',
     'stop_subagent', 'resume_subagent', 'get_subagent_status', 'list_subagents',
-    'sync', 'search_tools', 'get_page_tools',
+    'sync-to-opfs', 'search_tools', 'get_page_tools',
     'web_search', 'web_fetch', 'generate_image',
     'page_snapshot', 'page_text_content', 'page_find_elements',
     'page_synthesize_locators', 'page_screenshot',
@@ -166,6 +166,21 @@ function createPolicyTable(): Map<string, ToolPolicy> {
   }
 
   // -- prompt: user confirmation required -----------------------------------
+
+  // sync-to-disk: writing to the REAL disk is the risk-bearing step of the
+  // file pipeline (OPFS writes stay auto — they have pending review +
+  // snapshots as a second line of defense; the disk does not). Fixed memory
+  // key so one "always allow" covers the conversation.
+  set('sync-to-disk', {
+    level: 'prompt',
+    describe: (args) => {
+      const count = (args as { count?: number } | null)?.count
+      return typeof count === 'number' && count > 0
+        ? `Will write ${count} pending file change${count === 1 ? '' : 's'} to the real disk directory.`
+        : 'Will write pending file changes to the real disk directory.'
+    },
+    memoryKey: () => 'sync-to-disk',
+  })
 
   // call_tool: first invocation of a server+tool combination always prompts;
   // "always allow" whitelists it for the conversation. Tools coming from

@@ -11,6 +11,16 @@ import { isToolAllowedInMode, type AgentMode } from './agent-mode'
 import { getToolPolicy, type ToolPolicy } from './policy-engine'
 import { useSettingsStore } from '@/store/settings.store'
 
+/**
+ * Compatibility aliases for renamed tools. The canonical (new) name maps to
+ * legacy names the LLM may still emit from older prompts/muscle memory.
+ * Lookup by alias resolves to the canonical entry; execution reports the
+ * canonical name in envelopes. Prune the alias after one compat cycle.
+ */
+const TOOL_ALIASES: Record<string, string> = {
+  sync: 'sync-to-opfs', // renamed in PR-3 (tool authorization redesign)
+}
+
 // Import read tool
 import { readDefinition, readExecutor, readPromptDoc } from './tools/read.tool'
 // Import write tool
@@ -53,8 +63,10 @@ import { searchSkillsDefinition, searchSkillsExecutor, searchSkillsPromptDoc } f
 // Skill install tool (installs from Skill Store after user consent)
 import { installSkillDefinition, installSkillExecutor, installSkillPromptDoc } from './tools/install-skill.tool'
 
-// Sync-to-OPFS tool
+// Sync-to-OPFS tool (renamed from 'sync' in PR-3)
 import { syncToOPFSDefinition, syncToOPFSExecutor, syncPromptDoc } from './tools/sync-opfs.tool'
+// Sync-to-Disk tool (new in PR-3 — agent-initiated authorized disk flush)
+import { syncToDiskDefinition, syncToDiskExecutor, syncToDiskPromptDoc } from './tools/sync-to-disk.tool'
 
 // Switch mode tool
 import { switchAgentModeDefinition, createSwitchModeExecutor, switchModePromptDoc } from './tools/switch-mode.tool'
@@ -220,6 +232,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: snapshotRestoreDefinition, executor: snapshotRestoreExecutor },
   // Sync native files to OPFS
   { definition: syncToOPFSDefinition, executor: syncToOPFSExecutor },
+  // Agent-initiated pending-changes flush to real disk (prompt-authorized)
+  { definition: syncToDiskDefinition, executor: syncToDiskExecutor },
   // Changeset & sync tools (detect_conflicts always available; checkpoint tools registered dynamically)
   { definition: detectConflictsDefinition, executor: detectConflictsExecutor },
   // Cross-workspace conversation search
@@ -250,6 +264,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   lsPromptDoc,
   searchPromptDoc,
   syncPromptDoc,
+  syncToDiskPromptDoc,
   pythonPromptDoc,
   bashPromptDoc,
   ocrPromptDoc,
@@ -280,6 +295,11 @@ export function getBuiltinToolNames(): string[] {
 
 export class ToolRegistry {
   private tools = new Map<string, ToolEntry>()
+
+  /** Resolve a possibly-aliased tool name to its canonical name. */
+  resolveAlias(name: string): string {
+    return TOOL_ALIASES[name] ?? name
+  }
 
   /** Register a tool */
   register(definition: ToolDefinition, executor: ToolExecutor): void {
@@ -340,23 +360,26 @@ export class ToolRegistry {
 
   /**
    * Policy metadata for a registered tool (undefined when not registered).
-   * The policy table itself lives in policy-engine.ts — this accessor makes it
-   * reachable through the registry without duplicating the classification.
+   * Accepts aliases (e.g. legacy 'sync'). The policy table itself lives in
+   * policy-engine.ts — this accessor makes it reachable through the registry
+   * without duplicating the classification.
    */
   getPolicy(name: string): ToolPolicy | undefined {
-    if (!this.tools.has(name)) return undefined
-    return getToolPolicy(name)
+    const canonical = this.resolveAlias(name)
+    if (!this.tools.has(canonical)) return undefined
+    return getToolPolicy(canonical)
   }
 
   /** Execute a tool by name with intelligent error handling */
   async execute(
-    name: string,
+    rawName: string,
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<string> {
+    const name = this.resolveAlias(rawName)
     const entry = this.tools.get(name)
     if (!entry) {
-      return JSON.stringify({ error: `Unknown tool: ${name}` })
+      return JSON.stringify({ error: `Unknown tool: ${rawName}` })
     }
 
     try {

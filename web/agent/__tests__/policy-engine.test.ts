@@ -236,6 +236,18 @@ describe('policy table', () => {
     expect(getToolPolicy('switch_agent_mode').level).toBe('forbidden')
   })
 
+  it('sync-to-disk prompts with a fixed memory key and file-count description', () => {
+    const policy = getToolPolicy('sync-to-disk')
+    expect(policy.level).toBe('prompt')
+    expect(policy.memoryKey?.({})).toBe('sync-to-disk')
+    expect(policy.describe?.({ count: 3 })).toContain('3 pending file changes')
+    expect(policy.describe?.({ count: 1 })).toContain('1 pending file change ')
+  })
+
+  it('sync-to-opfs (renamed from sync) stays auto', () => {
+    expect(getToolPolicy('sync-to-opfs').level).toBe('auto')
+  })
+
   it('unregistered tools default to auto (PR-1 behavior freeze)', () => {
     expect(getToolPolicy('totally_unknown_tool').level).toBe('auto')
   })

@@ -339,7 +339,7 @@ async function executeSingleRead(
           'binary_file_rejected',
           `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
             'Please use the `run_python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
-            `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
+            `Example: use sync-to-opfs(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
           { details: { path, contentType: metadata.contentType, size: metadata.size } }
         )
       }
@@ -388,7 +388,7 @@ async function executeSingleRead(
         'binary_file_rejected',
         `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
           'Please use the `run_python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
-          `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
+          `Example: use sync-to-opfs(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
         { details: { path, contentType: metadata.contentType, size: metadata.size } }
       )
     }
@@ -540,7 +540,7 @@ async function executeSingleRead(
             'binary_file_rejected',
             `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
               'Please use the `run_python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
-              `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
+              `Example: use sync-to-opfs(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
             { details: { path, contentType: metadata.contentType, size: metadata.size } }
           )
         }

@@ -270,35 +270,14 @@ export const execExecutor: ToolExecutor = async (args, context) => {
   }
 
   return serializeExecExecution(scopeId, async () => {
-    // --- Step 3.5: Flush pending changes for this root before executing ---
-    // The command must run against the agent's CURRENT workspace state, not a
-    // stale disk snapshot. Pending write/edit/delete changes in the target root
-    // are synced to disk first (reusing the normal sync pipeline, including
-    // conflict detection). Other roots are untouched.
-    let autoSynced: string[] | undefined
-    try {
-    const flushResult = await flushPendingForRoot(context.workspaceId, rootName)
-    if (flushResult.kind === 'conflict') {
-      return toolErrorJson('exec', 'sync_conflict',
-        `Refused to execute "${cmdDisplay}": pending changes conflict with newer disk files.`,
-        {
-          hint: 'Resolve the conflicts (or sync explicitly) before re-running the command.',
-          details: { conflicts: flushResult.conflicts },
-        })
-    }
-    if (flushResult.kind === 'error') {
-      return toolErrorJson('exec', 'sync_failed',
-        `Refused to execute "${cmdDisplay}": failed to sync pending changes to disk.`,
-        { details: { error: flushResult.message } })
-    }
-    if (flushResult.syncedPaths.length > 0) {
-      autoSynced = flushResult.syncedPaths
-    }
-    } catch (err) {
-      return toolErrorJson('exec', 'sync_failed',
-        `Refused to execute "${cmdDisplay}": failed to sync pending changes to disk.`,
-        { details: { error: err instanceof Error ? err.message : String(err) } })
-    }
+    // --- Step 3.5 (REMOVED in PR-3): the old silent auto-flush before
+    // execution was an authorization bypass — it wrote pending changes to
+    // the real disk without any user confirmation, including delete-type
+    // changes. Disk sync now flows ONLY through sync-to-disk (prompt-level,
+    // authorized) or the run-level auto-apply. Instead, if the target root
+    // still has pending changes, the result tells the LLM exactly that (see
+    // buildStaleDiskNotice below) so it can call sync-to-disk itself when
+    // the command result depends on fresh content.
 
     // --- Step 4a: Background process start ---
   // exec_start ALWAYS required user approval above (decision 'prompt' is
@@ -315,7 +294,6 @@ export const execExecutor: ToolExecutor = async (args, context) => {
       port: typeof args.port === 'number' ? args.port : undefined,
       readyTimeout: typeof args.ready_timeout === 'number' ? args.ready_timeout : 60_000,
       abortSignal: context.abortSignal,
-      autoSynced,
     })
   }
 
@@ -349,6 +327,11 @@ export const execExecutor: ToolExecutor = async (args, context) => {
     .filter(Boolean)
     .join('')
 
+  // Post-execution check (best-effort): does the target root still hold
+  // pending changes the command could not see? Surfaces as `stale_disk` in
+  // the envelope + a hint, so the LLM can call sync-to-disk when needed.
+  const staleDiskNotice = await buildStaleDiskNotice(context.workspaceId, rootName)
+
     return toolOkJson('exec', {
       command: cmdStrings,
       exit_code: result.exit_code ?? null,
@@ -359,10 +342,11 @@ export const execExecutor: ToolExecutor = async (args, context) => {
       output: fullOutput || undefined,
       truncated: result.truncated === true,
       scope_id: scopeId,
-      auto_synced: autoSynced,
+      ...(staleDiskNotice ? { stale_disk: staleDiskNotice } : {}),
       ...(cwd ? { cwd } : {}),
       ...(rootName ? { root: rootName } : {}),
     }, {
+      ...(staleDiskNotice ? { hint: staleDiskNotice.hint } : {}),
       ...(result.exit_code != null && result.exit_code !== 0
         ? { hint: `Command exited with code ${result.exit_code}. Check stdout/stderr above for errors.` }
         : {}),
@@ -455,11 +439,10 @@ async function startBackgroundProcess(params: {
   port: number | undefined
   readyTimeout: number
   abortSignal?: AbortSignal
-  autoSynced: string[] | undefined
 }) {
   const {
     scopeId, cmdStrings, cmdDisplay, name, cwd, port, readyTimeout,
-    abortSignal, autoSynced,
+    abortSignal,
   } = params
 
   if (!name) {
@@ -519,7 +502,7 @@ async function startBackgroundProcess(params: {
           state: 'exited',
           exit_code: status.exit_code ?? null,
           log_tail: log.slice(-4000) || undefined,
-          auto_synced: autoSynced,
+
         }, {
           hint: 'The background process exited before its port became ready. Read log_tail for the error.',
         })
@@ -535,7 +518,7 @@ async function startBackgroundProcess(params: {
           url: `http://localhost:${detectedPort}`,
           port: detectedPort,
           log_tail: log.slice(-4000) || undefined,
-          auto_synced: autoSynced,
+
         }, {
           hint: 'The dev server is running in the background. The user can open the URL directly. Stop it later with the processes tool: processes({ action: "stop", process: "<name>" }).',
         })
@@ -561,71 +544,58 @@ async function startBackgroundProcess(params: {
     state: 'timeout',
     ...(detectedPort ? { port: detectedPort } : {}),
     log_tail: log.slice(-4000) || undefined,
-    auto_synced: autoSynced,
+
   }, {
     hint: `Port not ready after ${Math.round(readyTimeout / 1000)}s; the process is still running. Check log_tail, or read more with processes({ action: "logs", process: "${name}" }).`,
   })
 }
 
+// ─── Stale-disk notice (replaces the removed exec auto-flush) ──────────
+//
+// PR-3 removed the silent flush that wrote pending changes to disk before
+// every exec call — it was an authorization bypass (no user confirmation,
+// delete-type changes included). The trade-off: a command now sees the OLD
+// disk content while OPFS holds the new one. This notice re-establishes
+// DIAGNOSABILITY (the causal chain enters the LLM's context) without
+// re-introducing the bypass: the LLM must call sync-to-disk (authorized) if
+// it needs the command to see fresh content.
 
-type FlushResult =
-  | { kind: 'ok'; syncedPaths: string[]; snapshotId?: string }
-  | { kind: 'conflict'; conflicts: Array<{ path: string }> }
-  | { kind: 'error'; message: string }
-
-/**
- * Snapshot ids created by exec auto-flush, keyed by workspace (= conversation)
- * id. The conversation store's onLoopComplete drains these so the run-changes
- * card at the bottom of the loop covers files that were already flushed by an
- * exec call (otherwise those changes would never appear in any card).
- */
-const execFlushSnapshots = new Map<string, string[]>()
-
-/** Drain recorded exec-flush snapshot ids for a workspace (FIFO, clears them). */
-export function drainExecFlushSnapshotIds(workspaceId: string): string[] {
-  const ids = execFlushSnapshots.get(workspaceId)
-  if (!ids || ids.length === 0) return []
-  execFlushSnapshots.set(workspaceId, [])
-  return ids
+export interface StaleDiskNotice {
+  /** Pending paths in the target root (truncated when long). */
+  pendingPaths: string[]
+  /** Pending paths of type delete — deleted files may STILL exist on disk. */
+  pendingDeletions: string[]
+  /** Total pending count before truncation. */
+  total: number
+  /** LLM-facing hint (also attached as result.hint). */
+  hint: string
 }
 
-/** Peek recorded exec-flush snapshot ids without clearing (for tests/debug). */
-export function peekExecFlushSnapshotIds(workspaceId: string): string[] {
-  return [...(execFlushSnapshots.get(workspaceId) ?? [])]
-}
+const STALE_DISK_PATH_LIMIT = 10
 
 /**
- * Flush pending OPFS changes for the exec target root to disk.
- *
- * Semantics: the disk the command sees must equal the agent's
- * current workspace. Only the target root's pending paths are synced; other
- * roots stay in the normal approval flow.
- *
- * Visibility (§18.2): the flush goes through the SAME approved-snapshot
- * pipeline as the end-of-run auto-apply (createApprovedSnapshotForPaths →
- * syncToDisk → markSnapshotAsSynced) so the flushed files keep a rollback
- * record and show up in the run-changes card. The created snapshot id is
- * recorded per workspace and drained by the conversation store at loop
- * completion.
+ * Check the exec target root for pending changes and, if any, build the
+ * notice explaining that the command ran against stale disk content.
+ * Best-effort: any failure returns null (never blocks execution reporting).
  */
-async function flushPendingForRoot(
+async function buildStaleDiskNotice(
   workspaceId: string | null | undefined,
   rootName: string | undefined,
-): Promise<FlushResult> {
+): Promise<StaleDiskNotice | null> {
   try {
-    if (!workspaceId) return { kind: 'ok', syncedPaths: [] }
+    if (!workspaceId) return null
 
     const { getWorkspaceManager } = await import('@/opfs')
     const manager = await getWorkspaceManager()
     const workspace = await manager.getWorkspace(workspaceId)
-    if (!workspace) return { kind: 'ok', syncedPaths: [] }
+    if (!workspace) return null
 
-    // Pending changes for the target root only. resolvePath routes each path
-    // to its root; when the agent didn't pass a root, flush the pending paths
-    // of every native-host root that could be the default target.
     const pending = workspace.getPendingChanges()
-    if (pending.length === 0) return { kind: 'ok', syncedPaths: [] }
+    if (pending.length === 0) return null
 
+    // Only paths routed to the target root (explicit rootName, or the
+    // default native-host root when unspecified — same targeting the old
+    // flush used). Unresolvable paths are ignored.
     const targetPaths: string[] = []
     for (const change of pending) {
       try {
@@ -637,60 +607,39 @@ async function flushPendingForRoot(
         }
         targetPaths.push(change.path)
       } catch {
-        // Unresolvable path — leave it to the normal approval flow.
+        // Unresolvable — skip.
       }
     }
-    if (targetPaths.length === 0) return { kind: 'ok', syncedPaths: [] }
+    if (targetPaths.length === 0) return null
 
-    // Pre-flight conflict check (same as auto-apply): refuse to touch disk
-    // when the disk version moved on since the draft baseline.
-    const conflicts = await workspace.detectSyncConflicts(null, targetPaths)
-    if (conflicts.length > 0) {
-      return { kind: 'conflict', conflicts: conflicts.map((c) => ({ path: c.path })) }
-    }
-
-    // Create the approved snapshot FIRST (before/after contents for diff +
-    // rollback), mirroring autoApplyCompletedRunChanges. Summary names the
-    // trigger so the run-changes card can explain why the flush happened.
-    const snapshot = await workspace.createApprovedSnapshotForPaths(
-      targetPaths,
-      'auto-flush before exec',
-      null,
-      null,
+    const pendingByPath = new Map(pending.map((c) => [c.path, c]))
+    const pendingDeletions = targetPaths.filter(
+      (p) => pendingByPath.get(p)?.type === 'delete',
     )
+    const displayPaths = targetPaths.slice(0, STALE_DISK_PATH_LIMIT)
+    const suffix =
+      targetPaths.length > STALE_DISK_PATH_LIMIT
+        ? ` (…and ${targetPaths.length - STALE_DISK_PATH_LIMIT} more)`
+        : ''
 
-    const result = await workspace.syncToDisk(null, targetPaths)
-    if (result.conflicts.length > 0) {
-      // Raced between pre-flight and write; snapshot stays as a record but
-      // files remain pending for the manual review flow.
-      return { kind: 'conflict', conflicts: result.conflicts.map((c) => ({ path: c.path })) }
-    }
-    if (result.failed > 0) {
-      return { kind: 'error', message: `${result.failed} pending change(s) failed to sync` }
-    }
+    const hint =
+      `The command ran against DISK content, but ${targetPaths.length} pending change(s) in this root ` +
+      `are NOT on disk yet: ${displayPaths.join(', ')}${suffix}. ` +
+      (pendingDeletions.length > 0
+        ? `Note: ${pendingDeletions.length} of these are DELETE-type changes — the deleted file(s) may still exist on disk (ghost files). `+
+          ''
+        : '') +
+      `If this result depends on the latest file content, call sync-to-disk (asks the user for ` +
+      `permission) and re-run the command. Deletion-type changes are only applied via the Sync panel.`
 
-    if (snapshot && result.success === targetPaths.length) {
-      await workspace.markSnapshotAsSynced(snapshot.snapshotId)
+    return {
+      pendingPaths: displayPaths,
+      pendingDeletions,
+      total: targetPaths.length,
+      hint,
     }
-    if (snapshot) {
-      const list = execFlushSnapshots.get(workspaceId) ?? []
-      list.push(snapshot.snapshotId)
-      execFlushSnapshots.set(workspaceId, list)
-    }
-
-    // Refresh pending-change panels so flushed entries disappear immediately.
-    try {
-      const { useConversationContextStore } = await import(
-        '@/store/conversation-context.store'
-      )
-      await useConversationContextStore.getState().refreshPendingChanges(true)
-    } catch {
-      // Non-fatal: the run's own onLoopComplete refresh will catch up.
-    }
-
-    return { kind: 'ok', syncedPaths: targetPaths, snapshotId: snapshot?.snapshotId }
-  } catch (err) {
-    return { kind: 'error', message: err instanceof Error ? err.message : String(err) }
+  } catch {
+    return null
   }
 }
 
@@ -726,7 +675,7 @@ export const execPromptDoc: ToolPromptDoc = {
     '  - Pass an argv array, never a shell string: `["git", "status"]`, `["rg", "TODO", "src"]`, `["pnpm", "run", "typecheck"]`. Do not start commands with `bash`, `sh`, or `zsh`; that usually means the operation should be expressed as one direct argv command instead. Do not use `cd`, pipes, redirects, `&&`, `||`, or command substitution.',
     '  - `root` is an authorized root name such as `"<root-name>"`, not a file path. Specify it whenever multiple roots exist. `cwd`, when needed, is relative to root (for example `"packages/app"`), never absolute; use it instead of `cd`.',
     '  - Check `exit_code`, `stdout`, `stderr`, `timed_out`, and `truncated` in the result. Read-only and common verification commands are usually auto-approved; other commands require user approval, and dangerous commands are blocked.',
-    '  - Before executing, any pending changes you made in the target root are automatically synced to disk (see `auto_synced` in the result), so the command always runs against your current code. If syncing hits a conflict, the command is refused with the conflict list.',
+    '  - Commands see the version of the files that is ON DISK. Pending changes (from write/edit) are NOT on disk until synced: if a result carries `stale_disk`, the target root still has unsynced changes — call `sync-to-disk` first (asks the user for permission) and re-run the command when its result depends on those files. Delete-type changes are never auto-applied and may leave deleted files still present on disk.',
     '  - For long-running processes (dev servers): `exec({ command, background: true, name: "web", port: 5173 })` starts one and waits until ready in a single call. List / inspect / stop background processes with the `processes` tool.',
   ],
 }

@@ -20,7 +20,7 @@ const MAX_FILES = 50
 export const syncToOPFSDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'sync',
+    name: 'sync-to-opfs',
     description:
       'Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. ' +
       'Files already in OPFS (which may contain agent edits) are skipped to avoid overwriting pending changes. ' +
@@ -46,14 +46,14 @@ export const syncToOPFSDefinition: ToolDefinition = {
 export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   const { paths } = args
   if (!Array.isArray(paths) || paths.length === 0) {
-    return toolErrorJson('sync', 'invalid_args', 'paths must be a non-empty array of file paths or glob patterns')
+    return toolErrorJson('sync-to-opfs', 'invalid_args', 'paths must be a non-empty array of file paths or glob patterns')
   }
   const vfsPaths = paths
     .map((p) => String(p ?? '').trim())
     .filter((p) => p.toLowerCase().startsWith('vfs://'))
   if (vfsPaths.length > 0) {
     return toolErrorJson(
-      'sync',
+      'sync-to-opfs',
       'invalid_args',
       'sync only accepts workspace-relative native filesystem paths; vfs:// paths are already in OPFS and must not be synced',
       {
@@ -68,7 +68,7 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   // Resolve workspace runtime and files/ dir
   const runtime = await getWorkspaceRuntime(context.workspaceId)
   if (!runtime) {
-    return toolErrorJson('sync', 'no_opfs', 'No active workspace OPFS available')
+    return toolErrorJson('sync-to-opfs', 'no_opfs', 'No active workspace OPFS available')
   }
   const filesDir = await runtime.getFilesDir()
 
@@ -88,13 +88,13 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     // not a disk source. Only an explicitly supplied or FS Access handle is valid.
     const fallbackHandle = context.directoryHandle ?? await runtime.getNativeDirectoryHandle()
     if (!fallbackHandle) {
-      return toolErrorJson('sync', 'no_native_fs', 'No File System Access root is available. Native Host roots are handled through the executor-backed sync path.')
+      return toolErrorJson('sync-to-opfs', 'no_native_fs', 'No File System Access root is available. Native Host roots are handled through the executor-backed sync path.')
     }
     nativeHandleMap = new Map([['', fallbackHandle]])
   }
 
   if (nativeHandleMap.size === 0) {
-    return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
+    return toolErrorJson('sync-to-opfs', 'no_native_fs', 'No native filesystem access available')
   }
 
   // Build a rootName → rootHandle map and resolve paths per root
@@ -140,14 +140,14 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     // Check whether paths already exist in OPFS
     const alreadyInOPFS = await resolvePaths(filesDir, paths as string[])
     if (alreadyInOPFS.length > 0) {
-      return toolOkJson('sync', {
+      return toolOkJson('sync-to-opfs', {
         synced: 0,
         skipped: alreadyInOPFS.length,
         skippedReason: 'Files already exist in OPFS (sync not required)',
       })
     }
     return toolErrorJson(
-      'sync',
+      'sync-to-opfs',
       'no_files',
       'No files found on native filesystem matching the given paths',
       {
@@ -209,7 +209,7 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     }
   }
 
-  return toolOkJson('sync', {
+  return toolOkJson('sync-to-opfs', {
     synced,
     skipped,
     skippedReason: skipped > 0 ? 'File already exists in OPFS (preserved to avoid overwriting agent edits)' : undefined,
@@ -308,13 +308,13 @@ async function syncNativeHostFilesToOPFS(
   if (synced > 0) await runtime.rebuildFilesIndex()
 
   if (synced === 0 && skipped === 0 && errors.length === 0) {
-    return toolErrorJson('sync', 'no_files', 'No files found on Native Host disk matching the given paths', {
+    return toolErrorJson('sync-to-opfs', 'no_files', 'No files found on Native Host disk matching the given paths', {
       hint: 'Paths are resolved relative to the authorized project root.',
       details: { requested_paths: paths },
     })
   }
 
-  return toolOkJson('sync', {
+  return toolOkJson('sync-to-opfs', {
     synced,
     skipped,
     skippedReason: skipped > 0 ? 'File already exists in OPFS (preserved to avoid overwriting agent edits)' : undefined,
@@ -622,6 +622,6 @@ export const syncPromptDoc: ToolPromptDoc = {
   category: 'file-ops',
   section: '### File Sync (disk → OPFS)',
   lines: [
-    '- `sync(paths)` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before `run_python` when the script needs workspace files not yet available in OPFS. Example: `sync(paths=["data/*.csv", "config.json"])`. In multi-root: `sync(paths=["rootName/data/*.csv"])`.',
+    '- `sync-to-opfs(paths)` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before `run_python` when the script needs workspace files not yet available in OPFS. Example: `sync-to-opfs(paths=["data/*.csv", "config.json"])`. In multi-root: `sync-to-opfs(paths=["rootName/data/*.csv"])`.',
   ],
 }
