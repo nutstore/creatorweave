@@ -107,6 +107,14 @@ export const agent = {
         denyAll: "모두 거부",
         denyAllHint: "이 요청과 대기 중인 모든 요청을 거부",
         alwaysAllow: "이 대화에서 항상 허용",
+        settingsTab: "도구 승인",
+        settingsTitle: "도구 승인 기억",
+        settingsDescription: "“이 대화에서 항상 허용” 승인은 대화별로 메모리에 저장되며, 페이지를 새로 고치거나 대화를 닫으면 만료됩니다. 여기서 모든 기억을 한 번에 지울 수 있습니다.",
+        noGrants: "저장된 승인이 없습니다",
+        grantsCount: "{count}개의 승인이 기억되고 있습니다",
+        clearMemory: "승인 기억 지우기",
+        cleared: "모든 승인 기억을 지웠습니다",
+        settingsHint: "외부 도구(MCP/WebMCP) 승인은 server+도구 단위입니다. 신뢰할 수 없는 콘텐츠 페이지의 도구는 매번 확인되며 기억되지 않습니다.",
     },
 
     execAuth: {

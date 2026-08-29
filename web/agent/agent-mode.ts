@@ -9,7 +9,7 @@
 export type AgentMode = 'plan' | 'act'
 
 /** Tool category for mode-based filtering */
-export type ToolCategory = 'read' | 'write'
+export type ToolCategory = 'read' | 'write' | 'external'
 
 /** Tool metadata for mode classification */
 export interface ToolModeMetadata {
@@ -62,7 +62,15 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['search_conversations', { name: 'search_conversations', category: 'read' }],
   // Unified external tool bridge (search + call)
   ['search_tools', { name: 'search_tools', category: 'read' }],
-  ['call_tool', { name: 'call_tool', category: 'read' }],
+  // call_tool reaches OUTSIDE the workspace (MCP/WebMCP servers, upstream
+  // pages). It stays visible in plan mode so the agent can still probe
+  // external info, but every invocation requires per-call user approval
+  // (policy-engine authorize; plan mode never offers session memory).
+  ['call_tool', {
+    name: 'call_tool',
+    category: 'external',
+    planModeDescription: 'Execute external MCP/WebMCP tools (each call requires explicit user approval, even in plan mode)'
+  }],
   // Web bridge tools (read-only — fetch external info, requires Browser Extension)
   ['web_search', { name: 'web_search', category: 'read' }],
   ['web_fetch', { name: 'web_fetch', category: 'read' }],
@@ -118,9 +126,13 @@ export function getToolCategory(toolName: string): ToolCategory {
  */
 export function isToolAllowedInMode(toolName: string, mode: AgentMode): boolean {
   if (mode === 'act') return true // Act mode allows all tools
-  
+
   const category = getToolCategory(toolName)
-  return category === 'read'
+  // 'external' tools (call_tool) stay visible in plan mode: plan is for
+  // read-only EXPLORATION, which includes probing external sources. Safety
+  // comes from the prompt-level authorization on every invocation (see
+  // policy-engine), not from hiding the tool.
+  return category === 'read' || category === 'external'
 }
 
 /**

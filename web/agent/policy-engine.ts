@@ -54,6 +54,13 @@ export interface AuthorizeRequest {
   conversationId?: string | null
   /** Abort signal of the originating run — aborting resolves as deny. */
   signal?: AbortSignal
+  /**
+   * Extra runtime constraints beyond the static policy table.
+   * Currently: plan mode downgrades call_tool to per-call approval
+   * ("always allow" is suppressed — a plan-phase approval must not
+   * silently pre-authorize later calls, possibly in act mode).
+   */
+  mode?: 'plan' | 'act'
 }
 
 export type AuthResult =
@@ -75,9 +82,13 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
     }
   }
 
-  // 2. conversation-scoped "always allow" memory.
+  // 2. conversation-scoped "always allow" memory. Suppressed in plan mode —
+  // an approval granted during plan exploration must not pre-authorize the
+  // execution phase (possibly after a plan→act switch).
   const memoryKey = policy.memoryKey?.(req.args) ?? null
+  const memoryAllowed = req.mode !== 'plan'
   if (
+    memoryAllowed &&
     memoryKey !== null &&
     useSessionAllowStore.getState().has(req.conversationId, memoryKey)
   ) {
@@ -94,11 +105,12 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
     return { decision: 'allow', via: 'auto' }
   }
 
-  // 5. prompt — unified modal. Resolves false on deny or abort.
+  // 5. prompt — unified modal. Resolves false on deny or abort. In plan mode
+  // the "always allow" option is stripped (memoryKey forced null).
   const resolution = await useToolAuthStore.getState().request({
     toolName: req.toolName,
     description: policy.describe?.(req.args) ?? '',
-    memoryKey,
+    memoryKey: memoryAllowed ? memoryKey : null,
     conversationId: req.conversationId ?? null,
     signal: req.signal,
   })
@@ -154,6 +166,30 @@ function createPolicyTable(): Map<string, ToolPolicy> {
   }
 
   // -- prompt: user confirmation required -----------------------------------
+
+  // call_tool: first invocation of a server+tool combination always prompts;
+  // "always allow" whitelists it for the conversation. Tools coming from
+  // untrusted-content pages never get a memory key — they must be approved
+  // every single time (prompt-injection surface).
+  set('call_tool', {
+    level: 'prompt',
+    describe: (args) => {
+      const a = args as { full_tool_name?: string } | null
+      return a?.full_tool_name
+        ? `The agent wants to call the external tool "${a.full_tool_name}".`
+        : 'The agent wants to call an external MCP/WebMCP tool.'
+    },
+    memoryKey: (args) => {
+      const a = args as { full_tool_name?: string; untrusted?: boolean } | null
+      // Untrusted-content tools (annotated pages) are never remembered —
+      // every single call must be explicitly approved.
+      if (a?.untrusted) return null
+      const fullName = a?.full_tool_name?.trim()
+      if (!fullName) return null // unusable name → cannot build a safe key
+      return `call_tool::${fullName}`
+    },
+  })
+
   set('snapshot_restore', {
     level: 'prompt',
     describe: () => 'Restores files to a previous snapshot — unsaved pending changes may be discarded.',

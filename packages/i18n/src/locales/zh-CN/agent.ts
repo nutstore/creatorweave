@@ -80,6 +80,14 @@ export const agent = {
         denyAll: "全部拒绝",
         denyAllHint: "拒绝当前及所有排队的请求",
         alwaysAllow: "本对话始终允许",
+        settingsTab: "工具授权",
+        settingsTitle: "工具授权记忆",
+        settingsDescription: "“本对话始终允许”的授权会按对话记忆在内存中，刷新页面或关闭对话即失效。此处可一键清除全部记忆。",
+        noGrants: "当前没有任何授权记忆",
+        grantsCount: "当前共记住 {count} 条授权",
+        clearMemory: "清除授权记忆",
+        cleared: "已清除全部授权记忆",
+        settingsHint: "外部工具（MCP/WebMCP）的授权粒度为 server+工具；来自不受信内容页的工具每次都会询问、永不记忆。",
     },
 
     execAuth: {

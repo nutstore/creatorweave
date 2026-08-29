@@ -107,6 +107,14 @@ export const agent = {
         denyAll: "すべて拒否",
         denyAllHint: "このリクエストとキュー中のすべてを拒否",
         alwaysAllow: "この会話では常に許可",
+        settingsTab: "ツール承認",
+        settingsTitle: "ツール承認メモリ",
+        settingsDescription: "「この会話では常に許可」の承認は会話ごとにメモリへ保存され、ページ更新や会話を閉じると失効します。ここですべての記録を一括削除できます。",
+        noGrants: "保存された承認はありません",
+        grantsCount: "{count} 件の承認を記憶中",
+        clearMemory: "承認メモリを削除",
+        cleared: "すべての承認メモリを削除しました",
+        settingsHint: "外部ツール（MCP/WebMCP）の承認は server+ツール単位。信頼できないコンテンツページのツールは毎回確認され、記憶されません。",
     },
 
     execAuth: {

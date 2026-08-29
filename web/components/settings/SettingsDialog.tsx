@@ -36,12 +36,14 @@ import {
   Info,
   Keyboard,
   Database,
+  ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
 import { SecretManager } from './SecretManager'
 import ExecPolicyPanel from './ExecPolicyPanel'
+import ToolAuthPanel from './ToolAuthPanel'
 import { MCPSettings } from '@/components/mcp/MCPSettings'
 import { WebMCPSettings } from '@/components/webmcp/WebMCPSettings'
 import {
@@ -82,6 +84,7 @@ type SettingsTab =
   | 'webmcp'
   | 'extension'
   | 'exec-policy'
+  | 'tool-auth'
   | 'experimental'
   | 'webcontainer'
 
@@ -810,6 +813,7 @@ const SettingsDialogContent = forwardRef<
         { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
         { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
         { id: 'exec-policy', label: t('execPolicy.tab'), icon: <Terminal className="h-4 w-4" /> },
+        { id: 'tool-auth', label: t('agent.toolAuth.settingsTab'), icon: <ShieldCheck className="h-4 w-4" /> },
       ],
     },
     {
@@ -1032,6 +1036,9 @@ const SettingsDialogContent = forwardRef<
           {/* Exec Policy Tab */}
           {activeTab === 'exec-policy' && (
             <ExecPolicyPanel />
+          )}
+          {activeTab === 'tool-auth' && (
+            <ToolAuthPanel />
           )}
 
           {/* Experimental Features Tab */}

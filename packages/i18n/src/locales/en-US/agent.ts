@@ -81,6 +81,14 @@ export const agent = {
         denyAll: "Deny all",
         denyAllHint: "Deny this and all queued requests",
         alwaysAllow: "Always allow for this conversation",
+        settingsTab: "Tool Authorization",
+        settingsTitle: "Tool authorization memory",
+        settingsDescription: "\"Always allow for this conversation\" grants are remembered in memory per conversation and expire when the page refreshes or the conversation closes. Clear everything here with one click.",
+        noGrants: "No authorization memory",
+        grantsCount: "{count} grant(s) remembered",
+        clearMemory: "Clear authorization memory",
+        cleared: "All authorization memory cleared",
+        settingsHint: "External tool (MCP/WebMCP) grants are scoped per server+tool; tools from untrusted-content pages are asked every time and never remembered.",
     },
 
     execAuth: {

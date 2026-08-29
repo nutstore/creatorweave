@@ -214,11 +214,109 @@ describe('policy table', () => {
     expect(policy.memoryKey?.({})).toBeNull()
   })
 
+  it('call_tool prompts with a per server+tool memory key', () => {
+    const policy = getToolPolicy('call_tool')
+    expect(policy.level).toBe('prompt')
+    expect(
+      policy.memoryKey?.({ full_tool_name: 'github:create_issue' }),
+    ).toBe('call_tool::github:create_issue')
+    // unusable name → no safe key, ask every time
+    expect(policy.memoryKey?.({})).toBeNull()
+    expect(policy.memoryKey?.({ full_tool_name: '  ' })).toBeNull()
+  })
+
+  it('untrusted call_tool targets never get a memory key', () => {
+    const policy = getToolPolicy('call_tool')
+    expect(
+      policy.memoryKey?.({ full_tool_name: 'page_tool', untrusted: true }),
+    ).toBeNull()
+  })
+
   it('switch_agent_mode is forbidden', () => {
     expect(getToolPolicy('switch_agent_mode').level).toBe('forbidden')
   })
 
   it('unregistered tools default to auto (PR-1 behavior freeze)', () => {
     expect(getToolPolicy('totally_unknown_tool').level).toBe('auto')
+  })
+})
+
+describe('policy-engine: plan mode (call_tool double gating)', () => {
+  beforeEach(() => {
+    useSessionAllowStore.getState().clearAll()
+    useToolAuthStore.getState().clear()
+  })
+  afterEach(() => {
+    useSessionAllowStore.getState().clearAll()
+    useToolAuthStore.getState().clear()
+  })
+
+  it('a remembered call_tool grant does NOT short-circuit in plan mode', async () => {
+    // Act-mode approval remembered earlier in the same conversation.
+    useSessionAllowStore.getState().add('conv-1', 'call_tool::jira:get_ticket')
+
+    const pending = authorize({
+      toolName: 'call_tool',
+      args: { full_tool_name: 'jira:get_ticket' },
+      conversationId: 'conv-1',
+      mode: 'plan',
+    })
+    // Queues a modal (no short-circuit)…
+    expect(useToolAuthStore.getState().queue).toHaveLength(1)
+    // …and without the "always allow" option (memoryKey stripped).
+    expect(useToolAuthStore.getState().pending?.memoryKey).toBeNull()
+    useToolAuthStore.getState().approve()
+    expect(await pending).toEqual({ decision: 'allow', via: 'auto' })
+    // Single-call approval must NOT write memory.
+    expect(
+      useSessionAllowStore.getState().has('conv-1', 'call_tool::jira:get_ticket'),
+    ).toBe(true) // pre-existing grant untouched
+  })
+
+  it('plan-mode deny returns a reason the LLM can act on', async () => {
+    const pending = authorize({
+      toolName: 'call_tool',
+      args: { full_tool_name: 'jira:get_ticket' },
+      conversationId: 'conv-1',
+      mode: 'plan',
+    })
+    useToolAuthStore.getState().deny()
+    const result = await pending
+    expect(result.decision).toBe('deny')
+  })
+
+  it('auto tools are unaffected by plan mode (memory check is a no-op for them)', async () => {
+    const result = await authorize({
+      toolName: 'read',
+      args: { path: 'a.md' },
+      mode: 'plan',
+    })
+    expect(result).toEqual({ decision: 'allow', via: 'auto' })
+  })
+
+  it('call_tool still prompts in act mode and CAN be remembered', async () => {
+    const pending = authorize({
+      toolName: 'call_tool',
+      args: { full_tool_name: 'github:create_issue' },
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    expect(useToolAuthStore.getState().pending?.memoryKey).toBe(
+      'call_tool::github:create_issue',
+    )
+    useToolAuthStore.getState().approve(true)
+    expect(await pending).toEqual({ decision: 'allow', via: 'auto' })
+    expect(
+      useSessionAllowStore.getState().has('conv-1', 'call_tool::github:create_issue'),
+    ).toBe(true)
+
+    // Later call in the same conversation short-circuits (act mode).
+    const second = await authorize({
+      toolName: 'call_tool',
+      args: { full_tool_name: 'github:create_issue' },
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    expect(second).toEqual({ decision: 'allow', via: 'session-memory' })
   })
 })

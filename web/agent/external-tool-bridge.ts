@@ -18,6 +18,7 @@
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tools/tool-types'
 import { toolErrorJson, toolOkJson } from './tools/tool-envelope'
+import { authorize } from './policy-engine'
 import { getMCPManager } from '@/mcp/mcp-manager'
 import { useWebMCPStore } from '@/webmcp/store'
 import { getWebMCPBridge } from '@/webmcp/bridge-client'
@@ -810,6 +811,46 @@ export const callToolExecutor: ToolExecutor = async (args, context) => {
       'TOOL_NOT_FOUND',
       `Tool "${full_tool_name}" not found. Use search_tools to discover available tools.`,
       { retryable: true }
+    )
+  }
+
+  // --- Per-call authorization (PR-2) --------------------------------------
+  // call_tool reaches outside the workspace (MCP servers / upstream pages),
+  // so every invocation passes the policy engine. First call of a
+  // `server::tool` combination always prompts; "Always allow" whitelists it
+  // for the conversation. Untrusted-content tools return a null memory key
+  // (no "Always allow" button — every call needs explicit approval).
+  // In plan mode the memory short-circuit is suppressed: an approval granted
+  // during exploration must not pre-authorize later calls.
+  const { getCurrentWorkspaceAgentMode } = await import(
+    '@/store/workspace-preferences.store'
+  )
+  const auth = await authorize({
+    toolName: 'call_tool',
+    args: {
+      full_tool_name,
+      untrusted: tool.annotations?.untrustedContentHint === true,
+    },
+    conversationId: context.workspaceId,
+    signal: context.abortSignal,
+    mode: getCurrentWorkspaceAgentMode(),
+  })
+  if (auth.decision === 'deny') {
+    return toolErrorJson(
+      'call_tool',
+      'AUTH_DENIED_BY_USER',
+      auth.reason,
+      { retryable: false, details: { fullToolName: full_tool_name } }
+    )
+  }
+  // Stale-approval guard (executor layer): the queue is global and outlives
+  // loop lifecycles — never execute a request whose run was already aborted.
+  if (context.abortSignal?.aborted) {
+    return toolErrorJson(
+      'call_tool',
+      'AUTH_STALE_APPROVAL',
+      `Approval for "${full_tool_name}" arrived after the run was aborted; not executing.`,
+      { retryable: false }
     )
   }
 
