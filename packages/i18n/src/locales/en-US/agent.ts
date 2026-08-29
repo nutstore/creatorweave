@@ -73,6 +73,16 @@ export const agent = {
         deny: "Deny",
     },
 
+    toolAuth: {
+        title: "Tool Authorization",
+        subtitle: "Agent wants to run a command on your machine",
+        allow: "Allow once",
+        deny: "Deny",
+        denyAll: "Deny all",
+        denyAllHint: "Deny this and all queued requests",
+        alwaysAllow: "Always allow for this conversation",
+    },
+
     execAuth: {
         title: "Command Approval",
         subtitle: "Agent wants to run a command on your machine",

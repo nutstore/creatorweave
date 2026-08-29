@@ -8,6 +8,7 @@
 import type { ToolDefinition, ToolExecutor, ToolEntry, ToolContext, ToolPromptDoc } from './tools/tool-types'
 import { formatErrorForUser, withAutoRetry } from './error-handling'
 import { isToolAllowedInMode, type AgentMode } from './agent-mode'
+import { getToolPolicy, type ToolPolicy } from './policy-engine'
 import { useSettingsStore } from '@/store/settings.store'
 
 // Import read tool
@@ -335,6 +336,16 @@ export class ToolRegistry {
   isToolAvailableInMode(name: string, mode: AgentMode): boolean {
     if (!this.tools.has(name)) return false
     return isToolAllowedInMode(name, mode)
+  }
+
+  /**
+   * Policy metadata for a registered tool (undefined when not registered).
+   * The policy table itself lives in policy-engine.ts — this accessor makes it
+   * reachable through the registry without duplicating the classification.
+   */
+  getPolicy(name: string): ToolPolicy | undefined {
+    if (!this.tools.has(name)) return undefined
+    return getToolPolicy(name)
   }
 
   /** Execute a tool by name with intelligent error handling */

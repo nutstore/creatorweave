@@ -99,6 +99,16 @@ export const agent = {
         deny: "拒否",
     },
 
+    toolAuth: {
+        title: "ツール実行の承認",
+        subtitle: "AIがあなたのマシンでコマンドを実行しようとしています",
+        allow: "今回のみ許可",
+        deny: "拒否",
+        denyAll: "すべて拒否",
+        denyAllHint: "このリクエストとキュー中のすべてを拒否",
+        alwaysAllow: "この会話では常に許可",
+    },
+
     execAuth: {
         title: "コマンド実行の承認",
         subtitle: "AIがあなたのマシンでコマンドを実行しようとしています",

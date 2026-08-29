@@ -99,6 +99,16 @@ export const agent = {
         deny: "거부",
     },
 
+    toolAuth: {
+        title: "도구 실행 승인",
+        subtitle: "AI가 컴퓨터에서 명령어를 실행하려고 합니다",
+        allow: "이번만 허용",
+        deny: "거부",
+        denyAll: "모두 거부",
+        denyAllHint: "이 요청과 대기 중인 모든 요청을 거부",
+        alwaysAllow: "이 대화에서 항상 허용",
+    },
+
     execAuth: {
         title: "명령어 실행 승인",
         subtitle: "AI가 컴퓨터에서 명령어를 실행하려고 합니다",

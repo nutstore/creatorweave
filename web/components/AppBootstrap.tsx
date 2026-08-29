@@ -14,8 +14,9 @@ import { useRouter } from 'next/navigation'
 import { useT } from '@/i18n'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionInstallGuide } from '@/components/extension'
-import { PageWriteAuthModal } from '@/components/agent/PageWriteAuthModal'
-import { ExecAuthModal } from '@/components/agent/ExecAuthModal'
+// Unified authorization modal (PR-1) — replaces both PageWriteAuthModal and
+// ExecAuthModal. They now forward into the shared tool-auth.store queue.
+import { ToolAuthModal } from '@/components/agent/ToolAuthModal'
 import { ServiceWorkerBridge } from '@/components/ServiceWorkerBridge'
 
 /**
@@ -552,8 +553,7 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
         open={extensionGuideOpen}
         onOpenChange={(open) => { if (!open) extensionCloseGuide() }}
       />
-      <PageWriteAuthModal />
-      <ExecAuthModal />
+      <ToolAuthModal />
       <Toaster position="bottom-right" />
     </>
   )

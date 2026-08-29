@@ -72,6 +72,16 @@ export const agent = {
         deny: "拒绝",
     },
 
+    toolAuth: {
+        title: "工具执行授权",
+        subtitle: "AI 想要在你的机器上执行命令",
+        allow: "允许一次",
+        deny: "拒绝",
+        denyAll: "全部拒绝",
+        denyAllHint: "拒绝当前及所有排队的请求",
+        alwaysAllow: "本对话始终允许",
+    },
+
     execAuth: {
         title: "命令执行授权",
         subtitle: "AI 想要在你的机器上执行命令",
