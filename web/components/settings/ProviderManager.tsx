@@ -345,6 +345,8 @@ function ProviderCard({
   const handleSaveKey = useCallback(async () => {
     const trimmedKey = apiKey.trim()
     if (!trimmedKey) {
+      // Custom providers (Ollama, LM Studio, …) may run keyless — an empty
+      // input just clears the stored key without forcing the user to enter one.
       await clearApiKey()
       return
     }
@@ -403,7 +405,7 @@ function ProviderCard({
       toast.error(t('settings.toast.apiKeyLoadFailed'))
       return
     }
-    if (!key) {
+    if (!key && !isCustom) {
       toast.error(t('settings.toast.apiKeyRequired'))
       return
     }
@@ -614,7 +616,10 @@ function ProviderCard({
 
           {/* API Key */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-secondary">{t('settings.apiKey')}</label>
+            <label className="text-[12px] font-medium text-secondary">
+              {t('settings.apiKey')}
+              {isCustom && <span className="ml-1 font-normal text-tertiary">({t('settings.optional')})</span>}
+            </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -655,6 +660,9 @@ function ProviderCard({
                 {saved ? <Check className="h-4 w-4" /> : t('settings.save')}
               </BrandButton>
             </div>
+            {isCustom && (
+              <p className="text-[10px] leading-relaxed text-tertiary">{t('settings.apiKeyOptionalHint')}</p>
+            )}
           </div>
 
           {/* Account Balance (DeepSeek only) */}

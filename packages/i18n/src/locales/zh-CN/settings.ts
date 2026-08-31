@@ -4,6 +4,8 @@ export const settings = {
     llmProvider: "LLM 服务商",
     apiKey: "API Key",
     apiKeyPlaceholder: "输入 API Key...",
+    optional: "可选",
+    apiKeyOptionalHint: "本地服务（如 Ollama http://localhost:11434/v1）无需 API Key，留空即可",
     showApiKey: "显示 API Key",
     hideApiKey: "隐藏 API Key",
     save: "保存",
@@ -406,7 +408,7 @@ export const settings = {
     customBaseUrl: {
       label: "API Base URL",
       placeholder: "https://api.example.com/v1",
-      hint: "支持 OpenAI 兼容的 API 端点",
+      hint: "支持 OpenAI 兼容的 API 端点（本地模型填 Ollama 的 http://localhost:11434/v1）",
     },
 
     // API Mode

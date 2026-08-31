@@ -108,22 +108,25 @@ function streamCwOpenAIChatCompletions(
     const output = createEmptyAssistantOutput(model)
 
     try {
-      const apiKey = options?.apiKey?.trim()
-      if (!apiKey) {
-        throw new Error(`No API key for provider: ${String(model.provider)}`)
-      }
+      // API key is optional for custom providers (see buildHeaders below).
+      // Non-custom providers still go through their own handlers — but if a
+      // custom provider is configured with a key, it's passed through here.
+      const apiKey = options?.apiKey?.trim() || null
 
       const payload = buildChatCompletionsPayload(model, context, options)
       options?.onPayload?.(payload, model)
 
       const requestUrl = `${normalizeBaseUrl(model.baseUrl)}/chat/completions`
-      const buildHeaders = (token: string) => ({
-        Authorization: `Bearer ${token}`,
+      // API key is optional for custom providers: local runtimes (Ollama,
+      // LM Studio, llama.cpp server) reject or choke on arbitrary Bearer
+      // tokens, so omit the Authorization header entirely when no key is set.
+      const buildHeaders = (token: string | null) => ({
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         'Content-Type': 'application/json',
         ...(model.headers || {}),
         ...(options?.headers || {}),
       })
-      const doFetch = (token: string) => {
+      const doFetch = (token: string | null) => {
         const headers = buildHeaders(token)
         assertHeaderAscii(headers, 'LLM request headers')
         return fetch(requestUrl, {
@@ -563,7 +566,8 @@ function applyThinkingParams(
     case 'openrouter': {
       // OpenRouter unified: reasoning: { effort: "none" | "low" | ... }
       // Must send effort:"none" explicitly — OpenRouter enables thinking by default.
-      ;(payload as Record<string, unknown>).reasoning = {
+      const orPayload = payload as Record<string, unknown>
+      orPayload.reasoning = {
         effort: enabled ? toEffortValue(level!, thinkingLevelMap) : 'none',
       }
       break
@@ -576,7 +580,8 @@ function applyThinkingParams(
       break
     }
     case 'together': {
-      ;(payload as Record<string, unknown>).reasoning = { enabled }
+      const togetherPayload = payload as Record<string, unknown>
+      togetherPayload.reasoning = { enabled }
       if (enabled) {
         payload.reasoning_effort = toEffortValue(level!, thinkingLevelMap)
       }
@@ -782,7 +787,7 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
         .map((part) => part.text)
         .join('')
 
-      let thinkingContent = message.content
+      const thinkingContent = message.content
         .filter((part): part is { type: 'thinking'; thinking: string } => part.type === 'thinking')
         .map((part) => part.thinking)
         .join('')

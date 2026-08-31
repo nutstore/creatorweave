@@ -4,6 +4,8 @@ export const settings = {
     llmProvider: "LLM 공급자",
     apiKey: "API Key",
     apiKeyPlaceholder: "API Key를 입력하세요...",
+    optional: "선택",
+    apiKeyOptionalHint: "로컬 서버(예: Ollama http://localhost:11434/v1)는 API Key가 필요 없습니다 — 비워 두세요",
     showApiKey: "API Key 표시",
     hideApiKey: "API Key 숨기기",
     save: "저장",
@@ -413,7 +415,7 @@ export const settings = {
     customBaseUrl: {
       label: "API Base URL",
       placeholder: "https://api.example.com/v1",
-      hint: "OpenAI 호환 API 엔드포인트를 지원합니다",
+      hint: "OpenAI 호환 API 엔드포인트를 지원합니다 (로컬 모델은 Ollama의 http://localhost:11434/v1 사용)",
     },
 
     // API Mode

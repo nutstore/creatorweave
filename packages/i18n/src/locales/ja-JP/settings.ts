@@ -4,6 +4,8 @@ export const settings = {
     llmProvider: "LLM プロバイダ",
     apiKey: "API Key",
     apiKeyPlaceholder: "API Keyを入力...",
+    optional: "任意",
+    apiKeyOptionalHint: "ローカルサーバー（例：Ollama http://localhost:11434/v1）は API Key 不要 — 空欄のまま",
     showApiKey: "API Keyを表示",
     hideApiKey: "API Keyを非表示",
     save: "保存",
@@ -417,7 +419,7 @@ export const settings = {
     customBaseUrl: {
       label: "API Base URL",
       placeholder: "https://api.example.com/v1",
-      hint: "OpenAI 互換の API エンドポイントに対応",
+      hint: "OpenAI 互換の API エンドポイントに対応（ローカルモデルは Ollama の http://localhost:11434/v1 を入力）",
     },
 
     // API Mode

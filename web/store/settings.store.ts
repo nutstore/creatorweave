@@ -612,6 +612,19 @@ export const useSettingsStore = create<SettingsState>()(
           set({ hasApiKey: false, hasApiKeyLoaded: true })
           return false
         }
+
+        // Custom providers can run keyless (Ollama / LM Studio / llama.cpp at
+        // localhost). A configured baseUrl is enough to be "usable" — don't
+        // gate the UI on a missing API key for them.
+        if (
+          isCustomProviderType(state.providerType) &&
+          effective.baseUrl
+        ) {
+          apiKeyCache.set(effective.apiKeyProviderKey, true)
+          set({ hasApiKey: true, hasApiKeyLoaded: true })
+          return true
+        }
+
         const providerKey = effective.apiKeyProviderKey
 
         // Return cached value if available and not stale.

@@ -35,3 +35,4 @@ Open `http://localhost:5173`.
 
 - [Workspace](./workspace.md)
 - [Conversations](./conversation.md)
+- [Connect Ollama (Local Models)](./ollama.md) — run AI locally with no paid API and no data leaving your machine

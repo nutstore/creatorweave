@@ -60,24 +60,28 @@ export function canFetchModels(providerType: LLMProviderType): boolean {
 // ─── Fetch implementations ──────────────────────────────────────────────────
 
 /**
- * Fetch models from OpenAI-compatible /v1/models endpoint
+ * Fetch models from OpenAI-compatible /v1/models endpoint.
+ *
+ * `apiKey` is optional: local OpenAI-compatible runtimes (Ollama, LM Studio,
+ * llama.cpp server) don't require authentication, so we send a keyless GET.
  */
 async function fetchOpenAICompatibleModels(
   baseUrl: string,
-  apiKey: string
+  apiKey?: string
 ): Promise<ModelInfo[]> {
   const url = `${baseUrl}/models`
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`
+  }
+  assertHeaderAscii(headers, 'model list request headers')
+
   const response = await fetch(url, {
     method: 'GET',
-    headers: (() => {
-      const h = {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      }
-      assertHeaderAscii(h, 'model list request headers')
-      return h
-    })(),
+    headers,
     signal: AbortSignal.timeout(10000), // 10s timeout
   })
 
@@ -209,8 +213,10 @@ export async function fetchModelsForProvider(
   const baseUrl =
     options?.baseUrl || LLM_PROVIDER_CONFIGS[providerType]?.baseURL || ''
 
-  // Cannot fetch without API key
-  if (!apiKey) {
+  // Custom providers may run keyless (e.g. Ollama at localhost:11434/v1),
+  // so a missing key is not an immediate error for them — only built-in
+  // OpenAI-compatible providers fall back to the static list without a key.
+  if (!apiKey && !isCustom) {
     return {
       models: staticModels,
       source: 'static',
@@ -223,9 +229,10 @@ export async function fetchModelsForProvider(
     let models: ModelInfo[]
 
     if (providerType === 'google') {
-      models = await fetchGoogleModels(apiKey)
+      // Google is not custom → the !apiKey early-return above guarantees a key here.
+      models = await fetchGoogleModels(apiKey || '')
     } else if (isCustom || OPENAI_COMPATIBLE_PROVIDERS.includes(providerType)) {
-      models = await fetchOpenAICompatibleModels(baseUrl, apiKey)
+      models = await fetchOpenAICompatibleModels(baseUrl, apiKey || undefined)
     } else {
       // Unknown provider → static fallback
       return {

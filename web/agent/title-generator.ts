@@ -24,6 +24,7 @@ const NO_COMPRESS_TOKEN_BUDGET = 4000
 const RECENT_MESSAGE_COUNT = 6
 
 export interface TitleGeneratorModelConfig {
+  /** Optional: custom providers may run keyless (e.g. Ollama). */
   apiKey: string
   providerType: LLMProviderType
   baseUrl: string
@@ -199,7 +200,7 @@ export async function generateConversationTitle(
     const chatMessages = buildTitleMessages(messages, compressedContextSummary)
 
     const provider = createLLMProvider({
-      apiKey: config.apiKey,
+      apiKey: config.apiKey || '',
       providerType: config.providerType,
       baseUrl: config.baseUrl,
       model: config.model,

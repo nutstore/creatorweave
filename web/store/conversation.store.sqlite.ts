@@ -1967,13 +1967,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
       const apiKeyRepo = getApiKeyRepository()
       const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
-      if (!apiKey) return { ok: false, reason: 'no_api_key' }
+      // Custom providers may run keyless (e.g. Ollama) — an absent key only
+      // blocks title generation for built-in providers.
+      if (!apiKey && !isCustomProviderType(providerType)) {
+        return { ok: false, reason: 'no_api_key' }
+      }
 
       const title = await generateConversationTitle(
         conv.messages,
         conv.compressedContextSummary ?? null,
         {
-          apiKey,
+          apiKey: apiKey || '',
           providerType,
           baseUrl: providerConfig.baseUrl,
           model: providerConfig.modelName,
@@ -2283,8 +2287,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           return
         }
 
+        // Custom providers may run keyless (e.g. Ollama at localhost:11434/v1):
+        // no Authorization header is sent and Ollama ignores Bearer tokens, so
+        // a missing key is not a hard error for them.
         const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
-        if (!apiKey) {
+        if (!apiKey && !isCustomProviderType(providerType)) {
           failRunEarly('API Key 未设置，请先在设置中配置')
           return
         }
@@ -2314,7 +2321,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
 
         const provider = createLLMProvider({
-          apiKey,
+          apiKey: apiKey || '',
           providerType,
           baseUrl: providerConfig.baseUrl,
           model: providerConfig.modelName,
@@ -4355,7 +4362,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       const { createUserMessage, createAssistantMessage } = await import('@/agent/message-types')
       const { normalizeBaseUrl } = await import('@/agent/llm/pi-ai-url-utils')
 
-      let newMessages = [...conv.messages]
+      const newMessages = [...conv.messages]
       if (!options?.isRegeneration) {
         const userMsg = createUserMessage(`/image ${prompt}`)
         newMessages.push(userMsg)

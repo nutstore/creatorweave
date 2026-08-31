@@ -3,6 +3,8 @@ export const settings = {
     llmProvider: "LLM Provider",
     apiKey: "API Key",
     apiKeyPlaceholder: "Enter API Key...",
+    optional: "Optional",
+    apiKeyOptionalHint: "Local servers (e.g. Ollama at http://localhost:11434/v1) need no API key — leave empty",
     showApiKey: "Show API Key",
     hideApiKey: "Hide API Key",
     save: "Save",
@@ -416,7 +418,7 @@ export const settings = {
     customBaseUrl: {
       label: "API Base URL",
       placeholder: "https://api.example.com/v1",
-      hint: "Supports OpenAI-compatible API endpoints",
+      hint: "Supports OpenAI-compatible API endpoints (for local models, use Ollama's http://localhost:11434/v1)",
     },
 
     // API Mode

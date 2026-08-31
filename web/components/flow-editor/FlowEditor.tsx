@@ -22,6 +22,7 @@ import { FlowStepBar } from './FlowStepBar'
 import { flowToReactFlow, type FlowFlowNode, type FlowFlowEdge } from './flow-converter'
 import { useFlowStore } from '@/store/flow.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { isCustomProviderType } from '@/agent/providers/types'
 import { useAgentStore } from '@/store/agent.store'
 import type { FlowNode, FlowNodeKind } from '@/agent/flow/types'
 import type { ToolContext } from '@/agent/tools/tool-types'
@@ -258,11 +259,12 @@ function FlowEditorInner({ isFullscreen }: { isFullscreen?: boolean }) {
 
     setShowInputDialog(false)
 
-    // Resolve API key at click time
+    // Resolve API key at click time. Custom providers may run keyless
+    // (e.g. Ollama at localhost:11434/v1) — an absent key is fine for them.
     const { getApiKeyRepository } = await import('@/sqlite/repositories/api-key.repository')
     const apiKeyRepo = getApiKeyRepository()
     const apiKey = await apiKeyRepo.load(effectiveConfig?.apiKeyProviderKey ?? '')
-    if (!apiKey) {
+    if (!apiKey && !isCustomProviderType(providerType)) {
       toast.error('请先在设置中配置 API Key')
       return
     }
@@ -271,10 +273,10 @@ function FlowEditorInner({ isFullscreen }: { isFullscreen?: boolean }) {
     await flowRun.runWithConfig({
       flow: activeInstance!,
       context: toolContext,
-      llm: { ...llmConfigBase, apiKey },
+      llm: { ...llmConfigBase, apiKey: apiKey || '' },
       userInput: userInput.trim() || undefined,
     })
-  }, [llmConfigBase, toolContext, flowRun, activeInstance, effectiveConfig, userInput, needsUserInput])
+  }, [llmConfigBase, toolContext, flowRun, activeInstance, effectiveConfig, providerType, userInput, needsUserInput])
 
   const canRun = !!(activeInstance && activeInstance.nodes.length > 0 && llmConfigBase && toolContext)
 
