@@ -156,7 +156,7 @@ export function getModeDisplayName(mode: AgentMode): string {
 export function getModeDescription(mode: AgentMode): string {
   return mode === 'plan'
     ? 'Read-only mode. Agent can analyze and plan but cannot modify files.'
-    : 'Full-access mode. Agent can read, write, and modify files.'
+    : 'Agent can read, write, and call external tools — every sensitive operation requires user confirmation.'
 }
 
 /**
