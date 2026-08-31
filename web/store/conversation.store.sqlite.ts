@@ -33,6 +33,10 @@ import {
   generateId,
 } from '@/agent/message-types'
 import { extractFirstMentionedAgentId } from '@/agent/agent-mention'
+// Per-conversation authorization state (PR-1/PR-4 of the tool authorization
+// redesign): grants die with the conversation — leaf stores, safe to import.
+import { useSessionAllowStore } from '@/store/session-allow.store'
+import { useYoloModeStore } from '@/store/yolo-mode.store'
 import {
   emitThinkingStart,
   emitThinkingDelta,
@@ -1830,6 +1834,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         agentLoop.cancel()
       }
       deleteStreamingQueues(id)
+      // Authorization grants/yolo are conversation-scoped (redesign §3.8):
+      // once the conversation is deleted there is no re-opening path, so any
+      // remembered "always allow" or yolo grant must die with it. Without
+      // this, re-creating a conversation with a colliding id would inherit
+      // stale approvals.
+      try {
+        useSessionAllowStore.getState().clearFor(id)
+        useYoloModeStore.getState().setYolo(id, false)
+      } catch (error) {
+        console.warn('[conversation.store] Failed to clear conversation-scoped auth state:', error)
+      }
       set((state) => {
         state.suggestedFollowUps.delete(id)
         // Clean up any cancelled run IDs for this conversation's active run

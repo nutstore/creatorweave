@@ -6,26 +6,37 @@
  * a second concurrent request now queues behind the visible one instead of
  * silently denying it (FIFO only ever delays, never loses, a request).
  *
- * Keeps the legacy usePageWriteAuthStore API (getState().request/approve/
- * deny/clear) for page-write.tool.ts. Modal rendering now happens in
- * ToolAuthModal (subscribed to the unified store).
+ * The wrapper resolves the FULL unified-channel resolution
+ * ({ approved, remembered }): dropping `remembered` here silently broke
+ * "Always allow" — exactly the §3.9-7 failure the redesign doc predicted.
+ * The CALLER (page-write.tool.ts) owns writing the grant into
+ * session-allow, so the conversation id must be passed through too.
  *
- * Will be deleted after the page-action side is verified.
+ * Modal rendering happens in ToolAuthModal (subscribed to the unified
+ * store). Will be deleted after the page-action side is verified.
  */
 
-import { useToolAuthStore } from '@/store/tool-auth.store'
+import { useToolAuthStore, type ToolAuthResolution } from '@/store/tool-auth.store'
 
 interface PageWriteAuthState {
-  /** Push a new auth request. Returns a promise that resolves on user action. */
-  request: (toolName: string, description: string, signal?: AbortSignal) => Promise<boolean>
-  approve: () => void
+  /**
+   * Push a new auth request. Resolves { approved, remembered } so the caller
+   * can persist the "always allow" grant conversation-scoped.
+   */
+  request: (
+    toolName: string,
+    description: string,
+    signal?: AbortSignal,
+    conversationId?: string | null,
+  ) => Promise<ToolAuthResolution>
+  approve: (remember?: boolean) => void
   deny: () => void
   clear: () => void
 }
 
 function createPageWriteWrapper(): PageWriteAuthState & { getState: () => PageWriteAuthState } {
   const state: PageWriteAuthState = {
-    request: (toolName, description, signal) =>
+    request: (toolName, description, signal, conversationId) =>
       useToolAuthStore
         .getState()
         .request({
@@ -34,12 +45,11 @@ function createPageWriteWrapper(): PageWriteAuthState & { getState: () => PageWr
           // Coarse grant: one approval covers page-action writes for the
           // conversation (the URL blacklist remains a separate hard pre-check).
           memoryKey: 'page-action-write',
-          conversationId: null,
+          conversationId: conversationId ?? null,
           signal,
-        })
-        .then((r) => r.approved),
+        }),
 
-    approve: () => useToolAuthStore.getState().approve(false),
+    approve: (remember = false) => useToolAuthStore.getState().approve(remember),
     deny: () => useToolAuthStore.getState().deny(),
     clear: () => useToolAuthStore.getState().clear(),
   }

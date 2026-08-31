@@ -18,6 +18,12 @@ vi.mock('@/webmcp/store', () => ({
   useWebMCPStore: { getState: mocks.getWebMCPState },
 }))
 
+// call_tool now routes through the policy engine (PR-2). These tests target
+// error-wrapping behavior only, so authorization is stubbed to allow.
+vi.mock('../policy-engine', () => ({
+  authorize: vi.fn().mockResolvedValue({ decision: 'allow', via: 'auto' }),
+}))
+
 import { callToolExecutor } from '../external-tool-bridge'
 
 const inputSchema = { type: 'object' as const, properties: {} }

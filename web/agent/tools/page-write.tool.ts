@@ -25,7 +25,11 @@ import { toolOkJson, toolErrorJson } from './tool-envelope'
 import { isPageActionAvailable, runPageAction, type Locator } from './page-action-bridge'
 import { resolveWriteAuthorization } from './page-action-auth'
 import { usePageWriteAuthStore } from './page-write-auth.store'
+import { useSessionAllowStore } from '@/store/session-allow.store'
 import { locatorSchema } from './page-read.tool'
+
+// Coarse conversation-scoped grant key shared with page-write-auth.store.
+const PAGE_WRITE_MEMORY_KEY = 'page-action-write'
 
 // --------------------------------------------------------------
 // Authorization guard for write tools
@@ -47,23 +51,41 @@ async function authorizeWriteOrError(toolName: string, context: ToolContext): Pr
     })
   }
 
-  // decision === 'prompt' — show the standalone auth modal.
-  // This is NOT askUserQuestion (that's for LLM conversation flow).
-  // This blocks tool execution until the user clicks Approve/Deny.
-  const approved = await usePageWriteAuthStore.getState().request(
+  // decision === 'prompt' — conversation-scoped memory short-circuit first:
+  // an earlier "Always allow" grant covers ALL page-action writes for this
+  // conversation (coarse key, see page-write-auth.store). The URL blacklist
+  // above is a separate hard pre-check and has already returned by now.
+  const conversationId = context.workspaceId ?? null
+  if (useSessionAllowStore.getState().has(conversationId, PAGE_WRITE_MEMORY_KEY)) {
+    return null
+  }
+
+  // Show the standalone auth modal. This is NOT askUserQuestion (that's for
+  // LLM conversation flow). It blocks until the user picks
+  // Allow once / Always allow / Deny.
+  const resolution = await usePageWriteAuthStore.getState().request(
     toolName,
     auth.promptMessage || `Allow ${toolName} to modify the current page?`,
     context.abortSignal,
+    conversationId,
   )
 
-  // executeToolWithTimeout races tool work against this signal. Do not let a
-  // stale approval resume the underlying executor after the agent was stopped.
-  if (approved && !context.abortSignal?.aborted) return null
+  // Stale-approval guard: the queue outlives loop lifecycles — never let a
+  // request from an already-aborted run proceed.
+  if (!resolution.approved || context.abortSignal?.aborted) {
+    return toolErrorJson(toolName, 'AUTH_DENIED_BY_USER', 'User denied the page write action.', {
+      retryable: false,
+      details: { reason: 'USER_DENIED' },
+    })
+  }
 
-  return toolErrorJson(toolName, 'AUTH_DENIED_BY_USER', 'User denied the page write action.', {
-    retryable: false,
-    details: { reason: 'USER_DENIED' },
-  })
+  // "Always allow" — persist the grant conversation-scoped. The modal only
+  // shows this button when the memoryKey is non-null (always the case here).
+  if (resolution.remembered) {
+    useSessionAllowStore.getState().add(conversationId, PAGE_WRITE_MEMORY_KEY)
+  }
+
+  return null
 }
 
 // ===========================================================================
