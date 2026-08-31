@@ -9,12 +9,17 @@
  *
  * Renders as a 3-segment stacked horizontal bar with a cost estimate
  * sourced from OpenRouter's public /api/v1/models pricing data.
+ * Cost display currency is build-time selected: USD on the international
+ * build, RMB (converted at a fixed indicative rate) on the CN build —
+ * see lib/currency.ts.
  */
 
 import { useMemo } from 'react'
 import { Database, TrendingUp } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useSettingsStore } from '@/store/settings.store'
+import { DISPLAY_CURRENCY, formatCost } from '@/lib/currency'
+import { useUsdToCnyRate } from '@/lib/fx-rate'
 import { getModelPricing } from '@/agent/providers/model-store'
 import {
   getOpenRouterPricing,
@@ -62,14 +67,6 @@ function formatTokens(n: number): string {
   return (n / 1_000_000).toFixed(2) + 'M'
 }
 
-/** Format cost as $0.00 / $0.0023 / $1.23 */
-function formatCost(usd: number): string {
-  if (usd === 0) return '$0.00'
-  if (usd < 0.01) return `$${usd.toFixed(4)}`
-  if (usd < 1) return `$${usd.toFixed(3)}`
-  return `$${usd.toFixed(2)}`
-}
-
 /**
  * Parse a per-token USD string from a provider's /models response
  * (e.g. OpenRouter returns "0.0000025" meaning $0.0000025/token).
@@ -103,6 +100,9 @@ export function ConversationUsageBar({ messages }: ConversationUsageBarProps) {
   const t = useT()
   const providerType = useSettingsStore((s) => s.providerType)
   const modelName = useSettingsStore((s) => s.modelName)
+  // Live USD→CNY rate (CN build): starts from cache/static, re-renders when
+  // a fresh rate lands. On the international build this is a no-op constant.
+  const fxRate = useUsdToCnyRate()
 
   const usage = useMemo(() => aggregateAllMessages(messages), [messages])
 
@@ -211,12 +211,12 @@ export function ConversationUsageBar({ messages }: ConversationUsageBarProps) {
         <div className="flex items-center gap-1 text-neutral-500 tabular-nums text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {cost ? (
             <span title={t('conversation.usageBar.costBreakdown', {
-              input: formatCost(cost.input),
-              output: formatCost(cost.output),
-              cache: formatCost(cost.cache),
+              input: formatCost(cost.input, DISPLAY_CURRENCY, fxRate),
+              output: formatCost(cost.output, DISPLAY_CURRENCY, fxRate),
+              cache: formatCost(cost.cache, DISPLAY_CURRENCY, fxRate),
               model: modelName || providerType || 'unknown',
             })}>
-              {t('conversation.usageBar.cost', { amount: formatCost(cost.total) })}
+              {t('conversation.usageBar.cost', { amount: formatCost(cost.total, DISPLAY_CURRENCY, fxRate) })}
             </span>
           ) : (
             // Unknown pricing — show em-dash so we don't claim "free"
