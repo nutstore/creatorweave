@@ -21,7 +21,10 @@
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
-import { useExecAuthStore } from './exec-auth.store'
+// Unified auth channel (PR-1): exec prompts render via ToolAuthModal.
+// exec deliberately passes memoryKey: null — exec grants are tuned through
+// execpolicy.json, never through "always allow".
+import { useToolAuthStore } from '@/store/tool-auth.store'
 import { isNativeHostReachable, probeNativeHost } from '@/lib/native-host-probe'
 
 // ─── Bridge types ──────────────────────────────────────────────
@@ -252,11 +255,17 @@ export const execExecutor: ToolExecutor = async (args, context) => {
     : `This command will run in the "${projectLabel}" project directory${subdir}.`
 
   if (decision === 'prompt') {
-    const approved = await useExecAuthStore.getState().request(
-      cmdStrings,
+    const resolution = await useToolAuthStore.getState().request({
+      toolName: 'exec',
       description,
-      context.abortSignal,
-    )
+      // The command renders in the modal's code block (ExecAuthModal-era UX,
+      // preserved in ToolAuthModal via `detail`).
+      detail: cmdStrings.join(' '),
+      memoryKey: null,
+      conversationId: context.workspaceId ?? null,
+      signal: context.abortSignal,
+    })
+    const approved = resolution.approved
 
     // Stale-approval guard: the auth queue is global and outlives loop
     // lifecycles, so the user may approve a request whose originating run
@@ -285,6 +294,10 @@ export const execExecutor: ToolExecutor = async (args, context) => {
   // detached from the host, and this call waits for readiness internally so
   // the model gets one single result.
   if (background) {
+    // Stale-disk check at START time: a dev server/build runs for minutes
+    // reading from disk — if the root holds unsynced pending changes, the
+    // process (and any test/build result it produces) sees stale content.
+    const staleDiskNotice = await buildStaleDiskNotice(context.workspaceId, rootName)
     return startBackgroundProcess({
       scopeId,
       cmdStrings,
@@ -294,6 +307,7 @@ export const execExecutor: ToolExecutor = async (args, context) => {
       port: typeof args.port === 'number' ? args.port : undefined,
       readyTimeout: typeof args.ready_timeout === 'number' ? args.ready_timeout : 60_000,
       abortSignal: context.abortSignal,
+      staleDiskNotice,
     })
   }
 
@@ -327,9 +341,8 @@ export const execExecutor: ToolExecutor = async (args, context) => {
     .filter(Boolean)
     .join('')
 
-  // Post-execution check (best-effort): does the target root still hold
-  // pending changes the command could not see? Surfaces as `stale_disk` in
-  // the envelope + a hint, so the LLM can call sync-to-disk when needed.
+  // Post-execution stale-disk check for the FOREGROUND result only (the
+  // background branch computes its own notice at start time).
   const staleDiskNotice = await buildStaleDiskNotice(context.workspaceId, rootName)
 
     return toolOkJson('exec', {
@@ -439,10 +452,11 @@ async function startBackgroundProcess(params: {
   port: number | undefined
   readyTimeout: number
   abortSignal?: AbortSignal
+  staleDiskNotice?: StaleDiskNotice | null
 }) {
   const {
     scopeId, cmdStrings, cmdDisplay, name, cwd, port, readyTimeout,
-    abortSignal,
+    abortSignal, staleDiskNotice,
   } = params
 
   if (!name) {
@@ -502,9 +516,13 @@ async function startBackgroundProcess(params: {
           state: 'exited',
           exit_code: status.exit_code ?? null,
           log_tail: log.slice(-4000) || undefined,
+          ...(staleDiskNotice ? { stale_disk: staleDiskNotice } : {}),
 
         }, {
-          hint: 'The background process exited before its port became ready. Read log_tail for the error.',
+          hint: [
+            'The background process exited before its port became ready. Read log_tail for the error.',
+            staleDiskNotice?.hint,
+          ].filter(Boolean).join(' '),
         })
       }
       if (status.port_ready === true) {
@@ -518,9 +536,13 @@ async function startBackgroundProcess(params: {
           url: `http://localhost:${detectedPort}`,
           port: detectedPort,
           log_tail: log.slice(-4000) || undefined,
+          ...(staleDiskNotice ? { stale_disk: staleDiskNotice } : {}),
 
         }, {
-          hint: 'The dev server is running in the background. The user can open the URL directly. Stop it later with the processes tool: processes({ action: "stop", process: "<name>" }).',
+          hint: [
+            `The dev server is running in the background. The user can open the URL directly. Stop it later with the processes tool: processes({ action: "stop", process: "${name}" }).`,
+            staleDiskNotice?.hint,
+          ].filter(Boolean).join(' '),
         })
       }
     }
@@ -544,9 +566,13 @@ async function startBackgroundProcess(params: {
     state: 'timeout',
     ...(detectedPort ? { port: detectedPort } : {}),
     log_tail: log.slice(-4000) || undefined,
+    ...(staleDiskNotice ? { stale_disk: staleDiskNotice } : {}),
 
   }, {
-    hint: `Port not ready after ${Math.round(readyTimeout / 1000)}s; the process is still running. Check log_tail, or read more with processes({ action: "logs", process: "${name}" }).`,
+    hint: [
+      `Port not ready after ${Math.round(readyTimeout / 1000)}s; the process is still running. Check log_tail, or read more with processes({ action: "logs", process: "${name}" }).`,
+      staleDiskNotice?.hint,
+    ].filter(Boolean).join(' '),
   })
 }
 

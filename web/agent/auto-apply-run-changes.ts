@@ -6,6 +6,7 @@
  */
 
 import type { PendingChange, SyncResult } from '@/opfs/types/opfs-types'
+import { filterDiskEligiblePendingChanges } from '@/opfs/workspace/pending-disk-eligibility'
 
 export interface AutoApplyWorkspace {
   getNativeDirectoryHandle(): Promise<FileSystemDirectoryHandle | null>
@@ -61,12 +62,10 @@ export async function autoApplyCompletedRunChanges(
   // Changes can cancel themselves out (for example, create then delete), so
   // only consider paths that are still pending at finalization time. Deletions
   // remain in the manual review flow: a run-completion policy must never turn
-  // a background success into an irreversible local removal.
+  // a background success into an irreversible local removal. (Shared filter —
+  // pending-disk-eligibility.ts, same rule as sync-to-disk.)
   const eligiblePendingPaths = new Set(
-    workspace
-      .getPendingChanges()
-      .filter((change) => change.type === 'create' || change.type === 'modify')
-      .map((change) => change.path),
+    filterDiskEligiblePendingChanges(workspace.getPendingChanges()).map((c) => c.path),
   )
   const paths = uniqueCandidates.filter((path) => eligiblePendingPaths.has(path))
   if (paths.length === 0) {

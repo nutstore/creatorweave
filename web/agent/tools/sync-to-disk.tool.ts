@@ -23,6 +23,7 @@ import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import type { WorkspaceRuntime } from '@/opfs/workspace/workspace-runtime'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { authorize } from '../policy-engine'
+import { partitionPathsByDiskEligibility } from '@/opfs/workspace/pending-disk-eligibility'
 
 const TOOL_NAME = 'sync-to-disk'
 
@@ -78,31 +79,22 @@ async function flushPendingToDisk(
 
   // Filter the requested paths (or all pending) to create/modify BEFORE
   // passing onlyPaths to syncToDisk — delete-type changes must never reach
-  // the disk pipeline (§3.9 constraint 8).
-  const pendingByPath = new Map(runtime.getPendingChanges().map((c) => [c.path, c]))
+  // the disk pipeline (§3.9 constraint 8). Uses the SHARED eligibility rule
+  // (pending-disk-eligibility.ts, same as run-level auto-apply).
   const requestedSet = requestedPaths?.length ? new Set(requestedPaths) : null
-
-  const eligible: string[] = []
-  for (const change of runtime.getPendingChanges()) {
-    if (requestedSet && !requestedSet.has(change.path)) continue
-    if (change.type === 'create' || change.type === 'modify') {
-      eligible.push(change.path)
-    } else {
+  const allPending = runtime.getPendingChanges()
+  const candidatePaths = requestedSet
+    ? allPending.filter((c) => requestedSet.has(c.path)).map((c) => c.path)
+    : allPending.map((c) => c.path)
+  const { eligible, excluded } = partitionPathsByDiskEligibility(candidatePaths, allPending)
+  for (const e of excluded) {
+    // Report deletions always; report not-pending paths only when the caller
+    // explicitly asked for them (unrequested extras are just noise).
+    if (e.reason === 'delete' || requestedSet?.has(e.path)) {
       outcome.excludedDeletions.push({
-        path: change.path,
-        type: change.type === 'delete' ? 'delete' : 'unknown',
+        path: e.path,
+        type: e.reason === 'delete' ? 'delete' : 'unknown',
       })
-    }
-  }
-  // Requested paths that aren't pending at all (already synced / unknown).
-  if (requestedSet) {
-    for (const p of requestedPaths!) {
-      if (!pendingByPath.has(p) && !eligible.includes(p)) {
-        outcome.excludedDeletions.push({ path: p, type: 'unknown' })
-      }
-      if (pendingByPath.get(p)?.type === 'delete') {
-        // already recorded above; nothing to do
-      }
     }
   }
 
@@ -158,7 +150,19 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
     runtime = null
   }
   if (!runtime) {
-    return toolErrorJson(TOOL_NAME, 'no_workspace', 'No active workspace available for sync-to-disk.')
+    return toolErrorJson(
+      TOOL_NAME,
+      'no_workspace',
+      'No active workspace available for sync-to-disk.',
+      {
+        // Redesign §3.6: guide the agent toward the user-side recovery flow
+        // instead of a dead end — directory access is granted by the USER.
+        hint:
+          'No directory is authorized for this conversation yet. Ask the user to authorize a ' +
+          'local folder for this conversation first (folder authorization happens through the ' +
+          'directory access prompt), then retry sync-to-disk.',
+      },
+    )
   }
 
   // Pre-compute scope for the authorization modal BEFORE prompting.

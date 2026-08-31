@@ -24,7 +24,7 @@ import type { ToolDefinition, ToolExecutor, ToolPromptDoc, ToolContext } from '.
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 import { isPageActionAvailable, runPageAction, type Locator } from './page-action-bridge'
 import { resolveWriteAuthorization } from './page-action-auth'
-import { usePageWriteAuthStore } from './page-write-auth.store'
+import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
 import { locatorSchema } from './page-read.tool'
 
@@ -63,12 +63,15 @@ async function authorizeWriteOrError(toolName: string, context: ToolContext): Pr
   // Show the standalone auth modal. This is NOT askUserQuestion (that's for
   // LLM conversation flow). It blocks until the user picks
   // Allow once / Always allow / Deny.
-  const resolution = await usePageWriteAuthStore.getState().request(
+  const resolution = await useToolAuthStore.getState().request({
     toolName,
-    auth.promptMessage || `Allow ${toolName} to modify the current page?`,
-    context.abortSignal,
+    description: auth.promptMessage || `Allow ${toolName} to modify the current page?`,
+    // Coarse grant: one "Always allow" covers all page-action writes for the
+    // conversation (the URL blacklist above remains a separate hard pre-check).
+    memoryKey: PAGE_WRITE_MEMORY_KEY,
     conversationId,
-  )
+    signal: context.abortSignal,
+  })
 
   // Stale-approval guard: the queue outlives loop lifecycles — never let a
   // request from an already-aborted run proceed.
