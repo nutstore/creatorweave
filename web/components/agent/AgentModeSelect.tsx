@@ -3,12 +3,19 @@
  *
  * Modes:
  *   🔍 Plan  → agentMode='plan'                      (read-only, no writes)
- *   ⚡ Act   → agentMode='act', pageActionYolo=false  (writes, but each confirmed)
- *   🚀 YOLO  → agentMode='act', pageActionYolo=true   (writes auto-allowed, still URL-blacklist gated)
+ *   ⚡ Act   → agentMode='act', yolo off  (writes/external calls, each confirmed)
+ *   🚀 YOLO  → agentMode='act', yolo on   (ALL prompt-level approvals skipped:
+ *          external calls, disk writes, page-action writes — still URL-blacklist
+ *          gated, never forbidden tools; conversation-scoped)
  *
- * The underlying system stays two-state (plan/act) + independent pageActionYolo;
- * this component is a UI affordance that maps the three visible options to the
- * correct combination of the agent mode and page-session YOLO state.
+ * Since PR-4 yolo generalizes beyond page-action tools (it also covers
+ * call_tool and sync-to-disk), the option is shown EVERYWHERE — not only in
+ * extension side-panel mode.
+ *
+ * The underlying system stays two-state (plan/act) + conversation-scoped
+ * yolo (yolo-mode.store); this component maps the three visible options to
+ * the correct combination and mirrors the legacy page-action flag for older
+ * UI consumers.
  *
  * Design: compact pill button → popover with three options.
  */
@@ -16,7 +23,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { usePageActionSessionStore } from '@/store/page-action-session.store'
 import { useYoloModeStore, syncLegacyPageActionYolo } from '@/store/yolo-mode.store'
-import { isSidePanelMode } from '@/agent/workspace-assistant-context'
 import { useT } from '@/i18n'
 
 export interface AgentModeSelectProps {
@@ -116,9 +122,10 @@ export function AgentModeSelect({
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // YOLO is only relevant in side-panel mode (where page-action tools exist).
-  // In a normal tab, hide it entirely — YOLO has no effect without page tools.
-  const showYolo = isSidePanelMode()
+  // YOLO used to be side-panel-only (it only affected page-action writes).
+  // Since PR-4 it also covers external calls and disk writes in normal tabs,
+  // so the option is always shown.
+  const showYolo = true
 
   // Derive the visible mode from the underlying states. YOLO is now
   // conversation-scoped (yolo-mode.store); the legacy global flag is kept as
