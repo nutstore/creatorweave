@@ -32,8 +32,13 @@ import { create } from 'zustand'
 export interface PendingToolAuth {
   id: string
   toolName: string
-  /** Rendered by the modal. May carry pre-formatted context (root, paths…). */
-  description: string
+  /**
+   * Modal body. Either an i18n descriptor (rendered with useT by
+   * ToolAuthModal — the locale-aware path) or a pre-formatted string for
+   * callers that build context outside the React tree (exec's execution
+   * context; legacy thin-wrapper callers).
+   */
+  description: ToolAuthDescriptionInput
   /** Optional secondary block rendered as code (the exec command itself). */
   detail?: string
   /**
@@ -49,9 +54,18 @@ export interface PendingToolAuth {
   createdAt: number
 }
 
+/**
+ * Modal body input: an i18n descriptor ({ key, params }) or a plain string.
+ * String form is legacy — prefer the descriptor so the modal follows locale.
+ */
+export type ToolAuthDescriptionInput =
+  | { key: string; params?: Record<string, string | number> }
+  | string
+  | null
+
 export interface ToolAuthRequestInput {
   toolName: string
-  description: string
+  description: ToolAuthDescriptionInput
   /** Optional secondary block rendered as code (exec command, etc.). */
   detail?: string
   memoryKey?: string | null

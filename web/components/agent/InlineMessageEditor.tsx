@@ -22,6 +22,7 @@ import { FileMention, type FileMentionItem } from './FileMentionExtension'
 import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExtension'
 import { Paperclip, X, ImageIcon, FileIcon, FolderIcon, Loader2 } from 'lucide-react'
 import { extractDroppedFiles } from '@/lib/dragdrop'
+import { useT } from '@/i18n'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -219,6 +220,7 @@ export function InlineMessageEditor({
   cancelLabel,
   submitLabel,
 }: InlineMessageEditorProps) {
+  const t = useT()
   const [isDragOver, setIsDragOver] = useState(false)
   /** True while dropped folders are being expanded into files. */
   const [isExtractingDropped, setIsExtractingDropped] = useState(false)
@@ -659,7 +661,7 @@ export function InlineMessageEditor({
         >
           <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-700">
             <Loader2 className="h-8 w-8 animate-spin" />
-            <span className="text-sm font-medium">Extracting files…</span>
+            <span className="text-sm font-medium">{t('conversation.input.extractingFolder')}</span>
           </div>
         </div>
       )}

@@ -224,6 +224,11 @@ describe('policy table', () => {
     // unusable name → no safe key, ask every time
     expect(policy.memoryKey?.({})).toBeNull()
     expect(policy.memoryKey?.({ full_tool_name: '  ' })).toBeNull()
+    // i18n descriptor with the tool name param
+    expect(policy.describe?.({ full_tool_name: 'github:create_issue' })).toEqual({
+      key: 'describeCallTool',
+      params: { name: 'github:create_issue' },
+    })
   })
 
   it('untrusted call_tool targets never get a memory key', () => {
@@ -241,8 +246,12 @@ describe('policy table', () => {
     const policy = getToolPolicy('sync-to-disk')
     expect(policy.level).toBe('prompt')
     expect(policy.memoryKey?.({})).toBe('sync-to-disk')
-    expect(policy.describe?.({ count: 3 })).toContain('3 pending file changes')
-    expect(policy.describe?.({ count: 1 })).toContain('1 pending file change ')
+    // describe returns an i18n descriptor (rendered locale-aware by the modal)
+    expect(policy.describe?.({ count: 3 })).toEqual({
+      key: 'describeSyncToDisk',
+      params: { count: 3 },
+    })
+    expect(policy.describe?.({})).toEqual({ key: 'describeSyncToDiskGeneric' })
   })
 
   it('sync-to-opfs (renamed from sync) stays auto', () => {

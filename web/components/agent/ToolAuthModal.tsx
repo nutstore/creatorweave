@@ -16,8 +16,19 @@
  */
 
 import { useEffect } from 'react'
-import { useToolAuthStore } from '@/store/tool-auth.store'
+import { useToolAuthStore, type ToolAuthDescriptionInput } from '@/store/tool-auth.store'
 import { useT } from '@/i18n'
+
+/**
+ * Render the modal body: i18n descriptors are translated (locale-aware),
+ * plain strings (exec context) render as-is.
+ */
+function useDescriptionText(description: ToolAuthDescriptionInput): string | null {
+  const t = useT()
+  if (!description) return null
+  if (typeof description === 'string') return description
+  return t(`agent.toolAuth.${description.key}`, description.params)
+}
 
 export function ToolAuthModal() {
   const pending = useToolAuthStore((s) => s.pending)
@@ -26,6 +37,7 @@ export function ToolAuthModal() {
   const deny = useToolAuthStore((s) => s.deny)
   const denyAll = useToolAuthStore((s) => s.denyAll)
   const t = useT()
+  const descriptionText = useDescriptionText(pending?.description ?? null)
 
   // Hard block: the modal must stay up until an explicit button is clicked.
   // Backdrop clicks and Esc intentionally do nothing.
@@ -90,9 +102,9 @@ export function ToolAuthModal() {
         {/* Body — scrolls independently so the action buttons stay reachable
             even when the command/context is very long */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {pending.description?.trim() && (
+          {descriptionText && (
             <p className="text-sm leading-relaxed text-foreground/80">
-              {pending.description}
+              {descriptionText}
             </p>
           )}
           {isExecLike && (

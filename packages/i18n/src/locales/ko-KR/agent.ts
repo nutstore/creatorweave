@@ -116,6 +116,13 @@ export const agent = {
         clearMemory: "승인 기억 지우기",
         cleared: "모든 승인 기억을 지웠습니다",
         settingsHint: "외부 도구(MCP/WebMCP) 승인은 server+도구 단위입니다. 신뢰할 수 없는 콘텐츠 페이지의 도구는 매번 확인되며 기억되지 않습니다.",
+        describeSyncToDisk: "{count}개의 대기 중인 변경 사항을 실제 디스크에 기록합니다.",
+        describeSyncToDiskGeneric: "대기 중인 파일 변경 사항을 실제 디스크에 기록합니다.",
+        describeCallTool: "AI가 외부 도구 \"{name}\"을(를) 호출하려고 합니다.",
+        describeCallToolGeneric: "AI가 외부 MCP/WebMCP 도구를 호출하려고 합니다.",
+        describeSnapshotRestore: "파일을 이전 스냅샷으로 복원합니다 —— 동기화되지 않은 변경 사항은 삭제될 수 있습니다.",
+        describePageWriteUrl: "AI가 페이지({url})를 조작하려고 합니다.",
+        describePageWrite: "AI가 현재 페이지를 조작하려고 합니다.",
     },
 
     execAuth: {

@@ -89,6 +89,13 @@ export const agent = {
         clearMemory: "Clear authorization memory",
         cleared: "All authorization memory cleared",
         settingsHint: "External tool (MCP/WebMCP) grants are scoped per server+tool; tools from untrusted-content pages are asked every time and never remembered.",
+        describeSyncToDisk: "Will write {count} pending file change(s) to the real disk directory.",
+        describeSyncToDiskGeneric: "Will write pending file changes to the real disk directory.",
+        describeCallTool: "The agent wants to call the external tool \"{name}\".",
+        describeCallToolGeneric: "The agent wants to call an external MCP/WebMCP tool.",
+        describeSnapshotRestore: "Restores files to a previous snapshot — unsaved pending changes may be discarded.",
+        describePageWriteUrl: "The agent wants to interact with the page ({url}).",
+        describePageWrite: "The agent wants to interact with the current page.",
     },
 
     execAuth: {

@@ -28,14 +28,25 @@ import { isYoloOn } from '@/store/yolo-mode.store'
 
 export type ToolPolicyLevel = 'auto' | 'prompt' | 'forbidden'
 
+/**
+ * i18n-ready modal description: a translation key under `agent.toolAuth.*`
+ * plus interpolation params. ToolAuthModal renders it with useT so the
+ * modal body follows the user's locale (previously hardcoded English).
+ */
+export interface ToolAuthDescription {
+  /** Key under agent.toolAuth, e.g. 'describeSyncToDisk'. */
+  key: string
+  /** Interpolation params (e.g. { count: 3 }, { name: 'mcp:get' }). */
+  params?: Record<string, string | number>
+}
+
 export interface ToolPolicy {
   /** Default decision level for the tool. */
   level: ToolPolicyLevel
   /**
-   * Human-readable context rendered inside ToolAuthModal. Return a short
-   * sentence describing what exactly is about to happen.
+   * Modal context as an i18n descriptor (rendered by ToolAuthModal via useT).
    */
-  describe?: (args: unknown) => string
+  describe?: (args: unknown) => ToolAuthDescription
   /**
    * Session-memory key generator. A non-null key enables the "Always allow
    * for this conversation" button and the session-allow short-circuit.
@@ -110,7 +121,8 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
   // the "always allow" option is stripped (memoryKey forced null).
   const resolution = await useToolAuthStore.getState().request({
     toolName: req.toolName,
-    description: policy.describe?.(req.args) ?? '',
+    // i18n descriptor — ToolAuthModal renders it with useT (locale-aware).
+    description: policy.describe?.(req.args) ?? null,
     memoryKey: memoryAllowed ? memoryKey : null,
     conversationId: req.conversationId ?? null,
     signal: req.signal,
@@ -177,8 +189,8 @@ function createPolicyTable(): Map<string, ToolPolicy> {
     describe: (args) => {
       const count = (args as { count?: number } | null)?.count
       return typeof count === 'number' && count > 0
-        ? `Will write ${count} pending file change${count === 1 ? '' : 's'} to the real disk directory.`
-        : 'Will write pending file changes to the real disk directory.'
+        ? { key: 'describeSyncToDisk', params: { count } }
+        : { key: 'describeSyncToDiskGeneric' }
     },
     memoryKey: () => 'sync-to-disk',
   })
@@ -190,10 +202,10 @@ function createPolicyTable(): Map<string, ToolPolicy> {
   set('call_tool', {
     level: 'prompt',
     describe: (args) => {
-      const a = args as { full_tool_name?: string } | null
-      return a?.full_tool_name
-        ? `The agent wants to call the external tool "${a.full_tool_name}".`
-        : 'The agent wants to call an external MCP/WebMCP tool.'
+      const name = (args as { full_tool_name?: string } | null)?.full_tool_name
+      return name
+        ? { key: 'describeCallTool', params: { name } }
+        : { key: 'describeCallToolGeneric' }
     },
     memoryKey: (args) => {
       const a = args as { full_tool_name?: string; untrusted?: boolean } | null
@@ -208,7 +220,7 @@ function createPolicyTable(): Map<string, ToolPolicy> {
 
   set('snapshot_restore', {
     level: 'prompt',
-    describe: () => 'Restores files to a previous snapshot — unsaved pending changes may be discarded.',
+    describe: () => ({ key: 'describeSnapshotRestore' }),
     memoryKey: () => null, // rollbacks are too consequential to remember
   })
 
@@ -218,8 +230,8 @@ function createPolicyTable(): Map<string, ToolPolicy> {
       describe: (args) => {
         const url = (args as { url?: string } | null)?.url
         return url
-          ? `The agent wants to interact with the page (${url}).`
-          : 'The agent wants to interact with the current page.'
+          ? { key: 'describePageWriteUrl', params: { url } }
+          : { key: 'describePageWrite' }
       },
       // The URL blacklist (page-action-auth.ts) is a separate hard pre-check;
       // memory is deliberately coarse — one grant covers page-action writes.

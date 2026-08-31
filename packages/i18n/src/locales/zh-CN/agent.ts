@@ -88,6 +88,13 @@ export const agent = {
         clearMemory: "清除授权记忆",
         cleared: "已清除全部授权记忆",
         settingsHint: "外部工具（MCP/WebMCP）的授权粒度为 server+工具；来自不受信内容页的工具每次都会询问、永不记忆。",
+        describeSyncToDisk: "将把 {count} 个待同步文件变更写入真实磁盘目录。",
+        describeSyncToDiskGeneric: "将把待同步的文件变更写入真实磁盘目录。",
+        describeCallTool: "AI 请求调用外部工具 “{name}”。",
+        describeCallToolGeneric: "AI 请求调用一个外部 MCP/WebMCP 工具。",
+        describeSnapshotRestore: "将把文件恢复到某个历史快照 —— 未同步的待同步变更可能被丢弃。",
+        describePageWriteUrl: "AI 请求操作网页（{url}）。",
+        describePageWrite: "AI 请求操作当前网页。",
     },
 
     execAuth: {

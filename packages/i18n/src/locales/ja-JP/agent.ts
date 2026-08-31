@@ -116,6 +116,13 @@ export const agent = {
         clearMemory: "承認メモリを削除",
         cleared: "すべての承認メモリを削除しました",
         settingsHint: "外部ツール（MCP/WebMCP）の承認は server+ツール単位。信頼できないコンテンツページのツールは毎回確認され、記憶されません。",
+        describeSyncToDisk: "{count} 件の未同期変更を実際のディスクに書き込みます。",
+        describeSyncToDiskGeneric: "未同期の変更を実際のディスクに書き込みます。",
+        describeCallTool: "AI が外部ツール「{name}」を呼び出そうとしています。",
+        describeCallToolGeneric: "AI が外部 MCP/WebMCP ツールを呼び出そうとしています。",
+        describeSnapshotRestore: "ファイルを過去のスナップショットに復元します —— 未同期の変更は失われる可能性があります。",
+        describePageWriteUrl: "AI がページ（{url}）を操作しようとしています。",
+        describePageWrite: "AI が現在のページを操作しようとしています。",
     },
 
     execAuth: {
