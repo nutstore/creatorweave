@@ -29,6 +29,7 @@ import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { keyboardShortcuts } from './keyboardShortcuts'
 import { extension } from './extension'
+import { sidePanelRecipe } from './sidePanelRecipe'
 import { execPolicy } from './execPolicy'
 import { assets } from './assets'
 import { processes } from './processes'
@@ -86,6 +87,7 @@ export const zhCN = {
   questionCard,
   runChanges,
   extension,
+  sidePanelRecipe,
   execPolicy,
   assets,
   processes,

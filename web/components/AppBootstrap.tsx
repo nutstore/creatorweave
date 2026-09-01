@@ -14,6 +14,11 @@ import { useRouter } from 'next/navigation'
 import { useT } from '@/i18n'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionInstallGuide } from '@/components/extension'
+// Side-panel recipe opt-in: when the panel opens on a recipe-hosting site
+// (jmail.world archive / JMessage) whose injection switch is still off,
+// ask the user once whether to enable it (enables + reloads upstream page).
+import { RecipeOptInModal } from '@/components/sidepanel/RecipeOptInModal'
+import { getPendingRecipePrompt, type RecipePromptStatus } from '@/agent/sidepanel-recipe-prompt'
 // Unified authorization modal (PR-1) — replaces both PageWriteAuthModal and
 // ExecAuthModal. They now forward into the shared tool-auth.store queue.
 import { ToolAuthModal } from '@/components/agent/ToolAuthModal'
@@ -485,6 +490,40 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
     })
   }, [initialized, isStorageReady, router])
 
+  // ── Side-panel recipe opt-in prompt ──
+  // When the side panel opens on a recipe-hosting site (jmail.world
+  // archive / JMessage) whose injection switch is still off, offer a one-time
+  // enable (writes extension consent storage + reloads the upstream page so
+  // injection takes effect). Non-side-panel sessions never even reach the
+  // bridge probe (getPendingRecipePrompt returns null without a binding).
+  const [recipePrompt, setRecipePrompt] = useState<RecipePromptStatus | null>(null)
+  useEffect(() => {
+    if (!initialized || !isStorageReady) return
+    if (recipePrompt) return
+    let cancelled = false
+    // Delay past the project-route navigation so the workspace UI settles
+    // first; a consent dialog popping over the loading screen reads as a bug.
+    const timer = setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.info('[SidePanelRecipePrompt] probing for pending recipe opt-in…')
+      getPendingRecipePrompt()
+        .then((status) => {
+          if (!cancelled && status) {
+            // eslint-disable-next-line no-console
+            console.info('[SidePanelRecipePrompt] showing opt-in modal for', status.recipe.id)
+            setRecipePrompt(status)
+          }
+        })
+        .catch(() => {
+          // probe failure must never surface — best-effort by design
+        })
+    }, 1200)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [initialized, isStorageReady, recipePrompt])
+
   // --- Service Worker update prompt (was in AppReady) ---
   const swUpdateToastShownRef = useRef(false)
 
@@ -553,6 +592,12 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
         open={extensionGuideOpen}
         onOpenChange={(open) => { if (!open) extensionCloseGuide() }}
       />
+      {recipePrompt?.recipe && (
+        <RecipeOptInModal
+          recipe={recipePrompt.recipe}
+          onClose={() => setRecipePrompt(null)}
+        />
+      )}
       <ToolAuthModal />
       <Toaster position="bottom-right" />
     </>

@@ -30,6 +30,7 @@ import { goToFile } from './goToFile'
 import { keyboardShortcuts } from './keyboardShortcuts'
 import { assets } from './assets'
 import { processes } from './processes'
+import { sidePanelRecipe } from './sidePanelRecipe'
 import { execPolicy } from './execPolicy'
 import { tools } from './tools'
 
@@ -87,6 +88,7 @@ export const koKR = {
   runChanges,
   assets,
   processes,
+  sidePanelRecipe,
   execPolicy,
   tools,
 } as const
