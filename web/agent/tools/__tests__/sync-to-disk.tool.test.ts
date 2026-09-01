@@ -227,4 +227,58 @@ describe('sync-to-disk tool', () => {
     expect(parsed.data?.synced).toEqual(['a.ts'])
     expect(useToolAuthStore.getState().queue).toHaveLength(0)
   })
+
+  describe('snapshot summary (AI-provided title)', () => {
+    beforeEach(() => {
+      mockRuntime.getPendingChanges.mockReturnValue([
+        { path: 'a.ts', type: 'modify' },
+      ])
+      syncToDiskMock.mockResolvedValue({ success: 1, failed: 0, conflicts: [] })
+    })
+
+    it('appends a provided summary to the mechanical title prefix', async () => {
+      useYoloModeStore.getState().setYolo('conv-1', true)
+      await syncToDiskExecutor(
+        { paths: ['a.ts'], summary: 'fix homepage redirect' },
+        context,
+      )
+      expect(createSnapshotMock).toHaveBeenCalledWith(
+        ['a.ts'],
+        'sync-to-disk (1 file): fix homepage redirect',
+        null,
+        null,
+      )
+    })
+
+    it('keeps the bare mechanical title when summary is omitted', async () => {
+      useYoloModeStore.getState().setYolo('conv-1', true)
+      await syncToDiskExecutor({ paths: ['a.ts'] }, context)
+      expect(createSnapshotMock).toHaveBeenCalledWith(
+        ['a.ts'],
+        'sync-to-disk (1 file)',
+        null,
+        null,
+      )
+    })
+
+    it('degrades whitespace-only summaries to the bare prefix and clamps length', async () => {
+      useYoloModeStore.getState().setYolo('conv-1', true)
+      await syncToDiskExecutor({ paths: ['a.ts'], summary: '   ' }, context)
+      expect(createSnapshotMock).toHaveBeenCalledWith(
+        ['a.ts'],
+        'sync-to-disk (1 file)',
+        null,
+        null,
+      )
+
+      createSnapshotMock.mockClear()
+      await syncToDiskExecutor(
+        { paths: ['a.ts'], summary: 'x'.repeat(500) },
+        context,
+      )
+      const title = createSnapshotMock.mock.calls[0][1] as string
+      expect(title.startsWith('sync-to-disk (1 file): ')).toBe(true)
+      expect(title).toHaveLength('sync-to-disk (1 file): '.length + 160)
+    })
+  })
 })

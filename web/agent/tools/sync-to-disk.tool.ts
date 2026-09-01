@@ -65,6 +65,14 @@ export const syncToDiskDefinition: ToolDefinition = {
             'Multi-root paths include the root name prefix.',
           items: { type: 'string' },
         },
+        summary: {
+          type: 'string',
+          description:
+            'Short human-readable note about WHAT this sync delivers (e.g. "fix homepage ' +
+            'redirect"). Appended to the snapshot title shown in the snapshot list, after the ' +
+            'mechanical "sync-to-disk (N files)" prefix. Keep it under ~100 characters. ' +
+            'Omit only when there is genuinely nothing meaningful to say.',
+        },
       },
     },
   },
@@ -89,6 +97,7 @@ async function flushPendingToDisk(
   runtime: WorkspaceRuntime,
   requestedPaths: string[] | undefined,
   includeDeletions: boolean,
+  summary?: string,
 ): Promise<SyncToDiskOutcome> {
   const outcome: SyncToDiskOutcome = {
     synced: [],
@@ -130,9 +139,18 @@ async function flushPendingToDisk(
 
   // Snapshot FIRST (before/after contents for diff + rollback), mirroring
   // autoApplyCompletedRunChanges.
+  //
+  // Snapshot title: keep the predictable "sync-to-disk (N files)" prefix — it
+  // is the mechanism marker that makes sync-created snapshots recognizable
+  // and grep-able in the list (repo-level fallback would otherwise be the
+  // generic "Saved N file modifications"). The optional AI summary is APPENDED
+  // (not substituted) so the title also says WHAT the sync delivers. Clamped
+  // to a sane length; whitespace-only input degrades to the bare prefix.
+  const titlePrefix = `sync-to-disk (${eligible.length} file${eligible.length === 1 ? '' : 's'})`
+  const trimmedSummary = summary?.trim().slice(0, 160)
   const snapshot = await runtime.createApprovedSnapshotForPaths(
     eligible,
-    `sync-to-disk (${eligible.length} file${eligible.length === 1 ? '' : 's'})`,
+    trimmedSummary ? `${titlePrefix}: ${trimmedSummary}` : titlePrefix,
     null,
     null,
   )
@@ -260,6 +278,7 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
       runtime,
       requestedPaths?.length ? requestedPaths : undefined,
       includeDeletions,
+      typeof args.summary === 'string' ? args.summary : undefined,
     )
 
     // Refresh the change-review panel (left-side pending list) so synced
@@ -323,6 +342,6 @@ export const syncToDiskPromptDoc: ToolPromptDoc = {
   category: 'file-ops',
   section: '### File Sync (OPFS → disk)',
   lines: [
-    '- `sync-to-disk(paths?)` - Write your pending changes to the real disk (requires user approval each time unless remembered). Use BEFORE running a shell command whose result depends on the latest file content. Includes pending DELETIONS: the approval modal lists the files to be deleted, and approving applies them (rollback-able via snapshots). Deletions carry their own "always allow" grant, separate from regular writes. Never overwrites conflicting disk files.',
+    '- `sync-to-disk(paths?, summary?)` - Write your pending changes to the real disk (requires user approval each time unless remembered). Use BEFORE running a shell command whose result depends on the latest file content. Includes pending DELETIONS: the approval modal lists the files to be deleted, and approving applies them (rollback-able via snapshots). Deletions carry their own "always allow" grant, separate from regular writes. Never overwrites conflicting disk files. ALWAYS pass `summary` with a short note about what the changes deliver (e.g. "fix homepage redirect") — it becomes the snapshot title users see in the snapshot list.',
   ],
 }
