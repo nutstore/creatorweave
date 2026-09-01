@@ -36,11 +36,17 @@ const extensionDir = path.join(rootDir, 'browser-extension', 'dist', 'chrome-mv3
 await copy(extensionDir, path.join(publicDir, 'extension'))
 // Zip with fflate: CI nodes (office-linux) have no zip(1). Layout matches the
 // former `zip -r chrome-extension.zip extension` (files under extension/).
+// Collects files plus explicit directory entries (`dir/`): some unzip
+// implementations only recreate directories from explicit entries, so
+// omitting them loses all subdirectories on extraction.
 async function collectFiles(dir, acc = {}) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) await collectFiles(full, acc)
-    else {
+    if (entry.isDirectory()) {
+      const dirRel = path.relative(dir, full).split(path.sep).join('/')
+      acc[`${dirRel}/`] = new Uint8Array(0)
+      await collectFiles(full, acc)
+    } else {
       const rel = path.relative(dir, full).split(path.sep).join('/')
       acc[rel] = new Uint8Array(await readFile(full))
     }

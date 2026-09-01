@@ -68,11 +68,18 @@ function parseFrontmatter(content) {
   return fm
 }
 
-/** Recursively collect files under dir into {relativePath: Uint8Array}. */
+/**
+ * Recursively collect files under dir into {relativePath: Uint8Array}.
+ * Also emits explicit directory entries (`dir/` with empty payload): some
+ * unzip implementations only create directories from explicit entries, so
+ * omitting them flattens/loses all subdirectories on extraction.
+ */
 async function collectFiles(dir, base = dir, acc = {}) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
+      const dirRel = path.relative(base, full).split(path.sep).join('/')
+      if (dirRel) acc[`${dirRel}/`] = new Uint8Array(0)
       await collectFiles(full, base, acc)
     } else {
       const rel = path.relative(base, full).split(path.sep).join('/')
