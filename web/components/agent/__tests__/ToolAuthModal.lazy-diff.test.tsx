@@ -40,7 +40,7 @@ function requestWithFileChange(partial?: Partial<FileChange>) {
     .getState()
     .request({
       toolName: 'write_file',
-      description: { key: 'agent.toolAuth.title' },
+      description: { key: 'title' },
       fileChanges: [
         { type: 'modify', path: 'src/a.ts', ...partial },
       ],
