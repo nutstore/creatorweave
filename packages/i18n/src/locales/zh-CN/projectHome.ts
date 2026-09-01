@@ -9,7 +9,6 @@ export const projectHome = {
       projectCount: "{count} 项目",
       workspaceCount: "{count} 对话",
       docsHub: "文档中心",
-      privacy: "隐私政策",
       userDocs: "用户文档",
       developerDocs: "开发者文档",
     },
@@ -175,4 +174,9 @@ export const projectHome = {
       createFirst: "创建第一个项目",
     },
     defaultProjectName: "我的项目",
+} as const
+
+// Site footer (compliance bar on public pages)
+export const siteFooter = {
+  privacy: "隐私政策",
 } as const

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { IS_CN_BUILD } from '@/lib/site-footer-config'
 import styles from './privacy-page.module.css'
 
 type Locale = 'en' | 'zh'
@@ -317,7 +318,7 @@ export function PrivacyPage({ locale }: { locale: Locale }) {
 
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
-          <span>© 2026 EO2Weave</span>
+          <span>{IS_CN_BUILD ? `© 2026 上海奕惟网络科技有限公司 保留所有权利` : `© 2026 Astronet Technology PTE LTD. All rights reserved.`}</span>
         </div>
       </footer>
     </div>

@@ -10,7 +10,6 @@ export const projectHome = {
       projectCount: "{count} projects",
       workspaceCount: "{count} conversations",
       docsHub: "Docs Hub",
-      privacy: "Privacy",
       userDocs: "User Docs",
       developerDocs: "Developer Docs",
     },
@@ -181,4 +180,9 @@ export const projectHome = {
       createFirst: "Create First Project",
     },
     defaultProjectName: "My Project",
+} as const
+
+// Site footer (compliance bar on public pages)
+export const siteFooter = {
+  privacy: "Privacy Policy",
 } as const

@@ -22,7 +22,7 @@ import { commandPalette } from './commandPalette'
 import { mcp } from './mcp'
 import { onboarding } from './onboarding'
 import { workspace } from './workspace'
-import { projectHome } from './projectHome'
+import { projectHome, siteFooter } from './projectHome'
 import { fileTree } from './fileTree'
 import { agent } from './agent'
 import { sidebar } from './sidebar'
@@ -79,6 +79,7 @@ export const enUS = {
   onboarding,
   workspace,
   projectHome,
+  siteFooter,
   fileTree,
   agent,
   sidebar,

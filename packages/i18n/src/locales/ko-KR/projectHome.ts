@@ -8,7 +8,6 @@ export const projectHome = {
       projectCount: "{count} 프로젝트",
       workspaceCount: "{count} 대화",
       docsHub: "문서 센터",
-      privacy: "개인정보 처리방침",
       userDocs: "사용자 문서",
       developerDocs: "개발자 문서",
     },
@@ -169,4 +168,9 @@ export const projectHome = {
       createFirst: "첫 번째 프로젝트 생성",
     },
     defaultProjectName: "내 프로젝트",
+} as const
+
+// Site footer (compliance bar on public pages)
+export const siteFooter = {
+  privacy: "개인정보 처리방침",
 } as const

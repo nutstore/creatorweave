@@ -9,7 +9,6 @@ export const projectHome = {
       projectCount: "{count} プロジェクト",
       workspaceCount: "{count} 会話",
       docsHub: "ドキュメントセンター",
-      privacy: "プライバシー",
       userDocs: "ユーザードキュメント",
       developerDocs: "開発者ドキュメント",
     },
@@ -172,4 +171,9 @@ export const projectHome = {
       createFirst: "最初のプロジェクトを作成",
     },
     defaultProjectName: "マイプロジェクト",
+} as const
+
+// Site footer (compliance bar on public pages)
+export const siteFooter = {
+  privacy: "プライバシーポリシー",
 } as const
