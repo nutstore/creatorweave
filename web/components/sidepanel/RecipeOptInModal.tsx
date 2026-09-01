@@ -11,11 +11,11 @@
  *      render first — the modal must not race the project route).
  *   2. If the bound upstream tab hosts an unenabled recipe AND the user has
  *      not recently dismissed it → this modal renders.
- *   3. 「开启并刷新页面」→ `enableRecipeAndReload()` flips the extension-side
+ *   3. "Enable and reload" → `enableRecipeAndReload()` flips the extension-side
  *      consent switch (chrome.storage.local, same map as the recipes.html
  *      management page) and reloads the upstream page so injection is
  *      guaranteed to take effect. Success toast explains what happened.
- *   4. 「暂不开启」→ 30-day local cooldown, no nagging on every panel open.
+ *   4. "Not now" → 1-day local cooldown, no nagging on every panel open.
  *
  * The web app never persists consent itself — extension storage is the
  * single source of truth (revocable in the extension popup / recipes page).
@@ -54,13 +54,15 @@ export function RecipeOptInModal({ recipe, onClose }: RecipeOptInModalProps) {
     setSubmitting(false)
     if (ok) {
       toast.success(t('sidePanelRecipe.enabledToast', { name: recipe.displayName }))
+      onClose()
     } else {
-      // Bridge failure — likely a stale extension. Cool the prompt down so
-      // it does not reappear immediately in a broken state.
-      dismissRecipePrompt(recipe.id)
+      // Bridge failure — likely a stale extension. Do NOT record a
+      // dismissal: the user explicitly wanted to ENABLE, and cooling the
+      // prompt down would hide a transient failure for a whole day
+      // (it also raced the extension reload in the douban host-switch
+      // flow). Keep the modal open so the user can retry.
       toast.error(t('sidePanelRecipe.enableFailedToast'))
     }
-    onClose()
   }
 
   const handleDismiss = () => {

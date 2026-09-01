@@ -103,7 +103,7 @@ export function ToolAuthModal() {
             even when the command/context is very long */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {descriptionText && (
-            <p className="text-sm leading-relaxed text-foreground/80">
+            <p className="break-words text-sm leading-relaxed text-foreground/80">
               {descriptionText}
             </p>
           )}

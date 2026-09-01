@@ -63,14 +63,14 @@ describe('(app)/page.tsx first-run redirect', () => {
     localStorage.clear()
   })
 
-  it('waits (no redirect) when initialized but the list is still empty', async () => {
-    // Transitional state after clear-local-data / during re-init: never act
-    // on an empty list — the legacy AppReady only decided against loaded data.
+  it('redirects to /projects when initialized but the list is terminally empty', async () => {
+    // Terminal empty state: the user deleted every project. The auto-default
+    // flag stays set, so initialize() will never auto-create again — waiting
+    // forever would leave `/` blank. Redirect to the ProjectHome empty state.
     setupStore({ initialized: true, projects: [] })
     render(<App />)
 
-    await new Promise((r) => setTimeout(r, 30))
-    expect(routerReplaceMock).not.toHaveBeenCalled()
+    await waitFor(() => expect(routerReplaceMock).toHaveBeenCalledWith('/projects'))
   })
 
   it('waits (no redirect) while storage is not yet initialized', async () => {
@@ -129,22 +129,5 @@ describe('(app)/page.tsx first-run redirect', () => {
     // Already redirected this session → plain /projects redirect
     await waitFor(() => expect(routerReplaceMock).toHaveBeenCalledWith('/projects'))
     expect(routerReplaceMock).not.toHaveBeenCalledWith('/projects/project-fresh')
-  })
-
-  it('decides after the list arrives when mounted empty then filled (re-init flow)', async () => {
-    // Mount in the transitional empty state, then initialize() fills the
-    // list — the effect re-runs and the first-run decision happens then.
-    localStorage.setItem('creatorweave:auto-default-project-created', '1')
-    setupStore({ initialized: true, projects: [] })
-    render(<App />)
-
-    await new Promise((r) => setTimeout(r, 10))
-    expect(routerReplaceMock).not.toHaveBeenCalled()
-
-    useProjectStore.setState({ projects: [makeProject('project-late')] })
-
-    await waitFor(() =>
-      expect(routerReplaceMock).toHaveBeenCalledWith('/projects/project-late')
-    )
   })
 })

@@ -25,6 +25,7 @@ import { CW_WEBMCP_AGENT_MARKER, parseRelayCommand } from './webmcp/relay-protoc
 import { findRecipeForLocation } from './webmcp/recipes'
 import { jmailToolImplementations } from './webmcp/recipes/jmail-tools'
 import { jmessageToolImplementations } from './webmcp/recipes/jmessage-tools'
+import { doubanToolImplementations } from './webmcp/recipes/douban-movie-tools'
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -38,6 +39,8 @@ export default defineContentScript({
     const implementations: Record<string, Record<string, (args: Record<string, unknown>) => Promise<unknown>>> = {
       'jmail-world': jmailToolImplementations,
       'jmessage-world': jmessageToolImplementations,
+      'douban-movie': doubanToolImplementations,
+      'douban-search': doubanToolImplementations,
     }
 
     let activeRecipeId: string | null = null

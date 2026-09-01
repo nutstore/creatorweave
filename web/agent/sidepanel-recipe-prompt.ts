@@ -48,8 +48,8 @@ export interface RecipePromptStatus {
 }
 
 const DISMISS_STORAGE_KEY = 'cw_sidepanel_recipe_dismissed_v1'
-/** "Not now" cooldown: re-prompt after 30 days, not on every panel open. */
-const DISMISS_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000
+/** "Not now" cooldown: re-prompt after 1 day, not on every panel open. */
+const DISMISS_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
 function readDismissedMap(): Record<string, number> {
   try {
@@ -73,7 +73,7 @@ export function isRecipePromptDismissed(recipeId: string): boolean {
   return Date.now() - dismissedAt < DISMISS_COOLDOWN_MS
 }
 
-/** Record a "not now" answer for the recipe (30-day cooldown). */
+/** Record a "not now" answer for the recipe (1-day cooldown). */
 export function dismissRecipePrompt(recipeId: string): void {
   try {
     const map = readDismissedMap()
@@ -205,4 +205,56 @@ export async function enableRecipeAndReload(recipeId: string): Promise<boolean> 
   } catch {
     return false
   }
+}
+
+/**
+ * Re-probe cadence for HOST-CHANGE detection. The upstream tab can
+ * navigate to a DIFFERENT hostname after the side panel opened (e.g.
+ * movie.douban.com redirects its search to search.douban.com — two
+ * hosts, two separate recipes). The initial probe at panel open only
+ * saw the first host, so we re-probe periodically and on window focus.
+ *
+ * 15s is a deliberate trade-off:
+ *  - slow enough that the probe (postMessage → background → storage)
+ *    is negligible overhead,
+ *  - fast enough that the user typically sees the consent modal within
+ *    one focus cycle after the upstream site navigated away.
+ * Abuse is bounded by the 1-day dismissal cooldown: a host the user
+ * already declined NEVER re-prompts.
+ */
+export const RECIPE_REPROBE_INTERVAL_MS = 15_000
+
+/**
+ * Dev/diagnostic helper: run the FULL probe chain step by step and
+ * return a structured trace of where it bails. Exposed on window as
+ * __cwDebugRecipeProbe() by AppBootstrap in side-panel mode so a
+ * missing opt-in prompt can be diagnosed with one console command.
+ */
+export async function debugRecipeProbe(): Promise<Record<string, unknown>> {
+  const trace: Record<string, unknown> = {}
+  const { getSidePanelBindingId } = await import('@/agent/workspace-assistant-context')
+  trace.binding = getSidePanelBindingId()
+  trace.inSessionStorage = (() => {
+    try { return sessionStorage.getItem('__cw_workspace_assistant_binding') } catch { return 'err' }
+  })()
+  const agentWeb = (globalThis as { __agentWeb?: AgentWebRecipeBridge }).__agentWeb
+  trace.hasAgentWeb = !!agentWeb
+  trace.hasRecipeCheckStatus = !!agentWeb?.recipeCheckStatus
+  if (!trace.binding || !agentWeb?.recipeCheckStatus) return trace
+  try {
+    trace.status = await Promise.race([
+      agentWeb.recipeCheckStatus(String(trace.binding)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    ])
+  } catch (e) {
+    trace.status = `threw: ${String(e)}`
+  }
+  trace.dismissedMap = (() => {
+    try { return JSON.parse(localStorage.getItem(DISMISS_STORAGE_KEY) || '{}') } catch { return 'err' }
+  })()
+  return trace
+}
+
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __cwDebugRecipeProbe?: typeof debugRecipeProbe }).__cwDebugRecipeProbe = debugRecipeProbe
 }

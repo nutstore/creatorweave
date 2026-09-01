@@ -22,13 +22,21 @@ export default function RootPage() {
   // ProjectHome list. Uses a session-level flag so it only fires once
   // per browser session (avoids hijacking navigation for returning users).
   //
-  // An empty project list with initialized=true is a transitional state
-  // (e.g. re-init after clear-local-data): the legacy AppReady only ever
-  // ran this logic against fully-loaded data, so we return and wait for the
-  // effect to re-run when the list arrives — never act on the empty list.
+  // An initialized empty project list is TERMINAL, not transitional:
+  //   - initialize() holds initialized=false until its final atomic set
+  //     (projects + initialized + isLoading together), so an initialized
+  //     empty list is never a load-in-progress state.
+  //   - When the user deleted every project, the auto-default flag stays
+  //     set (only clear-local-data removes it), so the list stays empty
+  //     forever. Redirecting to /projects restores the legacy catch-all:
+  //     ProjectHome's empty state offers project creation instead of a
+  //     blank root page.
   useEffect(() => {
     if (!initialized) return
-    if (projects.length === 0) return
+    if (projects.length === 0) {
+      router.replace(projectsPath())
+      return
+    }
     // A side-panel launch carries a one-shot routing request. Let
     // AppBootstrap consume it after storage is ready; redirecting the root
     // route here first would race that handler and leave the panel at the
