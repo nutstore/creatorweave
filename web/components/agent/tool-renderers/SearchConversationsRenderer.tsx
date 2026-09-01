@@ -20,6 +20,7 @@ import type { ToolRenderCtx } from './types'
 import { useT } from '@/i18n'
 import {
   exportConversationsBatch,
+  listConversationsForExport,
   type BatchExportResult,
 } from '@/services/export/conversation-batch-export'
 import type { ConversationExportFormat } from '@/services/export/conversation-export'
@@ -59,6 +60,8 @@ interface SearchConversationsData {
     updated_after?: number | null
     updated_before?: number | null
     project?: string | null
+    projects?: string[] | null
+    query?: string
     sort_by?: string
   }
 }
@@ -221,8 +224,21 @@ function RowCheckbox({
  * One component owns both the selection state and the rows so checkboxes,
  * select-all and the export button share state naturally (no external hacks).
  */
-function ResultsBody({ results }: { results: SearchResultItem[] }) {
+function ResultsBody({
+  results,
+  hasMore,
+  filters,
+}: {
+  results: SearchResultItem[]
+  hasMore: boolean
+  filters: SearchConversationsData['filters']
+}) {
   const t = useT()
+  // "Load all" re-queries the DB directly (limit 500) so conversations the
+  // tool truncated become selectable and exportable too.
+  const [allResults, setAllResults] = useState<SearchResultItem[]>(results)
+  const [loadingAll, setLoadingAll] = useState(false)
+  const [loadAllError, setLoadAllError] = useState<string | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [activeProject, setActiveProject] = useState<string | null>(null)
   const [format, setFormat] = useState<ConversationExportFormat>('markdown')
@@ -234,10 +250,10 @@ function ResultsBody({ results }: { results: SearchResultItem[] }) {
   // The tool result already contains the full returned result set. Keep every
   // row selectable: truncating here made conversations beyond the first 15
   // impossible to export even though they were included in the tool payload.
-  const projects = [...new Set(results.flatMap((r) => (r.projectName ? [r.projectName] : [])))].sort()
+  const projects = [...new Set(allResults.flatMap((r) => (r.projectName ? [r.projectName] : [])))].sort()
   const visible = activeProject
-    ? results.filter((r) => r.projectName === activeProject)
-    : results
+    ? allResults.filter((r) => r.projectName === activeProject)
+    : allResults
 
   const allChecked = visible.length > 0 && visible.every((r) => checked.has(r.conversationId))
   const someChecked = visible.some((r) => checked.has(r.conversationId)) && !allChecked
@@ -261,16 +277,87 @@ function ResultsBody({ results }: { results: SearchResultItem[] }) {
       return next
     })
 
-  const handleExport = async () => {
-    if (checked.size === 0 || isExporting) return
+  const handleLoadAll = async () => {
+    if (loadingAll) return
+    setLoadingAll(true)
+    setLoadAllError(null)
+    try {
+      const rows = await listConversationsForExport({
+        projects: filters?.projects ?? (filters?.project ? [filters.project] : undefined),
+        updatedAfter: filters?.updated_after ?? undefined,
+        updatedBefore: filters?.updated_before ?? undefined,
+        query: filters?.query && filters.query !== '*' ? filters.query : undefined,
+        keywordSearch: true,
+        limit: 500,
+      })
+      setAllResults((prev) => {
+        const seen = new Set(prev.map((r) => r.conversationId))
+        const extra = rows
+          .filter((r) => !seen.has(r.conversationId))
+          .map((r) => ({
+            conversationId: r.conversationId,
+            title: r.title,
+            workspaceName: r.workspaceName,
+            projectName: r.projectName,
+            updatedAt: r.updatedAt,
+            snippet: null,
+            lastAssistantMessage: null,
+          }))
+        return [...prev, ...extra]
+      })
+    } catch (err) {
+      setLoadAllError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoadingAll(false)
+    }
+  }
+
+  const handleExport = async (ids?: string[]) => {
+    const exportingAll = ids != null // "export all" path (whole filtered view)
+    if (!exportingAll && checked.size === 0) return
+    if (isExporting) return
     setIsExporting(true)
     setError(null)
     setResult(null)
     setProgress({ percent: 0, step: '', title: '' })
     try {
-      const byId = new Map(results.map((r) => [r.conversationId, r]))
+      // "Export all" must cover the *entire* filtered set, including rows the
+      // tool response truncated. Re-query the DB for the full list (limit 500)
+      // instead of only the rows currently loaded in the list.
+      //
+      // Project scope: the in-card `activeProject` filter wins over the tool's
+      // `filters.project(s)` — the user narrowed the view after the tool ran,
+      // so "export all of this project" must match what's on screen, not the
+      // broader original query scope.
+      let exportRows = allResults
+      if (exportingAll) {
+        const projectScope = activeProject
+          ? [activeProject]
+          : filters?.projects ?? (filters?.project ? [filters.project] : undefined)
+        const full = await listConversationsForExport({
+          projects: projectScope,
+          updatedAfter: filters?.updated_after ?? undefined,
+          updatedBefore: filters?.updated_before ?? undefined,
+          query: filters?.query && filters.query !== '*' ? filters.query : undefined,
+          keywordSearch: true,
+          limit: 500,
+        })
+        if (full.length > 0) {
+          exportRows = full.map((r) => ({
+            conversationId: r.conversationId,
+            title: r.title,
+            workspaceName: r.workspaceName,
+            projectName: r.projectName,
+            updatedAt: r.updatedAt,
+            snippet: null,
+            lastAssistantMessage: null,
+          }))
+        }
+      }
+      const targetIds = ids ?? [...checked]
+      const byId = new Map(exportRows.map((r) => [r.conversationId, r]))
       const res = await exportConversationsBatch(
-        [...checked].map((id) => {
+        targetIds.map((id) => {
           const r = byId.get(id)
           return {
             conversationId: id,
@@ -359,6 +446,23 @@ function ResultsBody({ results }: { results: SearchResultItem[] }) {
             </>
           )}
         </button>
+
+        {/* One-click export of the whole filtered view (project/time window),
+            so users don't have to tick rows one by one. */}
+        {visible.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void handleExport(visible.map((r) => r.conversationId))}
+            disabled={isExporting}
+            title={activeProject ? t('agent.searchConversations.exportAllProjectTitle') : t('agent.searchConversations.exportAllTitle')}
+            className="inline-flex items-center gap-1 rounded border border-neutral-300 px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40 hover:border-primary-500 hover:text-primary-600 dark:border-neutral-600"
+          >
+            <Download className="h-2.5 w-2.5" />
+            {activeProject
+              ? t('agent.searchConversations.exportAllProject', { count: visible.length })
+              : t('agent.searchConversations.exportAll', { count: visible.length })}
+          </button>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -463,6 +567,13 @@ function ResultsBody({ results }: { results: SearchResultItem[] }) {
           </div>
         ))}
       </div>
+
+      <LoadAllFooter
+        hasMore={hasMore}
+        loading={loadingAll}
+        error={loadAllError}
+        onLoadAll={() => void handleLoadAll()}
+      />
     </>
   )
 }
@@ -628,18 +739,54 @@ registerRenderer({
         )}
 
         {/* Conversation list + export toolbar (selection & export state live inside) */}
-        <ResultsBody results={results} />
-
-        {/* The backend may still have more results than this tool response returned. */}
-        {data.hasMore && (
-          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
-            {t('agent.searchConversations.moreAvailable')}
-          </div>
-        )}
+        <ResultsBody results={results} hasMore={!!data.hasMore} filters={filters} />
       </div>
     )
   },
 })
+
+/**
+ * Footer of the results list: when the tool response was truncated
+ * (hasMore), offers a one-click "load all" that re-queries the DB so every
+ * matching conversation becomes checkable / exportable.
+ */
+function LoadAllFooter({
+  hasMore,
+  loading,
+  error,
+  onLoadAll,
+}: {
+  hasMore: boolean
+  loading: boolean
+  error: string | null
+  onLoadAll: () => void
+}) {
+  const t = useT()
+  if (error) {
+    return <div className="text-[10px] text-red-500">{error}</div>
+  }
+  if (!hasMore && !loading) return null
+  return (
+    <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
+      {hasMore && (
+        <button
+          type="button"
+          onClick={onLoadAll}
+          disabled={loading}
+          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors text-neutral-500 hover:text-neutral-700 disabled:opacity-50 dark:text-neutral-400 dark:hover:text-neutral-200"
+        >
+          {loading && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+          {loading
+            ? t('agent.searchConversations.loadingAll')
+            : t('agent.searchConversations.loadAll')}
+        </button>
+      )}
+      {!loading && (
+        <span className="ml-1">{t('agent.searchConversations.moreAvailable')}</span>
+      )}
+    </div>
+  )
+}
 
 function StreamingPlaceholder() {
   return (
