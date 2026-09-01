@@ -28,6 +28,7 @@
  */
 
 import { create } from 'zustand'
+import type { FileChange } from '@/opfs/types/opfs-types'
 
 export interface PendingToolAuth {
   id: string
@@ -41,6 +42,10 @@ export interface PendingToolAuth {
   description: ToolAuthDescriptionInput
   /** Optional secondary block rendered as code (the exec command itself). */
   detail?: string
+  /** Raw tool arguments, rendered in the modal as pretty-printed JSON. */
+  toolArgs?: unknown
+  /** Structured file-change list (sync-like tools); clickable rows → diff. */
+  fileChanges?: FileChange[]
   /**
    * Session-memory key. Non-null enables the "Always allow" button; null means
    * every invocation must be decided individually.
@@ -68,6 +73,10 @@ export interface ToolAuthRequestInput {
   description: ToolAuthDescriptionInput
   /** Optional secondary block rendered as code (exec command, etc.). */
   detail?: string
+  /** Raw tool arguments for modal display (pretty-printed JSON). */
+  toolArgs?: unknown
+  /** Structured file-change list (sync-like tools); clickable rows → diff. */
+  fileChanges?: FileChange[]
   memoryKey?: string | null
   conversationId?: string | null
   signal?: AbortSignal
@@ -131,6 +140,8 @@ export const useToolAuthStore = create<ToolAuthState>((set, get) => ({
         toolName: input.toolName,
         description: input.description,
         detail: input.detail,
+        toolArgs: input.toolArgs,
+        fileChanges: input.fileChanges,
         memoryKey: input.memoryKey ?? null,
         conversationId: input.conversationId ?? null,
         resolve: settle,

@@ -831,6 +831,9 @@ export const callToolExecutor: ToolExecutor = async (args, context) => {
       full_tool_name,
       untrusted: tool.annotations?.untrustedContentHint === true,
     },
+    // Show the ACTUAL call arguments in the authorization modal (policy
+    // `args` above only carries the name + trust hint for decisions).
+    toolArgs: toolArgs,
     conversationId: context.workspaceId,
     signal: context.abortSignal,
     mode: getCurrentWorkspaceAgentMode(),

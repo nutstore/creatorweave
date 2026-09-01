@@ -15,9 +15,189 @@
  *   - Deny (+ Deny all when more requests are queued)
  */
 
-import { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useToolAuthStore, type ToolAuthDescriptionInput } from '@/store/tool-auth.store'
+import type { FileChange } from '@/opfs/types/opfs-types'
 import { useT } from '@/i18n'
+
+/** Max files rendered in the file-change list (rest collapses into "+N more"). */
+const FILE_LIST_LIMIT = 50
+/** Max characters of pretty-printed args before truncating. */
+const ARGS_DISPLAY_LIMIT = 2000
+
+/**
+ * Collapsible block showing the raw tool arguments as pretty-printed JSON.
+ * Collapsed by default so the modal stays compact for large payloads.
+ */
+function ArgsBlock({ toolArgs }: { toolArgs: unknown }) {
+  const t = useT()
+  const [expanded, setExpanded] = useState(false)
+  let text: string
+  try {
+    text = JSON.stringify(toolArgs, null, 2) ?? String(toolArgs)
+  } catch {
+    text = String(toolArgs)
+  }
+  const truncated = text.length > ARGS_DISPLAY_LIMIT
+  if (truncated) text = text.slice(0, ARGS_DISPLAY_LIMIT) + '\n…'
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+      >
+        {expanded ? t('agent.toolAuth.hideArgs') : t('agent.toolAuth.viewArgs')}
+      </button>
+      {expanded && (
+        <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-xs text-foreground/80 whitespace-pre-wrap break-all">
+          {text}
+        </pre>
+      )}
+    </div>
+  )
+}
+
+const FILE_TYPE_BADGE: Record<FileChange['type'], string> = {
+  add: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+  modify: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  delete: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+}
+
+/**
+ * Lightweight file-change list: type badge + path per row. Clicking a row
+ * opens a near-fullscreen diff viewer overlay (large window — the auth modal
+ * itself stays compact).
+ */
+function FileChangeListBlock({ changes }: { changes: FileChange[] }) {
+  const t = useT()
+  const [selected, setSelected] = useState<FileChange | null>(null)
+  const shown = changes.slice(0, FILE_LIST_LIMIT)
+  const overflow = changes.length - shown.length
+  // Lazy: Monaco loads only when the user actually opens a file.
+  const LazyFileDiffViewer = lazyFileDiffViewer()
+
+  // Esc closes the diff viewer window. This is a read-only review overlay
+  // (NOT the authorization modal — which must stay Esc-immune), so a
+  // keyboard dismiss is safe. Capture phase so it wins over the modal's
+  // own prevent-only Esc handler.
+  useEffect(() => {
+    if (!selected) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setSelected(null)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [selected])
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/30">
+      <p className="border-b border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
+        {t('agent.toolAuth.fileChangesTitle', { count: changes.length })}
+        {' · '}
+        {t('agent.toolAuth.clickToPreview')}
+      </p>
+      <ul className="max-h-48 overflow-y-auto py-1">
+        {shown.map((c) => (
+          <li key={c.path}>
+            <button
+              onClick={() => setSelected(c)}
+              className="flex w-full items-center gap-2 px-3 py-1 text-left transition-colors hover:bg-muted"
+            >
+              <span
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                  FILE_TYPE_BADGE[c.type] ?? ''
+                }`}
+              >
+                {c.type}
+              </span>
+              <span className="truncate font-mono text-xs text-foreground/80" title={c.path}>
+                {c.path}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {overflow > 0 && (
+        <p className="px-3 py-1.5 text-xs text-muted-foreground">
+          {t('agent.toolAuth.moreFiles', { count: overflow })}
+        </p>
+      )}
+
+      {/* Near-fullscreen diff viewer overlay (large review window). */}
+      {selected && LazyFileDiffViewer && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                  FILE_TYPE_BADGE[selected.type] ?? ''
+                }`}
+              >
+                {selected.type}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-mono text-sm text-foreground" title={selected.path}>
+                {selected.path}
+              </span>
+              <button
+                onClick={() => setSelected(null)}
+                className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <LazyFileDiffViewer fileChange={selected} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Lazily resolve the FileDiffViewer component (one shared module promise —
+ * avoids pulling Monaco into the modal bundle until a file is expanded).
+ */
+type FileDiffViewerModule = {
+  FileDiffViewer: React.ComponentType<{ fileChange: FileChange | null }>
+}
+
+let fileDiffViewerPromise: Promise<FileDiffViewerModule | null> | null = null
+function lazyFileDiffViewer() {
+  const [comp, setComp] = useState<FileDiffViewerModule['FileDiffViewer'] | null>(null)
+  useEffect(() => {
+    if (!fileDiffViewerPromise) {
+      fileDiffViewerPromise = import('@/components/sync/FileDiffViewer')
+        .then((m) => ({ FileDiffViewer: m.FileDiffViewer }) as FileDiffViewerModule)
+        .catch(() => null)
+    }
+    let cancelled = false
+    void fileDiffViewerPromise.then((m) => {
+      // Wrap in an updater: passing a component function directly to setState makes
+      // React treat it as an updater (basicStateReducer) and CALL it with the previous
+      // state (null), crashing inside the component ("Cannot destructure 'fileChange'").
+      if (!cancelled) setComp(() => m?.FileDiffViewer ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return comp
+}
 
 /**
  * Render the modal body: i18n descriptors are translated (locale-aware),
@@ -113,6 +293,10 @@ export function ToolAuthModal() {
                 $ {pending.detail}
               </code>
             </div>
+          )}
+          {pending.toolArgs !== undefined && <ArgsBlock toolArgs={pending.toolArgs} />}
+          {pending.fileChanges && pending.fileChanges.length > 0 && (
+            <FileChangeListBlock changes={pending.fileChanges} />
           )}
         </div>
 

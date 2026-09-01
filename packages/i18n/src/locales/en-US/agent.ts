@@ -97,6 +97,11 @@ export const agent = {
         describeSnapshotRestore: "Restores files to a previous snapshot — unsaved pending changes may be discarded.",
         describePageWriteUrl: "The agent wants to interact with the page ({url}).",
         describePageWrite: "The agent wants to interact with the current page.",
+        viewArgs: "View call arguments",
+        hideArgs: "Hide call arguments",
+        fileChangesTitle: "{count} file change(s) pending",
+        moreFiles: "+{count} more",
+        clickToPreview: "Click a file to preview its changes",
     },
 
     execAuth: {

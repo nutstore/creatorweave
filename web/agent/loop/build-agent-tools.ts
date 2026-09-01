@@ -1,5 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { isToolAllowedInMode, type AgentMode } from '../agent-mode'
+import { getToolPolicy } from '../policy-engine'
 import type { ContextManager } from '../context-manager'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
 import type { Message, ToolCall } from '../message-types'
@@ -116,7 +117,15 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
           // (e.g. python tool accepts a `timeout` parameter). Use the larger of the per-call
           // value or the global default so we never accidentally reduce a legitimate timeout.
           let effectiveTimeoutMs: number | null = input.toolExecutionTimeout
-          if (input.toolTimeoutExemptions.has(toolDef.function.name)) {
+          if (
+            input.toolTimeoutExemptions.has(toolDef.function.name) ||
+            // Prompt-level tools wait for a USER decision in the auth modal
+            // (policy-engine → tool-auth.store). Like ask_user_question, the
+            // outer timer must NOT run while the modal is open — a 30s timeout
+            // would kill the call while the user is still deciding. These tools
+            // wait indefinitely for approve/deny (abort still works).
+            getToolPolicy(toolDef.function.name).level === 'prompt'
+          ) {
             effectiveTimeoutMs = null
           } else if (typeof args.timeout === 'number' && args.timeout > 0) {
             effectiveTimeoutMs = Math.min(args.timeout, 300_000) // cap at 5 min for safety

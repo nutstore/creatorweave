@@ -30,8 +30,17 @@ import type { WorkspaceRuntime } from '@/opfs/workspace/workspace-runtime'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { authorize } from '../policy-engine'
 import { partitionPathsByDiskEligibility } from '@/opfs/workspace/pending-disk-eligibility'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 
 const TOOL_NAME = 'sync-to-disk'
+
+/**
+ * Cap on the structured file-change list sent to the authorization modal.
+ * PendingChange objects are lightweight (no content), but a flush with
+ * thousands of entries would bloat the modal payload for little UX gain —
+ * the modal itself only renders the first 50 rows anyway.
+ */
+const AUTH_FILE_CHANGES_LIMIT = 200
 
 export const syncToDiskDefinition: ToolDefinition = {
   type: 'function',
@@ -212,9 +221,22 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
   // flush explicitly lists the doomed paths, and "always allow" for writes
   // never covers deletions (and vice versa) — each grant is informed.
   const includeDeletions = deletionPaths.length > 0
+  // Structured list for the modal: every eligible change (create/modify AND
+  // delete) mapped to FileChange shape so ToolAuthModal can render a
+  // clickable list (click → diff preview). FileChange.type uses 'add' for
+  // creations; PendingChange.type uses 'create'.
+  const eligibleFileChanges = pending
+    .filter((c) => !requestedSet || requestedSet.has(c.path))
+    .slice(0, AUTH_FILE_CHANGES_LIMIT)
+    .map((c) => ({
+      type: (c.type === 'create' ? 'add' : c.type) as 'add' | 'modify' | 'delete',
+      path: c.path,
+      deleteMode: c.deleteMode,
+    }))
   const auth = await authorize({
     toolName: TOOL_NAME,
     args: { count: eligibleCount, deletes: deletionPaths },
+    fileChanges: eligibleFileChanges,
     conversationId: context.workspaceId,
     signal: context.abortSignal,
   })
@@ -239,6 +261,15 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
       requestedPaths?.length ? requestedPaths : undefined,
       includeDeletions,
     )
+
+    // Refresh the change-review panel (left-side pending list) so synced
+    // files disappear immediately — otherwise the UI keeps showing stale
+    // entries until some other action triggers a refresh.
+    try {
+      await useConversationContextStore.getState().refreshPendingChanges(true)
+    } catch {
+      // Non-fatal: the next refresh cycle will reconcile the list.
+    }
 
     const deletedPending = outcome.excludedDeletions.filter((e) => e.type === 'delete')
     const hints: string[] = []

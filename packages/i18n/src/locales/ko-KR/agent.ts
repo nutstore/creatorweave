@@ -130,6 +130,11 @@ export const agent = {
         describeSnapshotRestore: "파일을 이전 스냅샷으로 복원합니다 —— 동기화되지 않은 변경 사항은 삭제될 수 있습니다.",
         describePageWriteUrl: "AI가 페이지({url})를 조작하려고 합니다.",
         describePageWrite: "AI가 현재 페이지를 조작하려고 합니다.",
+        viewArgs: "호출 인자 보기",
+        hideArgs: "호출 인자 숨기기",
+        fileChangesTitle: "{count}개 파일 변경 대기 중",
+        moreFiles: "+{count}개 더보기",
+        clickToPreview: "파일을 클릭하면 변경 내용을 미리 볼 수 있습니다",
     },
 
     execAuth: {

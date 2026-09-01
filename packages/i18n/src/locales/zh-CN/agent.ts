@@ -96,6 +96,11 @@ export const agent = {
         describeSnapshotRestore: "将把文件恢复到某个历史快照 —— 未同步的待同步变更可能被丢弃。",
         describePageWriteUrl: "AI 请求操作网页（{url}）。",
         describePageWrite: "AI 请求操作当前网页。",
+        viewArgs: "查看调用参数",
+        hideArgs: "收起调用参数",
+        fileChangesTitle: "{count} 个文件变更待写入",
+        moreFiles: "还有 {count} 个文件",
+        clickToPreview: "点击文件可预览变更内容",
     },
 
     execAuth: {

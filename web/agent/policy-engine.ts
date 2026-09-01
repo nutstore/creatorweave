@@ -25,6 +25,7 @@
 import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
 import { isYoloOn } from '@/store/yolo-mode.store'
+import type { FileChange } from '@/opfs/types/opfs-types'
 
 export type ToolPolicyLevel = 'auto' | 'prompt' | 'forbidden'
 
@@ -61,6 +62,17 @@ export interface AuthorizeRequest {
   toolName: string
   /** Tool arguments, passed to describe()/memoryKey() for context. */
   args?: unknown
+  /**
+   * Raw tool arguments for modal DISPLAY (pretty-printed JSON). Independent
+   * from `args`: callers keep using `args` for policy decisions while passing
+   * a user-friendly payload here (e.g. call_tool passes the real call args).
+   */
+  toolArgs?: unknown
+  /**
+   * Structured file-change list for sync-like tools — rendered by
+   * ToolAuthModal as a clickable list (click → diff preview).
+   */
+  fileChanges?: FileChange[]
   /** Conversation id (ToolContext.workspaceId). Scopes session memory. */
   conversationId?: string | null
   /** Abort signal of the originating run — aborting resolves as deny. */
@@ -123,6 +135,8 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
     toolName: req.toolName,
     // i18n descriptor — ToolAuthModal renders it with useT (locale-aware).
     description: policy.describe?.(req.args) ?? null,
+    toolArgs: req.toolArgs,
+    fileChanges: req.fileChanges,
     memoryKey: memoryAllowed ? memoryKey : null,
     conversationId: req.conversationId ?? null,
     signal: req.signal,

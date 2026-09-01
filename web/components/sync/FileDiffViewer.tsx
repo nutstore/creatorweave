@@ -273,7 +273,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
         if (fileChange.type !== 'add') {
           const nativeContent = await readNativeFileViaConversation(conversation, filePath)
-          showNativePanel = nativeContent !== null
+          // Deletion preview: keep the disk content visible even though the
+          // OPFS side is already cleared. Without this, a delete shows only a
+          // "file deleted" placeholder (showNativePanel=false + opfs=null →
+          // early-return below) instead of WHAT is being deleted — which is
+          // exactly what the user needs for informed consent.
+          showNativePanel = fileChange.type === 'delete' ? true : nativeContent !== null
         }
 
         if (isImage) {
@@ -421,7 +426,16 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             if (fileChange.type !== 'add') {
               nativeContent = await readNativeFileViaConversation(conversation, filePath)
               if (!nativeContent && showNativePanel) {
-                nativeContent = t('sidebar.fileDiffViewer.cannotReadNativeContent')
+                // Deletion preview fallback: if the disk file is already gone
+                // (or unreadable) we still force the native panel so the
+                // renderer shows the "will be deleted" diff/placeholder
+                // instead of silently collapsing to an empty view.
+                if (fileChange.type === 'delete') {
+                  nativeContent = ''
+                  showNativePanel = true
+                } else {
+                  nativeContent = t('sidebar.fileDiffViewer.cannotReadNativeContent')
+                }
               }
             }
           } catch (err) {

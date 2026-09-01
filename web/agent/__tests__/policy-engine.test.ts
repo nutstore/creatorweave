@@ -191,6 +191,27 @@ describe('policy-engine authorize()', () => {
     expect(useSessionAllowStore.getState().allowed.size).toBe(0)
   })
 
+  it('passes toolArgs and fileChanges through to the queued modal request', async () => {
+    const pendingPromise = authorize({
+      toolName: 'sync-to-disk',
+      args: { count: 2, deletes: ['a.txt'] },
+      toolArgs: { paths: ['a.txt', 'b.txt'] },
+      fileChanges: [
+        { type: 'add', path: 'a.txt' },
+        { type: 'delete', path: 'b.txt' },
+      ],
+      conversationId: 'conv-1',
+    })
+    const pending = useToolAuthStore.getState().pending
+    expect(pending?.toolArgs).toEqual({ paths: ['a.txt', 'b.txt'] })
+    expect(pending?.fileChanges).toEqual([
+      { type: 'add', path: 'a.txt' },
+      { type: 'delete', path: 'b.txt' },
+    ])
+    useToolAuthStore.getState().deny()
+    expect(await pendingPromise).toEqual({ decision: 'deny', reason: expect.any(String) })
+  })
+
   it('denial returns a reason the LLM can act on', async () => {
     const pending = authorize({ toolName: 'snapshot_restore', args: {} })
     useToolAuthStore.getState().deny()

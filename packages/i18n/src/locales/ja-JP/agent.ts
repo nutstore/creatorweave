@@ -130,6 +130,11 @@ export const agent = {
         describeSnapshotRestore: "ファイルを過去のスナップショットに復元します —— 未同期の変更は失われる可能性があります。",
         describePageWriteUrl: "AI がページ（{url}）を操作しようとしています。",
         describePageWrite: "AI が現在のページを操作しようとしています。",
+        viewArgs: "呼び出し引数を表示",
+        hideArgs: "呼び出し引数を隠す",
+        fileChangesTitle: "{count} 件のファイル変更が保留中",
+        moreFiles: "他 {count} 件",
+        clickToPreview: "ファイルをクリックして変更をプレビュー",
     },
 
     execAuth: {
