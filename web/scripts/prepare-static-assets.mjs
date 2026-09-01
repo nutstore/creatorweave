@@ -39,15 +39,15 @@ await copy(extensionDir, path.join(publicDir, 'extension'))
 // Collects files plus explicit directory entries (`dir/`): some unzip
 // implementations only recreate directories from explicit entries, so
 // omitting them loses all subdirectories on extraction.
-async function collectFiles(dir, acc = {}) {
+async function collectFiles(dir, base = dir, acc = {}) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
-      const dirRel = path.relative(dir, full).split(path.sep).join('/')
-      acc[`${dirRel}/`] = new Uint8Array(0)
-      await collectFiles(full, acc)
+      const dirRel = path.relative(base, full).split(path.sep).join('/')
+      if (dirRel) acc[`${dirRel}/`] = new Uint8Array(0)
+      await collectFiles(full, base, acc)
     } else {
-      const rel = path.relative(dir, full).split(path.sep).join('/')
+      const rel = path.relative(base, full).split(path.sep).join('/')
       acc[rel] = new Uint8Array(await readFile(full))
     }
   }

@@ -64,29 +64,133 @@ export default defineConfig({
     define: {
       __CW_CODEX_OAUTH__: JSON.stringify(CODEX_OAUTH),
     },
+    // NOTE: rollupOptions.output is ignored by WXT for its HTML entries, and a
+    // post-build rename breaks WXT's own lstat pass — so the `_virtual_*`
+    // chunk is renamed inside the bundle via the sanitize-virtual-chunk-names
+    // plugin below.
     // Store build: also strip the Codex box from popup.html at build time.
     // (main.ts removes it at runtime, but the markup would still ship in the
     // zip for reviewers to find.) The .codex-box div is the last element
     // before <footer>, so a greedy match up to the last </div> before footer
     // removes exactly that block.
-    plugins: CODEX_OAUTH
-      ? []
-      : [
-          {
-            name: 'strip-codex-popup',
-            transformIndexHtml: {
-              order: 'post' as const,
-              handler(html: string) {
-                // Strip the Codex markup block AND its CSS class definitions
-                // (.codex-box / .codex-btn / .codex-log / .reset-credit-*) so
-                // no trace of the feature ships in the store zip.
-                let out = html.replace(/[ \t]*<div class="codex-box">[\s\S]*<\/div>(\s*<footer)/, '$1');
-                out = out.replace(/[ \t]*\.(?:codex-[a-z-]+|reset-credit-[a-z-]+)[^{]*\{[^}]*\}[\s\S]*?(?=\n[ \t]*\.|\n[ \t]*<\/style>)/g, '');
-                return out;
+    plugins: [
+      {
+        name: 'sanitize-virtual-chunk-names',
+        // Chrome MV3 does not serve extension resources whose path starts with
+        // '_' (reserved namespace: _locales, _next, ...). Vite names chunks
+        // after their virtual module ('_virtual_wxt-html-plugins-*.js'), which
+        // Chrome refuses to load. Rename in-bundle and rewrite all references
+        // before anything is written to disk.
+        closeBundle() {
+          // Chrome MV3 does not serve extension resources whose path starts
+          // with '_' (reserved namespace: _locales, _next, ...). Vite names
+          // chunks after their virtual module ('_virtual_wxt-html-plugins-*.js'),
+          // which Chrome refuses to load. WXT's HTML plugin emits those chunks
+          // outside of Vite's bundle graph, so we rename on disk here (after
+          // Vite writes everything, before WXT's own lstat pass) and rewrite
+          // every HTML/JS reference.
+          const fsMod = require('fs') as typeof import('fs');
+          const pathMod = require('path') as typeof import('path');
+          const renames = new Map<string, string>();
+          const walk = (dir: string): void => {
+            for (const entry of fsMod.readdirSync(dir, { withFileTypes: true })) {
+              const full = pathMod.join(dir, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (entry.name.startsWith('_virtual_')) {
+                const fixed = 'virtual_' + entry.name.slice('_virtual_'.length);
+                const target = pathMod.join(dir, fixed);
+                // COPY (not rename) — WXT does its own lstat on the original
+                // path AFTER Vite closes, and removing the original throws
+                // ENOENT. The browser loads from HTML/JS references, which we
+                // rewrite to the new (safe) name below.
+                fsMod.copyFileSync(full, target);
+                renames.set(entry.name, fixed);
+              }
+            }
+          };
+          // closeBundle runs from vite's own cwd (browser-extension), so resolve
+          // the dist directory relative to it.
+          const candidates = [
+            pathMod.resolve('dist/chrome-mv3'),
+            pathMod.resolve('dist/chrome-mv3-dev'),
+          ];
+          for (const out of candidates) {
+            if (fsMod.existsSync(out)) walk(out);
+          }
+          if (!renames.size) return;
+          const rewrite = (dir: string): void => {
+            for (const entry of fsMod.readdirSync(dir, { withFileTypes: true })) {
+              const full = pathMod.join(dir, entry.name);
+              if (entry.isDirectory()) rewrite(full);
+              else if (/\.(html|js|css|json)$/.test(entry.name)) {
+                let text = fsMod.readFileSync(full, 'utf8');
+                let changed = false;
+                for (const [from, to] of renames) {
+                  if (text.includes(from)) {
+                    text = text.split(from).join(to);
+                    changed = true;
+                  }
+                }
+                if (changed) fsMod.writeFileSync(full, text);
+              }
+            }
+          };
+          for (const out of candidates) {
+            if (fsMod.existsSync(out)) rewrite(out);
+          }
+          // eslint-disable-next-line no-console
+          console.log(`[sanitize-virtual-chunks] renamed: ${[...renames.keys()].join(', ')}`);
+          // The browser loads from HTML/JS references (now `virtual_*`), so
+          // the original `_virtual_*` files are dead weight in the zip.
+          // WXT still lstats them during its build summary, which fires AFTER
+          // Vite's closeBundle, so we can't delete them synchronously here.
+          // Register a process-exit cleanup that runs once Node has finished
+          // everything (including WXT's summary print) but before the next
+          // build step (`prepare:assets`) starts touching the dist dir.
+          process.on('exit', () => {
+            for (const out of candidates) {
+              if (!fsMod.existsSync(out)) continue;
+              for (const [from] of renames) {
+                for (const entry of fsMod.readdirSync(out, { withFileTypes: true })) {
+                  const full = pathMod.join(out, entry.name);
+                  if (entry.isDirectory()) {
+                    try {
+                      fsMod.unlinkSync(pathMod.join(full, from));
+                    } catch {
+                      // already gone — ignore
+                    }
+                  } else if (entry.name === from) {
+                    try {
+                      fsMod.unlinkSync(full);
+                    } catch {
+                      // already gone — ignore
+                    }
+                  }
+                }
+              }
+            }
+          });
+        },
+      },
+      ...(CODEX_OAUTH
+        ? []
+        : [
+            {
+              name: 'strip-codex-popup',
+              transformIndexHtml: {
+                order: 'post' as const,
+                handler(html: string) {
+                  // Strip the Codex markup block AND its CSS class definitions
+                  // (.codex-box / .codex-btn / .codex-log / .reset-credit-*) so
+                  // no trace of the feature ships in the store zip.
+                  let out = html.replace(/[ \t]*<div class="codex-box">[\s\S]*<\/div>(\s*<footer)/, '$1');
+                  out = out.replace(/[ \t]*\.(?:codex-[a-z-]+|reset-credit-[a-z-]+)[^{]*\{[^}]*\}[\s\S]*?(?=\n[ \t]*\.|\n[ \t]*<\/style>)/g, '');
+                  return out;
+                },
               },
             },
-          },
-        ],
+          ]),
+    ],
   }),
   // Dev (`wxt`) and build (`wxt build`) output to DIFFERENT directories:
   //   dev   → dist/chrome-mv3-dev   (WXT default; live-reload artifacts)
