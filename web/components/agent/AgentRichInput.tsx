@@ -934,8 +934,30 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   }), [editor])
 
   // ── Clear editor on resetToken change (message sent) ──
+  // IMPORTANT: this must NOT run when the editor instance is first created.
+  // With `immediatelyRender: false` the editor arrives after mount, so the
+  // effect's first run sees the initial token — that is editor readiness, NOT
+  // a send-reset. Gating on an actual token change (vs. initial token) fixes
+  // two silent asset-loss bugs:
+  //   1. Draft → conversation transition (?new=1 first send): the input
+  //      remounts under key={convId}; the old code's first run would
+  //      clearAll() the GLOBAL pending-asset store before sendMessage read
+  //      it, dropping the staged attachments from the draft input.
+  //   2. Plain conversation switches: key={convId} remount → editor rebuild
+  //      → same first-run clearAll(), wiping staged-but-unsent attachments.
+  // StrictMode note: comparing against the token the editor was created with
+  // (not a "first run" flag) keeps the guard immune to double-invoked
+  // effects — a double run sees an unchanged token on the second pass.
+  const editorInitialTokenRef = useRef<number | null>(null)
   useEffect(() => {
     if (!editor) return
+    if (editorInitialTokenRef.current === null) {
+      // Editor just became available — record the token it was created with.
+      editorInitialTokenRef.current = resetToken
+      return
+    }
+    if (resetToken === editorInitialTokenRef.current) return
+    // Token changed since the editor instance was created → real send-reset.
     // Capture the message being sent into the input history BEFORE clearing.
     if (!editor.isEmpty) {
       const sent = getPlainText(editor)
