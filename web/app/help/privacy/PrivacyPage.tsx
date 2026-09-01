@@ -306,7 +306,7 @@ export function PrivacyPage({ locale }: { locale: Locale }) {
                 {section.id === 'contact' ? (
                   <div className={styles.contactCard}>
                     {section.body}
-                    <a href="mailto:support@eo2suite.cn">{text.contactLabel} →</a>
+                    <a href="mailto:support@eo2suite.com">{text.contactLabel} →</a>
                   </div>
                 ) : section.body}
               </section>
