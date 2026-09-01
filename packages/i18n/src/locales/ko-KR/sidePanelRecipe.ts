@@ -1,8 +1,8 @@
 // 사이드 패널 레시피 동의 프롬프트 (jmail.world / JMessage 주입 스위치)
 export const sidePanelRecipe = {
-  title: "이 사이트에서 AI 도구 주입을 허용할까요?",
+  title: "이 사이트에서 WebMCP 도구 주입을 허용할까요?",
   description:
-    "eo2weave 브라우저 확장은 {name}에 MCP 도구(총 {count}개)를 주입할 수 있습니다. 허용하면 AI 어시스턴트가 이 사이트를 직접 검색하고 조작할 수 있게 됩니다.",
+    "eo2weave 브라우저 확장은 {name}에 WebMCP 도구(총 {count}개)를 주입할 수 있습니다. 허용하면 AI 어시스턴트가 이 사이트를 직접 검색하고 조작할 수 있게 됩니다.",
   privacyNote: "이 권한은 확장 프로그램의 \"지원 사이트\" 관리 페이지에서 언제든 해제할 수 있습니다.",
   enableToggle: "확인 시 즉시 활성화하고 페이지 새로고침",
   confirm: "활성화 후 페이지 새로고침",

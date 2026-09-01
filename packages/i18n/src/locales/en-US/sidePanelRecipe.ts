@@ -1,8 +1,8 @@
 // Side panel recipe opt-in prompt (jmail.world / JMessage injection switch)
 export const sidePanelRecipe = {
-  title: "Enable AI tool injection for this site?",
+  title: "Enable WebMCP tools for this site?",
   description:
-    "The eo2weave browser extension can inject MCP tools into {name} ({count} tools). Once enabled, your AI assistant can search and operate this site for you directly.",
+    "The eo2weave browser extension can inject WebMCP tools into {name} ({count} tools). Once enabled, your AI assistant can search and operate this site for you directly.",
   privacyNote: "You can revoke this authorization anytime in the extension's Supported Sites page.",
   enableToggle: "Enable now and reload the page on confirm",
   confirm: "Enable & reload page",

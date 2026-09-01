@@ -56,7 +56,7 @@ describe('RecipeOptInModal', () => {
     expect(dismissRecipePromptMock).not.toHaveBeenCalled()
   })
 
-  it('confirm with failure: shows error toast, records cooldown, closes', async () => {
+  it('confirm with failure: shows error toast, keeps modal open for retry', async () => {
     enableRecipeAndReloadMock.mockResolvedValue(false)
     const onClose = vi.fn()
     render(<RecipeOptInModal recipe={recipe} onClose={onClose} />)
@@ -64,9 +64,11 @@ describe('RecipeOptInModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enable & reload page' }))
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalled()
-      expect(dismissRecipePromptMock).toHaveBeenCalledWith('jmessage-world')
-      expect(onClose).toHaveBeenCalledTimes(1)
     })
+    // Bridge failure must NOT cool the prompt down — the user explicitly
+    // asked to enable, so the modal stays open for a retry.
+    expect(dismissRecipePromptMock).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('"not now" records the dismissal cooldown and closes without enabling', () => {
