@@ -7,10 +7,13 @@ import { useYoloModeStore } from '@/store/yolo-mode.store'
 
 /**
  * sync-to-disk is the authorized disk-flush entry point. These tests pin the
- * three guarantees from redesign doc §3.6:
- *   1. delete-type changes are stripped BEFORE the disk pipeline
+ * guarantees from redesign doc §3.6 (as amended by the "authorized deletions"
+ * follow-up):
+ *   1. delete-type changes ARE applied on this authorized channel, and the
+ *      flush that contains them uses the deletion-specific memory key
  *   2. forceOverwrite is never passed through (conflicts → skipped, reported)
  *   3. every call passes the policy engine (prompt level)
+ *   4. a regular-write "always allow" grant never covers deletions
  */
 
 vi.mock('@/opfs', () => ({
@@ -96,28 +99,82 @@ describe('sync-to-disk tool', () => {
     expect(parsed.data?.synced_count).toBe(1)
   })
 
-  it('strips delete-type changes BEFORE the disk pipeline and reports them', async () => {
+  it('applies delete-type changes on the authorized channel and reports them', async () => {
     mockRuntime.getPendingChanges.mockReturnValue([
       { path: 'keep.ts', type: 'modify' },
+      { path: 'gone.ts', type: 'delete' },
+    ])
+    syncToDiskMock.mockResolvedValue({ success: 2, failed: 0, conflicts: [] })
+
+    const pending = syncToDiskExecutor({}, context)
+    await new Promise((r) => setTimeout(r, 0))
+    // Deletion-bearing flush uses the deletion-specific memory key.
+    expect(useToolAuthStore.getState().pending?.memoryKey).toBe('sync-to-disk:delete')
+    useToolAuthStore.getState().approve()
+    const parsed = JSON.parse((await pending) as string) as {
+      data?: {
+        synced: string[]
+        excluded_deletions: string[]
+        applied_deletions: string[]
+      }
+      hint?: string
+    }
+
+    // The delete reached the disk pipeline alongside the write.
+    expect(syncToDiskMock).toHaveBeenCalledWith(null, ['keep.ts', 'gone.ts'], false)
+    expect(parsed.data?.synced).toEqual(['keep.ts', 'gone.ts'])
+    expect(parsed.data?.applied_deletions).toEqual(['gone.ts'])
+    expect(parsed.data?.excluded_deletions).toEqual([])
+    const metaHint = String((parsed as { meta?: { hint?: string } }).meta?.hint ?? '')
+    expect(metaHint).toContain('deletion')
+    expect(metaHint).toContain('gone.ts')
+  })
+
+  it('a write-only "always allow" grant does NOT cover a deletion-bearing flush', async () => {
+    // First flush: writes only → remembered under the plain key.
+    mockRuntime.getPendingChanges.mockReturnValue([
+      { path: 'a.ts', type: 'modify' },
+    ])
+    syncToDiskMock.mockResolvedValue({ success: 1, failed: 0, conflicts: [] })
+    const first = syncToDiskExecutor({ paths: ['a.ts'] }, context)
+    await new Promise((r) => setTimeout(r, 0))
+    useToolAuthStore.getState().approve(true)
+    await first
+    expect(useSessionAllowStore.getState().has('conv-1', 'sync-to-disk')).toBe(true)
+
+    // Second flush: now includes a deletion → NEW modal (different memory
+    // key); the write grant must not silently cover file removals.
+    mockRuntime.getPendingChanges.mockReturnValue([
+      { path: 'a.ts', type: 'modify' },
+      { path: 'gone.ts', type: 'delete' },
+    ])
+    const second = syncToDiskExecutor({}, context)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(useToolAuthStore.getState().pending?.memoryKey).toBe('sync-to-disk:delete')
+    useToolAuthStore.getState().approve(true)
+    await second
+    expect(useSessionAllowStore.getState().has('conv-1', 'sync-to-disk:delete')).toBe(true)
+  })
+
+  it('a deletion-only flush authorizes with the deletion description', async () => {
+    mockRuntime.getPendingChanges.mockReturnValue([
       { path: 'gone.ts', type: 'delete' },
     ])
     syncToDiskMock.mockResolvedValue({ success: 1, failed: 0, conflicts: [] })
 
     const pending = syncToDiskExecutor({}, context)
     await new Promise((r) => setTimeout(r, 0))
+    expect(useToolAuthStore.getState().pending?.toolName).toBe('sync-to-disk')
+    expect(useToolAuthStore.getState().pending?.description).toEqual({
+      key: 'describeSyncToDiskDelete',
+      params: { count: 1, paths: 'gone.ts' },
+    })
     useToolAuthStore.getState().approve()
     const parsed = JSON.parse((await pending) as string) as {
-      data?: { synced: string[]; excluded_deletions: string[] }
-      hint?: string
+      data?: { synced: string[]; applied_deletions: string[] }
     }
-
-    // syncToDisk only ever saw the modify — never the delete.
-    expect(syncToDiskMock).toHaveBeenCalledWith(null, ['keep.ts'], false)
-    expect(parsed.data?.synced).toEqual(['keep.ts'])
-    expect(parsed.data?.excluded_deletions).toEqual(['gone.ts'])
-    const metaHint = String((parsed as { meta?: { hint?: string } }).meta?.hint ?? '')
-    expect(metaHint).toContain('delete-type')
-    expect(metaHint).toContain('Sync panel')
+    expect(parsed.data?.synced).toEqual(['gone.ts'])
+    expect(parsed.data?.applied_deletions).toEqual(['gone.ts'])
   })
 
   it('forces forceOverwrite=false and reports per-file conflicts as skipped', async () => {

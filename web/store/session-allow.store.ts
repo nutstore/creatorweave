@@ -4,7 +4,8 @@
  * Conversation-scoped "always allow" memory for tool authorizations.
  *
  * When the user picks "Allow for this conversation" in ToolAuthModal, the
- * tool's memory key (e.g. `sync-to-disk` or `mcp-server::tool_name`) is added
+ * tool's memory key (e.g. `sync-to-disk`, `sync-to-disk:delete` or
+ * `mcp-server::tool_name`) is added
  * here. The policy engine checks this store BEFORE showing a prompt modal, so
  * remembered tools pass without further interruption.
  *

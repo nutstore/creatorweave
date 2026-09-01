@@ -157,6 +157,9 @@ function createPolicyTable(): Map<string, ToolPolicy> {
   const table = new Map<string, ToolPolicy>()
   const set = (name: string, policy: ToolPolicy) => table.set(name, policy)
 
+  /** Max deletion paths shown in the deletion-bearing flush modal body. */
+  const SYNC_DELETE_PATH_LIMIT = 8
+
   // -- auto: read-only & sandboxed -----------------------------------------
   for (const name of [
     'read', 'write', 'edit', 'delete', 'search', 'ls',
@@ -182,17 +185,40 @@ function createPolicyTable(): Map<string, ToolPolicy> {
 
   // sync-to-disk: writing to the REAL disk is the risk-bearing step of the
   // file pipeline (OPFS writes stay auto — they have pending review +
-  // snapshots as a second line of defense; the disk does not). Fixed memory
-  // key so one "always allow" covers the conversation.
+  // snapshots as a second line of defense; the disk does not).
+  //
+  // A flush WITHOUT pending deletions and a flush WITH deletions get
+  // DIFFERENT descriptions and DIFFERENT memory keys: the deletion-bearing
+  // modal explicitly lists the doomed paths (the informed consent for an
+  // irreversible-on-disk operation), and "always allow" for regular writes
+  // never silently covers deletions — each grant must match what it covers.
   set('sync-to-disk', {
     level: 'prompt',
-    describe: (args) => {
-      const count = (args as { count?: number } | null)?.count
+    describe: (args): ToolAuthDescription => {
+      const a = args as { count?: number; deletes?: string[] } | null
+      const deletes = Array.isArray(a?.deletes) ? a.deletes : []
+      if (deletes.length > 0) {
+        // Deletion-bearing flush: list the paths (bounded) so the user sees
+        // exactly which files will be removed from disk.
+        const shown = deletes.slice(0, SYNC_DELETE_PATH_LIMIT)
+        const overflow = deletes.length - shown.length
+        const pathsDisplay =
+          shown.join(', ') + (overflow > 0 ? ` …(+${overflow} more)` : '')
+        return {
+          key: 'describeSyncToDiskDelete',
+          params: { count: deletes.length, paths: pathsDisplay },
+        }
+      }
+      const count = a?.count
       return typeof count === 'number' && count > 0
         ? { key: 'describeSyncToDisk', params: { count } }
         : { key: 'describeSyncToDiskGeneric' }
     },
-    memoryKey: () => 'sync-to-disk',
+    memoryKey: (args) => {
+      const a = args as { deletes?: string[] } | null
+      const hasDeletes = Array.isArray(a?.deletes) && a.deletes.length > 0
+      return hasDeletes ? 'sync-to-disk:delete' : 'sync-to-disk'
+    },
   })
 
   // call_tool: first invocation of a server+tool combination always prompts;

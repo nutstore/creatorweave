@@ -245,13 +245,32 @@ describe('policy table', () => {
   it('sync-to-disk prompts with a fixed memory key and file-count description', () => {
     const policy = getToolPolicy('sync-to-disk')
     expect(policy.level).toBe('prompt')
-    expect(policy.memoryKey?.({})).toBe('sync-to-disk')
+    // Regular write flush → plain memory key.
+    expect(policy.memoryKey?.({ count: 3 })).toBe('sync-to-disk')
     // describe returns an i18n descriptor (rendered locale-aware by the modal)
     expect(policy.describe?.({ count: 3 })).toEqual({
       key: 'describeSyncToDisk',
       params: { count: 3 },
     })
     expect(policy.describe?.({})).toEqual({ key: 'describeSyncToDiskGeneric' })
+  })
+
+  it('deletion-bearing sync-to-disk gets its own description and memory key', () => {
+    const policy = getToolPolicy('sync-to-disk')
+    // Deletion flush → deletion-specific key and a modal body listing paths.
+    expect(policy.memoryKey?.({ count: 1, deletes: ['a.ts', 'b.ts'] })).toBe(
+      'sync-to-disk:delete',
+    )
+    expect(policy.describe?.({ count: 1, deletes: ['a.ts', 'b.ts'] })).toEqual({
+      key: 'describeSyncToDiskDelete',
+      params: { count: 2, paths: 'a.ts, b.ts' },
+    })
+    // More than the display limit → overflow suffix instead of full list.
+    const many = Array.from({ length: 10 }, (_, i) => `f${i}.ts`)
+    const desc = policy.describe?.({ count: 1, deletes: many })
+    const params = desc?.params as { count: number; paths: string } | undefined
+    expect(params?.paths).toContain('…(+2 more)')
+    expect(params?.paths).not.toContain('f8.ts')
   })
 
   it('sync-to-opfs (renamed from sync) stays auto', () => {
@@ -284,6 +303,20 @@ describe('policy-engine: yolo generalization (PR-4)', () => {
     })
     expect(result).toEqual({ decision: 'allow', via: 'yolo' })
     expect(useToolAuthStore.getState().queue).toHaveLength(0)
+  })
+
+  it('a remembered WRITE flush grant does not cover a DELETION-bearing flush', async () => {
+    useSessionAllowStore.getState().add('conv-1', 'sync-to-disk')
+
+    const pending = authorize({
+      toolName: 'sync-to-disk',
+      args: { count: 1, deletes: ['gone.ts'] },
+      conversationId: 'conv-1',
+    })
+    // The deletion flush gets its own modal — the write grant never crosses.
+    expect(useToolAuthStore.getState().queue).toHaveLength(1)
+    useToolAuthStore.getState().approve()
+    expect(await pending).toEqual({ decision: 'allow', via: 'auto' })
   })
 
   it('yolo does NOT leak into other conversations', async () => {

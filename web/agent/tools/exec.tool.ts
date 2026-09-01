@@ -652,11 +652,10 @@ async function buildStaleDiskNotice(
       `The command ran against DISK content, but ${targetPaths.length} pending change(s) in this root ` +
       `are NOT on disk yet: ${displayPaths.join(', ')}${suffix}. ` +
       (pendingDeletions.length > 0
-        ? `Note: ${pendingDeletions.length} of these are DELETE-type changes — the deleted file(s) may still exist on disk (ghost files). `+
-          ''
+        ? `Note: ${pendingDeletions.length} of these are DELETE-type changes — the deleted file(s) may still exist on disk (ghost files). `
         : '') +
       `If this result depends on the latest file content, call sync-to-disk (asks the user for ` +
-      `permission) and re-run the command. Deletion-type changes are only applied via the Sync panel.`
+      `permission; pending deletions are included and listed in the approval modal) and re-run the command.`
 
     return {
       pendingPaths: displayPaths,

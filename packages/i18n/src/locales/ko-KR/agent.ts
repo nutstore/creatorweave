@@ -118,6 +118,7 @@ export const agent = {
         settingsHint: "외부 도구(MCP/WebMCP) 승인은 server+도구 단위입니다. 신뢰할 수 없는 콘텐츠 페이지의 도구는 매번 확인되며 기억되지 않습니다.",
         describeSyncToDisk: "{count}개의 대기 중인 변경 사항을 실제 디스크에 기록합니다.",
         describeSyncToDiskGeneric: "대기 중인 파일 변경 사항을 실제 디스크에 기록합니다.",
+        describeSyncToDiskDelete: "{count}개의 삭제를 실제 디스크에 적용합니다: {paths}. 디스크 삭제는 되돌릴 수 없습니다 — 나열된 파일이 제거됩니다(스냅샷으로 복원 가능).",
         describeCallTool: "AI가 외부 도구 \"{name}\"을(를) 호출하려고 합니다.",
         describeCallToolGeneric: "AI가 외부 MCP/WebMCP 도구를 호출하려고 합니다.",
         describeSnapshotRestore: "파일을 이전 스냅샷으로 복원합니다 —— 동기화되지 않은 변경 사항은 삭제될 수 있습니다.",

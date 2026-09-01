@@ -6,17 +6,23 @@
  * (removed in this PR — see exec.tool.ts): writing to the real disk is a
  * risk-bearing operation, so it must prompt via the policy engine.
  *
- * Guarantees (redesign doc §3.6):
+ * Guarantees (redesign doc §3.6, as amended by the "authorized deletions"
+ * follow-up):
  *   - Policy level 'prompt' → ToolAuthModal every time unless the user picked
- *     "Always allow for this conversation" (memoryKey is fixed).
+ *     "Always allow for this conversation". A flush that includes delete-type
+ *     changes uses a DELETION-SPECIFIC description (lists the paths) and its
+ *     own memory key (`sync-to-disk:delete`), so a plain write grant can
+ *     never silently cover deletions — the modal IS the informed consent,
+ *     and the user's approval is honored: deletions ARE applied.
  *   - forceOverwrite is FORCED to false and not exposed to the LLM; conflicting
  *     paths are skipped per-file and reported (second line of defense,
  *     independent from the modal).
- *   - Only 'create'/'modify' changes are eligible. Delete-type changes are
- *     stripped BEFORE syncing and surfaced in the result — deletion of real
- *     files stays in the manual Sync panel review flow.
+ *   - Only this AUTHORIZED channel may apply delete-type changes. Unattended
+ *     paths (run-level auto-apply) still exclude them (see
+ *     pending-disk-eligibility.ts for the fork).
  *   - Snapshot pipeline is reused (createApprovedSnapshotForPaths → syncToDisk
- *     → markSnapshotAsSynced) so synced files stay rollback-able.
+ *     → markSnapshotAsSynced) so synced — and deleted — files stay
+ *     rollback-able (the snapshot captures deleted files' before-content).
  */
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
@@ -32,18 +38,20 @@ export const syncToDiskDefinition: ToolDefinition = {
   function: {
     name: TOOL_NAME,
     description:
-      'Write your pending changes (from write/edit tools) to the real disk so that subsequent ' +
+      'Write your pending changes (from write/edit/delete tools) to the real disk so that subsequent ' +
       'shell commands can see them. Use this when a command result depends on the latest file ' +
       'content. Requires user approval each time unless the user grants "always allow" for this ' +
-      'conversation. Never overwrites conflicting disk files, and never deletes files on disk — ' +
-      'delete-type changes must be approved by the user in the Sync panel.',
+      'conversation. PENDING DELETIONS ARE INCLUDED: the approval modal will explicitly list the ' +
+      'files to be deleted (irreversible on disk, rollback-able via snapshots), and deletions use ' +
+      'a separate "always allow" grant from regular writes. Never overwrites conflicting disk files.',
     parameters: {
       type: 'object',
       properties: {
         paths: {
           type: 'array',
           description:
-            'Pending change paths to sync (defaults to ALL pending create/modify changes). ' +
+            'Pending change paths to sync (defaults to ALL pending changes, including pending ' +
+            'deletions). ' +
             'Examples: ["src/app.ts"] or ["creatorweave/src/a.ts", "creatorweave/src/b.ts"]. ' +
             'Multi-root paths include the root name prefix.',
           items: { type: 'string' },
@@ -58,6 +66,8 @@ interface SyncToDiskOutcome {
   skippedConflicts: string[]
   failed: number
   excludedDeletions: Array<{ path: string; type: 'delete' | 'unknown' }>
+  /** Paths in `synced` whose pending change was a deletion (authorized channel only). */
+  appliedDeletions: string[]
   snapshotId?: string
 }
 
@@ -69,24 +79,31 @@ interface SyncToDiskOutcome {
 async function flushPendingToDisk(
   runtime: WorkspaceRuntime,
   requestedPaths: string[] | undefined,
+  includeDeletions: boolean,
 ): Promise<SyncToDiskOutcome> {
   const outcome: SyncToDiskOutcome = {
     synced: [],
     skippedConflicts: [],
     failed: 0,
     excludedDeletions: [],
+    appliedDeletions: [],
   }
 
-  // Filter the requested paths (or all pending) to create/modify BEFORE
-  // passing onlyPaths to syncToDisk — delete-type changes must never reach
-  // the disk pipeline (§3.9 constraint 8). Uses the SHARED eligibility rule
-  // (pending-disk-eligibility.ts, same as run-level auto-apply).
+  // Filter the requested paths (or all pending) to the disk-eligible set
+  // BEFORE passing onlyPaths to syncToDisk (§3.9 constraint 8). On this
+  // authorized channel deletions pass through when the user approved a flush
+  // containing them; the shared eligibility rule (pending-disk-eligibility.ts)
+  // keeps run-level auto-apply deletion-free.
   const requestedSet = requestedPaths?.length ? new Set(requestedPaths) : null
   const allPending = runtime.getPendingChanges()
   const candidatePaths = requestedSet
     ? allPending.filter((c) => requestedSet.has(c.path)).map((c) => c.path)
     : allPending.map((c) => c.path)
-  const { eligible, excluded } = partitionPathsByDiskEligibility(candidatePaths, allPending)
+  const { eligible, excluded } = partitionPathsByDiskEligibility(
+    candidatePaths,
+    allPending,
+    { includeDeletions },
+  )
   for (const e of excluded) {
     // Report deletions always; report not-pending paths only when the caller
     // explicitly asked for them (unrequested extras are just noise).
@@ -125,6 +142,12 @@ async function flushPendingToDisk(
   }
   const conflictSet = new Set(outcome.skippedConflicts)
   outcome.synced = eligible.filter((p) => !conflictSet.has(p))
+
+  // Deletions that actually reached the disk on this authorized flush.
+  const pendingByPath = new Map(allPending.map((c) => [c.path, c]))
+  outcome.appliedDeletions = outcome.synced.filter(
+    (p) => pendingByPath.get(p)?.type === 'delete',
+  )
 
   if (snapshot && outcome.synced.length > 0) {
     await runtime.markSnapshotAsSynced(snapshot.snapshotId)
@@ -173,18 +196,25 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
       (c.type === 'create' || c.type === 'modify') &&
       (!requestedSet || requestedSet.has(c.path)),
   ).length
+  const deletionPaths = pending
+    .filter((c) => c.type === 'delete' && (!requestedSet || requestedSet.has(c.path)))
+    .map((c) => c.path)
 
-  if (eligibleCount === 0 && pending.length === 0) {
+  if (eligibleCount === 0 && deletionPaths.length === 0 && pending.length === 0) {
     return toolOkJson(TOOL_NAME, {
       synced: [],
       message: 'No pending changes to sync.',
     })
   }
 
-  // --- Authorization (prompt level; "always allow" = fixed memory key) ------
+  // --- Authorization (prompt level). Regular writes and deletions use
+  // DIFFERENT memory keys and descriptions: the modal for a deletion-bearing
+  // flush explicitly lists the doomed paths, and "always allow" for writes
+  // never covers deletions (and vice versa) — each grant is informed.
+  const includeDeletions = deletionPaths.length > 0
   const auth = await authorize({
     toolName: TOOL_NAME,
-    args: { count: eligibleCount },
+    args: { count: eligibleCount, deletes: deletionPaths },
     conversationId: context.workspaceId,
     signal: context.abortSignal,
   })
@@ -204,14 +234,24 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
   }
 
   try {
-    const outcome = await flushPendingToDisk(runtime, requestedPaths?.length ? requestedPaths : undefined)
+    const outcome = await flushPendingToDisk(
+      runtime,
+      requestedPaths?.length ? requestedPaths : undefined,
+      includeDeletions,
+    )
 
     const deletedPending = outcome.excludedDeletions.filter((e) => e.type === 'delete')
     const hints: string[] = []
+    if (outcome.appliedDeletions.length > 0) {
+      hints.push(
+        `${outcome.appliedDeletions.length} deletion(s) were applied to the real disk as part of ` +
+          `this authorized sync: ${outcome.appliedDeletions.join(', ')}`,
+      )
+    }
     if (deletedPending.length > 0) {
       hints.push(
-        `${deletedPending.length} delete-type change(s) were NOT synced — deletions on disk require ` +
-          `manual user approval in the Sync panel: ${deletedPending.map((d) => d.path).join(', ')}`,
+        `${deletedPending.length} delete-type change(s) were NOT synced — deletions require the ` +
+          `user's explicit approval of a deletion-bearing flush: ${deletedPending.map((d) => d.path).join(', ')}`,
       )
     }
     if (outcome.skippedConflicts.length > 0) {
@@ -231,6 +271,7 @@ export const syncToDiskExecutor: ToolExecutor = async (args, context) => {
         synced_count: outcome.synced.length,
         skipped_conflicts: outcome.skippedConflicts,
         excluded_deletions: deletedPending.map((d) => d.path),
+        applied_deletions: outcome.appliedDeletions,
         snapshot_id: outcome.snapshotId,
       },
       // Success envelopes have no hint field — advisory notes ride in meta
@@ -251,6 +292,6 @@ export const syncToDiskPromptDoc: ToolPromptDoc = {
   category: 'file-ops',
   section: '### File Sync (OPFS → disk)',
   lines: [
-    '- `sync-to-disk(paths?)` - Write your pending changes to the real disk (requires user approval each time unless remembered). Use BEFORE running a shell command whose result depends on the latest file content. Never overwrites conflicting disk files; never applies delete-type changes (those need manual user approval in the Sync panel).',
+    '- `sync-to-disk(paths?)` - Write your pending changes to the real disk (requires user approval each time unless remembered). Use BEFORE running a shell command whose result depends on the latest file content. Includes pending DELETIONS: the approval modal lists the files to be deleted, and approving applies them (rollback-able via snapshots). Deletions carry their own "always allow" grant, separate from regular writes. Never overwrites conflicting disk files.',
   ],
 }
