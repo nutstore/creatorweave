@@ -21,6 +21,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { projectWorkspacePath } from '@/lib/route-paths'
 import { createPortal } from 'react-dom'
+import { BrushCleaningIcon } from '@/components/icons/BrushCleaningIcon'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -1180,13 +1181,14 @@ export const Sidebar = memo(function Sidebar({
               <Download className="h-3 w-3" />
             </BrandButton>
             <BrandButton
+              iconButton
               variant="ghost"
-              className="h-6 px-2 text-[11px]"
+              className="h-6 w-6"
               disabled={scopedConversationIds.length === 0 || clearingConversations}
               onClick={() => setClearConversationsDialogOpen(true)}
               title={t('sidebar.clearWorkspace')}
             >
-              {t('sidebar.clear')}
+              <BrushCleaningIcon className="h-3 w-3" />
             </BrandButton>
             <BrandButton
               iconButton
