@@ -40,6 +40,13 @@ export interface PendingToolAuth {
    * context; legacy thin-wrapper callers).
    */
   description: ToolAuthDescriptionInput
+  /**
+   * The tool's own description from its provider (MCP server / WebMCP page),
+   * rendered as a separate "tool description" block so users can tell what
+   * the tool actually does before authorizing. Modal clamps it to a few
+   * lines with an expand toggle. Optional — most callers don't set it.
+   */
+  toolDescription?: string | null
   /** Optional secondary block rendered as code (the exec command itself). */
   detail?: string
   /** Raw tool arguments, rendered in the modal as pretty-printed JSON. */
@@ -71,6 +78,8 @@ export type ToolAuthDescriptionInput =
 export interface ToolAuthRequestInput {
   toolName: string
   description: ToolAuthDescriptionInput
+  /** Provider-supplied tool description for modal display (see PendingToolAuth). */
+  toolDescription?: string | null
   /** Optional secondary block rendered as code (exec command, etc.). */
   detail?: string
   /** Raw tool arguments for modal display (pretty-printed JSON). */
@@ -139,6 +148,7 @@ export const useToolAuthStore = create<ToolAuthState>((set, get) => ({
         id,
         toolName: input.toolName,
         description: input.description,
+        toolDescription: input.toolDescription ?? null,
         detail: input.detail,
         toolArgs: input.toolArgs,
         fileChanges: input.fileChanges,

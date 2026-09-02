@@ -13,6 +13,8 @@
  *   1. forbidden                        → deny
  *   2. session memory hit               → allow   ("always allow this convo")
  *   3. yolo mode on                     → allow   (never for forbidden)
+ *   3.5 trusted source (settings)       → allow   (plan AND act; never
+ *                                                 untrusted-content tools)
  *   4. level === 'auto'                 → allow
  *   5. otherwise                        → prompt via tool-auth.store
  *
@@ -25,6 +27,7 @@
 import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
 import { isYoloOn } from '@/store/yolo-mode.store'
+import { isToolSourceTrusted } from '@/store/trusted-source.store'
 import type { FileChange } from '@/opfs/types/opfs-types'
 
 export type ToolPolicyLevel = 'auto' | 'prompt' | 'forbidden'
@@ -73,6 +76,13 @@ export interface AuthorizeRequest {
    * ToolAuthModal as a clickable list (click → diff preview).
    */
   fileChanges?: FileChange[]
+  /**
+   * The tool's own description from its provider (MCP server / WebMCP
+   * page), rendered by ToolAuthModal as a clamped "tool description" block
+   * with expand toggle. Helps users understand unfamiliar tool names
+   * before authorizing. Purely display-only — never used for decisions.
+   */
+  toolDescription?: string | null
   /** Conversation id (ToolContext.workspaceId). Scopes session memory. */
   conversationId?: string | null
   /** Abort signal of the originating run — aborting resolves as deny. */
@@ -84,10 +94,19 @@ export interface AuthorizeRequest {
    * silently pre-authorize later calls, possibly in act mode).
    */
   mode?: 'plan' | 'act'
+  /**
+   * Origin the tool belongs to (WebMCP hostname / MCP serverId). When the
+   * user has marked this origin "always trusted" in settings, prompt-level
+   * tools from it run WITHOUT the modal — in both plan and act mode. Trusted
+   * origins are configured in a calm settings context, so unlike
+   * conversation-scoped memory the grant is not suppressed in plan mode and
+   * never expires with the conversation.
+   */
+  trustedSource?: { kind: 'webmcp' | 'mcp'; sourceId: string } | null
 }
 
 export type AuthResult =
-  | { decision: 'allow'; via: 'forbidden-never' | 'session-memory' | 'yolo' | 'auto' }
+  | { decision: 'allow'; via: 'forbidden-never' | 'session-memory' | 'yolo' | 'trusted-source' | 'auto' }
   | { decision: 'deny'; reason: string }
 
 /**
@@ -124,6 +143,22 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
     return { decision: 'allow', via: 'yolo' }
   }
 
+  // 3.5 user-marked trusted origin — persistent, cross-conversation,
+  // cross-mode (plan AND act). isToolSourceTrusted() itself rejects
+  // untrusted-content tools, so the human gate on prompt-injection surface
+  // survives even a blanket "trust this site" grant. Mode-independence is
+  // the feature: settings-granted trust is not an in-conversation approval.
+  if (
+    req.trustedSource &&
+    isToolSourceTrusted(
+      req.trustedSource.kind,
+      req.trustedSource.sourceId,
+      { untrustedContent: (req.args as { untrusted?: boolean } | null)?.untrusted === true }
+    )
+  ) {
+    return { decision: 'allow', via: 'trusted-source' }
+  }
+
   // 4. auto — no user interaction needed.
   if (policy.level === 'auto') {
     return { decision: 'allow', via: 'auto' }
@@ -135,6 +170,7 @@ export async function authorize(req: AuthorizeRequest): Promise<AuthResult> {
     toolName: req.toolName,
     // i18n descriptor — ToolAuthModal renders it with useT (locale-aware).
     description: policy.describe?.(req.args) ?? null,
+    toolDescription: req.toolDescription ?? null,
     toolArgs: req.toolArgs,
     fileChanges: req.fileChanges,
     memoryKey: memoryAllowed ? memoryKey : null,

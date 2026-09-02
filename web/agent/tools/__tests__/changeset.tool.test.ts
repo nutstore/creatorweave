@@ -2,15 +2,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
 import { createCheckpointExecutor, detectConflictsExecutor, rollbackCheckpointExecutor } from '../changeset.tool'
 
+/**
+ * Mock boundary: changeset tools resolve their workspace via
+ *   resolveConversation → getWorkspaceManager().getWorkspace(workspaceId)
+ * (see changeset.tool.ts). The workspace object carries the snapshot /
+ * rollback / conflict APIs the tools call through.
+ *
+ * The old test mocked getActiveConversation from conversation-context.store —
+ * that indirection was removed when workspaceId became loop-provided.
+ */
 const createDraftSnapshotMock = vi.fn()
 const rollbackSnapshotMock = vi.fn()
+const detectSyncConflictsMock = vi.fn()
+const getNativeDirectoryHandleMock = vi.fn()
 const updateCurrentCountsMock = vi.fn()
 const refreshPendingChangesMock = vi.fn()
-const getActiveConversationMock = vi.fn()
-const resolveNativeDirectoryHandleForPathMock = vi.fn()
+const getWorkspaceMock = vi.fn()
+
+vi.mock('@/opfs', () => ({
+  getWorkspaceManager: async () => ({
+    getWorkspace: getWorkspaceMock,
+  }),
+}))
 
 vi.mock('@/store/conversation-context.store', () => ({
-  getActiveConversation: () => getActiveConversationMock(),
   useConversationContextStore: {
     getState: () => ({
       updateCurrentCounts: updateCurrentCountsMock,
@@ -19,27 +34,43 @@ vi.mock('@/store/conversation-context.store', () => ({
   },
 }))
 
-vi.mock('../tool-utils', () => ({
-  resolveNativeDirectoryHandleForPath: (...args: unknown[]) => resolveNativeDirectoryHandleForPathMock(...args),
-}))
+vi.mock('../tool-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../tool-utils')>()
+  return {
+    ...actual,
+    resolveNativeDirectoryHandleForPath: async (...args: unknown[]) => {
+      if (resolveNativeDirectoryHandleForPathMock) {
+        return resolveNativeDirectoryHandleForPathMock(...args)
+      }
+      return { handle: null, nativePath: '' }
+    },
+  }
+})
+
+let resolveNativeDirectoryHandleForPathMock: ((...args: unknown[]) => Promise<unknown>) | null = null
 
 const context: ToolContext = {
   directoryHandle: null,
+  workspaceId: 'ws-1',
+}
+
+/** Wire the workspace mock to a given fake workspace object. */
+function mockWorkspace(workspace: Record<string, unknown> | null) {
+  getWorkspaceMock.mockResolvedValue(workspace)
 }
 
 describe('checkpoint tools', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resolveNativeDirectoryHandleForPathMock = null
     updateCurrentCountsMock.mockResolvedValue(undefined)
     refreshPendingChangesMock.mockResolvedValue(undefined)
-    resolveNativeDirectoryHandleForPathMock.mockResolvedValue({ handle: null, nativePath: '' })
+    getNativeDirectoryHandleMock.mockResolvedValue(null)
   })
 
   it('create_checkpoint returns created payload when draft exists', async () => {
     createDraftSnapshotMock.mockResolvedValue({ snapshotId: 'snap_1', opCount: 3 })
-    getActiveConversationMock.mockResolvedValue({
-      conversation: { createDraftSnapshot: createDraftSnapshotMock },
-    })
+    mockWorkspace({ createDraftSnapshot: createDraftSnapshotMock })
 
     const result = await createCheckpointExecutor({ summary: 'batch update' }, context)
     const parsed = JSON.parse(result)
@@ -48,17 +79,14 @@ describe('checkpoint tools', () => {
     expect(parsed.created).toBe(true)
     expect(parsed.checkpointId).toBe('snap_1')
     expect(parsed.opCount).toBe(3)
-    // Verify directoryHandle was passed to createDraftSnapshot
     expect(createDraftSnapshotMock).toHaveBeenCalledWith('batch update', null)
   })
 
   it('create_checkpoint passes directoryHandle to createDraftSnapshot', async () => {
     const mockHandle = {} as FileSystemDirectoryHandle
-    resolveNativeDirectoryHandleForPathMock.mockResolvedValue({ handle: mockHandle, nativePath: '' })
+    resolveNativeDirectoryHandleForPathMock = async () => ({ handle: mockHandle, nativePath: '' })
     createDraftSnapshotMock.mockResolvedValue({ snapshotId: 'snap_2', opCount: 1 })
-    getActiveConversationMock.mockResolvedValue({
-      conversation: { createDraftSnapshot: createDraftSnapshotMock },
-    })
+    mockWorkspace({ createDraftSnapshot: createDraftSnapshotMock })
 
     await createCheckpointExecutor({ summary: 'test' }, context)
 
@@ -67,15 +95,22 @@ describe('checkpoint tools', () => {
 
   it('create_checkpoint returns no-op when no draft exists', async () => {
     createDraftSnapshotMock.mockResolvedValue(null)
-    getActiveConversationMock.mockResolvedValue({
-      conversation: { createDraftSnapshot: createDraftSnapshotMock },
-    })
+    mockWorkspace({ createDraftSnapshot: createDraftSnapshotMock })
 
     const result = await createCheckpointExecutor({}, context)
     const parsed = JSON.parse(result)
 
     expect(parsed.success).toBe(true)
     expect(parsed.created).toBe(false)
+  })
+
+  it('create_checkpoint errors when no workspace is active', async () => {
+    mockWorkspace(null)
+
+    const result = await createCheckpointExecutor({}, { directoryHandle: null })
+    const parsed = JSON.parse(result)
+
+    expect(parsed.error).toContain('No active workspace')
   })
 
   it('rollback_checkpoint validates required checkpoint_id', async () => {
@@ -86,11 +121,9 @@ describe('checkpoint tools', () => {
 
   it('rollback_checkpoint returns unresolved paths', async () => {
     rollbackSnapshotMock.mockResolvedValue({ reverted: 1, unresolved: ['src/a.ts'] })
-    getActiveConversationMock.mockResolvedValue({
-      conversation: {
-        rollbackSnapshot: rollbackSnapshotMock,
-        getNativeDirectoryHandle: vi.fn().mockResolvedValue(null),
-      },
+    mockWorkspace({
+      rollbackSnapshot: rollbackSnapshotMock,
+      getNativeDirectoryHandle: getNativeDirectoryHandleMock,
     })
 
     const result = await rollbackCheckpointExecutor({ checkpoint_id: 'snap_1' }, context)
@@ -102,12 +135,17 @@ describe('checkpoint tools', () => {
   })
 
   it('detect_conflicts returns envelope with no conflicts', async () => {
-    const detectSyncConflictsMock = vi.fn().mockResolvedValue([])
-    getActiveConversationMock.mockResolvedValue({
-      conversation: { detectSyncConflicts: detectSyncConflictsMock },
+    detectSyncConflictsMock.mockResolvedValue([])
+    resolveNativeDirectoryHandleForPathMock = async () => ({
+      handle: {} as FileSystemDirectoryHandle,
+      nativePath: '',
     })
+    mockWorkspace({ detectSyncConflicts: detectSyncConflictsMock })
 
-    const result = await detectConflictsExecutor({}, { directoryHandle: {} as FileSystemDirectoryHandle })
+    const result = await detectConflictsExecutor(
+      {},
+      { directoryHandle: {} as FileSystemDirectoryHandle, workspaceId: 'ws-1' }
+    )
     const parsed = JSON.parse(result)
 
     expect(parsed.ok).toBe(true)
@@ -116,21 +154,33 @@ describe('checkpoint tools', () => {
     expect(parsed.data.conflicts).toEqual([])
   })
 
+  it('detect_conflicts errors without a directory handle', async () => {
+    mockWorkspace({ detectSyncConflicts: detectSyncConflictsMock })
+
+    const result = await detectConflictsExecutor({}, context)
+    const parsed = JSON.parse(result)
+
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error.code).toBe('no_directory_handle')
+  })
+
   it('detect_conflicts returns envelope with conflict metadata', async () => {
-    const detectSyncConflictsMock = vi.fn().mockResolvedValue([
+    detectSyncConflictsMock.mockResolvedValue([
       {
         path: 'src/a.ts',
         opfsMtime: 100,
         currentFsMtime: 200,
       },
     ])
-    getActiveConversationMock.mockResolvedValue({
-      conversation: { detectSyncConflicts: detectSyncConflictsMock },
+    resolveNativeDirectoryHandleForPathMock = async () => ({
+      handle: {} as FileSystemDirectoryHandle,
+      nativePath: '',
     })
+    mockWorkspace({ detectSyncConflicts: detectSyncConflictsMock })
 
     const result = await detectConflictsExecutor(
       { paths: ['src/a.ts'] },
-      { directoryHandle: {} as FileSystemDirectoryHandle }
+      { directoryHandle: {} as FileSystemDirectoryHandle, workspaceId: 'ws-1' }
     )
     const parsed = JSON.parse(result)
 

@@ -8,17 +8,18 @@ import {
 } from '@/webmcp'
 import { useSettingsStore } from '@/store/settings.store'
 import { useExtensionStore } from '@/store/extension.store'
+import { ExternalTrustCard } from '@/components/external-tools/ExternalTrustCard'
 import { WebMCPGlobalToggleCard } from './WebMCPGlobalToggleCard'
 import { WebMCPHostList } from './WebMCPHostList'
 
 /**
- * WebMCP settings — connection status + read-only tool list.
+ * WebMCP settings — global switches + read-only tool list.
  *
- * The list shows discovered (authorized) WebMCP tools: the extension
- * filters unauthorized tools out of discovery responses, so whatever
- * renders here is usable by the agent right now. Authorization
- * management lives exclusively in the extension popup; this page never
- * mutates authorization state.
+ * Top of the page, in order:
+ * 1. The shared external-trust switch (identical to the MCP page's card).
+ * 2. The WebMCP global toggle (discovery/registration control).
+ * 3. The discovered hosts list — read-only; per-site authorization lives
+ *    exclusively in the extension popup.
  */
 export function WebMCPSettings() {
   const t = useT()
@@ -74,6 +75,9 @@ export function WebMCPSettings() {
 
   return (
     <div className="space-y-4 py-1">
+      {/* 1. Shared trust switch — identical card to the MCP page */}
+      <ExternalTrustCard t={t} />
+
       <WebMCPGlobalToggleCard
         t={t}
         globalEnabled={globalEnabled}

@@ -834,6 +834,14 @@ export const callToolExecutor: ToolExecutor = async (args, context) => {
     // Show the ACTUAL call arguments in the authorization modal (policy
     // `args` above only carries the name + trust hint for decisions).
     toolArgs: toolArgs,
+    // Show the tool's own description from its provider (MCP server / WebMCP
+    // page) so users can tell what an unfamiliar tool name actually does
+    // before authorizing. Display-only.
+    toolDescription: tool.description?.trim() || null,
+    // Origin for the settings-side "always trust" list (webmcp hostname /
+    // mcp serverId). Trusted origins skip the modal in plan AND act mode;
+    // untrusted-content tools still never qualify (see policy-engine 3.5).
+    trustedSource: { kind: tool.source, sourceId: tool.sourceId },
     conversationId: context.workspaceId,
     signal: context.abortSignal,
     mode: getCurrentWorkspaceAgentMode(),

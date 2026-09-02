@@ -29,6 +29,9 @@ import { getMCPManager } from '@/mcp'
 import type { MCPServerConfig, MCPConnectionState } from '@/mcp/mcp-types'
 import { useT } from '@/i18n'
 import { useExtensionStore } from '@/store/extension.store'
+import { ShieldCheck } from 'lucide-react'
+import { useTrustedSourceStore } from '@/store/trusted-source.store'
+import { ExternalTrustCard } from '@/components/external-tools/ExternalTrustCard'
 
 type TransportType = 'sse' | 'streamable_http'
 
@@ -91,6 +94,10 @@ export function MCPSettings() {
   const [showToken, setShowToken] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [connectingServerId, setConnectingServerId] = useState<string | null>(null)
+
+  // Global default-trust switch state — only for the per-server status
+  // badge; the switch itself lives in the shared ExternalTrustCard above.
+  const defaultTrustExternal = useTrustedSourceStore((state) => state.defaultTrustExternal)
 
   const loadServers = useCallback(async () => {
     setLoading(true)
@@ -447,6 +454,9 @@ export function MCPSettings() {
   return (
     <div className="mcp-settings space-y-4">
 
+      {/* Global trust switch (shared card, always first) */}
+      <ExternalTrustCard t={(key) => tf(key, key)} />
+
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -752,6 +762,18 @@ export function MCPSettings() {
                           {tf('mcp.badge.builtin', 'Builtin')}
                         </span>
                       )}
+                      <label className="ml-1 flex shrink-0 items-center gap-1 text-[11px] text-tertiary" title={tf('settings.externalTrustToggle', 'Trust external tools by default')}>
+                        <ShieldCheck
+                          className={`h-3 w-3 ${
+                            defaultTrustExternal
+                              ? 'text-primary-600'
+                              : 'text-neutral-400 dark:text-neutral-500'
+                          }`}
+                        />
+                        {defaultTrustExternal
+                          ? tf('settings.externalTrustOnShort', 'Trusted')
+                          : tf('settings.externalTrustOffShort', 'Prompts')}
+                      </label>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-tertiary">
                       <span className="truncate font-mono">{server.url}</span>

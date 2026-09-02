@@ -97,3 +97,47 @@ describe('ToolAuthModal lazy FileDiffViewer', () => {
     expect(screen.getByTestId('diff-viewer-stub')).toBeInTheDocument()
   })
 })
+
+describe('ToolAuthModal tool description block', () => {
+  beforeEach(() => {
+    useToolAuthStore.getState().clear()
+  })
+
+  afterEach(() => {
+    useToolAuthStore.getState().clear()
+  })
+
+  function requestWithDescription(toolDescription?: string | null) {
+    return useToolAuthStore.getState().request({
+      toolName: 'call_tool',
+      description: { key: 'describeCallTool', params: { name: 'foo::bar' } },
+      toolDescription,
+      memoryKey: 'call_tool::foo::bar',
+    })
+  }
+
+  it('renders the provider description with expand/collapse toggle when present', () => {
+    void requestWithDescription(
+      'Fetches the current weather for a given city using the OpenWeather API.'
+    )
+    render(<ToolAuthModal />)
+
+    expect(screen.getByText('What this tool does')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Fetches the current weather for a given city using the OpenWeather API.'
+      )
+    ).toBeInTheDocument()
+
+    // jsdom cannot measure layout: scrollHeight === clientHeight → the
+    // toggle button must NOT appear for short descriptions.
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
+  })
+
+  it('does not render the block when the tool has no description', () => {
+    void requestWithDescription(null)
+    render(<ToolAuthModal />)
+
+    expect(screen.queryByText('What this tool does')).not.toBeInTheDocument()
+  })
+})

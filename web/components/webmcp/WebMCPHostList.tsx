@@ -21,12 +21,11 @@ function summarizeTabs(group: WebMCPToolGroupCatalog): string {
 }
 
 /**
- * Read-only list of discovered (authorized) WebMCP tools.
+ * List of discovered (authorized) WebMCP tools — read-only.
  *
- * The extension filters unauthorized tools out of discovery responses, so
- * everything rendered here is usable by the agent right now. Authorization
- * management (per-site / per-group switches) lives exclusively in the
- * extension popup — this component renders state, it never mutates it.
+ * The shared trust switch lives one level up (WebMCPSettings); per-site
+ * authorization still lives exclusively in the extension popup — this
+ * component renders state, it never mutates anything.
  */
 export function WebMCPHostList({ t, hosts }: WebMCPHostListProps) {
   if (hosts.length === 0) {
@@ -39,9 +38,6 @@ export function WebMCPHostList({ t, hosts }: WebMCPHostListProps) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300">
-        {t('settings.webMCPManageInExtension')}
-      </div>
       {hosts.map((host) => {
         const totalTools = host.groups.reduce((sum, group) => sum + group.registeredTools.length, 0)
         const totalTabs = host.groups.reduce((sum, group) => sum + group.tabs.length, 0)

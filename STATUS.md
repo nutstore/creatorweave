@@ -63,6 +63,14 @@
       `prepare:assets` (Vite-era on-demand middleware died with the migration);
       `wxt dev` load-unpacked remains the primary dev workflow.
 
+### Fixed 2026-09-02
+- [x] **Legacy mock drift in io.tool / changeset.tool tests** — both files
+      predated the VfsBackend refactor (read → `resolveVfsTarget().backend.readFile`,
+      changeset → `getWorkspaceManager().getWorkspace()`); rewritten against
+      current contracts. Batch `reads`/`paths` params and `binary_base64`
+      responses are gone — single-path only, binaries rejected with run_python
+      hint. Agent suite now 64 files / 658 tests, zero failures.
+
 ---
 
 ## 4. References

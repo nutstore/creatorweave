@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useToolAuthStore } from '@/store/tool-auth.store'
 import { useSessionAllowStore } from '@/store/session-allow.store'
 import { useYoloModeStore } from '@/store/yolo-mode.store'
+import { useTrustedSourceStore } from '@/store/trusted-source.store'
 import { authorize, getToolPolicy } from '../policy-engine'
 
 describe('tool-auth.store (unified FIFO queue)', () => {
@@ -451,5 +452,85 @@ describe('policy-engine: plan mode (call_tool double gating)', () => {
       mode: 'act',
     })
     expect(second).toEqual({ decision: 'allow', via: 'session-memory' })
+  })
+})
+
+describe('policy-engine: trusted source (global default-trust switch)', () => {
+  beforeEach(() => {
+    useTrustedSourceStore.getState().setDefaultTrustExternal(true)
+    useSessionAllowStore.getState().clearAll()
+    useToolAuthStore.getState().clear()
+  })
+  afterEach(() => {
+    useTrustedSourceStore.getState().setDefaultTrustExternal(true)
+    useSessionAllowStore.getState().clearAll()
+    useToolAuthStore.getState().clear()
+  })
+
+  const callToolArgs = { full_tool_name: 'workspace.jianguoyun_com:message_send_text' }
+
+  it('default ON: external calls auto-allow in act mode without a modal', async () => {
+    const result = await authorize({
+      toolName: 'call_tool',
+      args: callToolArgs,
+      trustedSource: { kind: 'webmcp', sourceId: 'workspace.jianguoyun.com' },
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    expect(result).toEqual({ decision: 'allow', via: 'trusted-source' })
+    expect(useToolAuthStore.getState().queue).toHaveLength(0)
+  })
+
+  it('default ON: external calls auto-allow in PLAN mode too (unlike session memory)', async () => {
+    const result = await authorize({
+      toolName: 'call_tool',
+      args: callToolArgs,
+      trustedSource: { kind: 'webmcp', sourceId: 'workspace.jianguoyun.com' },
+      conversationId: 'conv-1',
+      mode: 'plan',
+    })
+    expect(result).toEqual({ decision: 'allow', via: 'trusted-source' })
+    expect(useToolAuthStore.getState().queue).toHaveLength(0)
+  })
+
+  it('switch OFF: external calls prompt again', async () => {
+    useTrustedSourceStore.getState().setDefaultTrustExternal(false)
+
+    const pending = authorize({
+      toolName: 'call_tool',
+      args: callToolArgs,
+      trustedSource: { kind: 'webmcp', sourceId: 'workspace.jianguoyun.com' },
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    expect(useToolAuthStore.getState().queue).toHaveLength(1)
+    useToolAuthStore.getState().deny()
+    expect((await pending).decision).toBe('deny')
+  })
+
+  it('untrusted-content tools NEVER qualify, even with default trust ON', async () => {
+    const pending = authorize({
+      toolName: 'call_tool',
+      args: { ...callToolArgs, untrusted: true },
+      trustedSource: { kind: 'webmcp', sourceId: 'workspace.jianguoyun.com' },
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    // The prompt-injection surface keeps its human gate.
+    expect(useToolAuthStore.getState().queue).toHaveLength(1)
+    useToolAuthStore.getState().deny()
+    expect((await pending).decision).toBe('deny')
+  })
+
+  it('missing trustedSource falls through to the modal (no behavior change for other tools)', async () => {
+    const pending = authorize({
+      toolName: 'call_tool',
+      args: callToolArgs,
+      conversationId: 'conv-1',
+      mode: 'act',
+    })
+    expect(useToolAuthStore.getState().queue).toHaveLength(1)
+    useToolAuthStore.getState().deny()
+    expect((await pending).decision).toBe('deny')
   })
 })

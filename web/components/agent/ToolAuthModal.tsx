@@ -15,7 +15,7 @@
  *   - Deny (+ Deny all when more requests are queued)
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useToolAuthStore, type ToolAuthDescriptionInput } from '@/store/tool-auth.store'
 import type { FileChange } from '@/opfs/types/opfs-types'
 import { useT } from '@/i18n'
@@ -53,6 +53,54 @@ function ArgsBlock({ toolArgs }: { toolArgs: unknown }) {
         <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-xs text-foreground/80 whitespace-pre-wrap break-all">
           {text}
         </pre>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Collapsible block showing the tool's own description from its provider
+ * (MCP server / WebMCP page). Clamped to a few lines by default — long
+ * provider descriptions must not blow up the modal — with an expand toggle
+ * that only appears when the text actually overflows (measured, not
+ * guessed from character count).
+ */
+function ToolDescriptionBlock({ description }: { description: string }) {
+  const t = useT()
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const textRef = useRef<HTMLParagraphElement>(null)
+
+  // Measured once on mount while the text is still clamped: scrollHeight
+  // reflects the full content, clientHeight the clamped box.
+  useEffect(() => {
+    const el = textRef.current
+    if (!el) return
+    setOverflowing(el.scrollHeight > el.clientHeight + 1)
+  }, [description])
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        {t('agent.toolAuth.toolDescriptionTitle')}
+      </p>
+      <p
+        ref={textRef}
+        className={`mt-1 break-words text-xs leading-relaxed text-foreground/70 ${
+          expanded ? '' : 'line-clamp-3'
+        }`}
+      >
+        {description}
+      </p>
+      {overflowing && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+        >
+          {expanded
+            ? t('agent.toolAuth.toolDescriptionCollapse')
+            : t('agent.toolAuth.toolDescriptionExpand')}
+        </button>
       )}
     </div>
   )
@@ -287,6 +335,7 @@ export function ToolAuthModal() {
               {descriptionText}
             </p>
           )}
+          {pending.toolDescription && <ToolDescriptionBlock description={pending.toolDescription} />}
           {isExecLike && (
             <div className="mt-3 rounded-lg border border-border bg-muted/50 px-3 py-2">
               <code className="block max-h-48 overflow-y-auto break-all whitespace-pre-wrap font-mono text-sm text-primary-600 dark:text-primary-500">
