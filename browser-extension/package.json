@@ -10,6 +10,7 @@
     "build": "wxt build",
     "build:store": "CW_CODEX_OAUTH=0 wxt build",
     "zip:store": "CW_CODEX_OAUTH=0 wxt zip",
+    "pack:release": "node scripts/pack-release.mjs",
     "build:firefox": "wxt build -b firefox",
     "watch": "wxt build --watch",
     "zip": "wxt zip",
