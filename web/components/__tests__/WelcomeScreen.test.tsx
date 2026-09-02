@@ -73,7 +73,6 @@ vi.mock('@/i18n', () => ({
     'agent.vision.screenshotUnavailable': 'Screenshot unavailable',
     'agent.pageScreenshot.captureFailed': 'Could not capture screenshot',
     'onboarding.steps.files.title': 'Let AI read your files',
-    'agent.folderTip.description': 'Choose a folder and AI can read and edit its files.',
     'welcome.setupLocalFirstHint': 'Your data stays in this browser.',
     'welcome.mountFolderButton': 'Choose a folder',
     'welcome.mountFolderDesc': 'Choose a folder and AI can read and edit its files.',

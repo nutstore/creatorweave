@@ -56,10 +56,9 @@ function getInitialStep(
 interface WelcomeScreenProps {
   onStartConversation: (text: string) => void
   onOpenSettings?: (tab?: SettingsTab) => void
-  onGatewayLoginSuccess?: () => void
 }
 
-export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLoginSuccess }: WelcomeScreenProps) {
+export function WelcomeScreen({ onStartConversation, onOpenSettings }: WelcomeScreenProps) {
   const [inputValue, setInputValue] = useState('')
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null)
   const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false)
@@ -273,8 +272,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               <button
                 type="button"
                 onClick={async () => {
-                  const ok = await gatewayLogin()
-                  if (ok) onGatewayLoginSuccess?.()
+                  await gatewayLogin()
                 }}
                 disabled={isGatewayLoginRunning}
                 className="flex w-full items-center gap-3 border-b border-amber-200/60 px-4 py-3.5 text-left transition-colors hover:bg-white/60 disabled:opacity-60 dark:border-amber-800/40 dark:hover:bg-neutral-900/40"

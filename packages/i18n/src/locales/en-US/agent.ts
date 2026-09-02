@@ -59,14 +59,6 @@ export const agent = {
         aiSearchBadge: "AI semantic search",
         bm25Fallback: "BM25 fallback",
     },
-    folderTip: {
-        title: "Open Local Folder",
-        description:
-            "AI can read and edit files in a folder you authorize, and save content locally.",
-        selectFolder: "Select Folder",
-        later: "Later",
-    },
-
     pageWriteAuth: {
         title: "AI requests to modify the current page",
         approve: "Approve",

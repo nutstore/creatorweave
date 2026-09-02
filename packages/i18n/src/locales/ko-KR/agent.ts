@@ -43,14 +43,6 @@ export const agent = {
         aiSearchBadge: "AI 시맨틱 검색",
         bm25Fallback: "BM25 대체",
     },
-    folderTip: {
-        title: "로컬 폴더 열기",
-        description:
-            "폴더 권한을 부여하면 AI가 파일을 읽고 편집하고 로컬에 저장할 수 있습니다.",
-        selectFolder: "폴더 선택",
-        later: "나중에",
-    },
-
     // 대화 검색 도구
     searchConversations: {
         failed: "실패",

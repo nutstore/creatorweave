@@ -59,13 +59,6 @@ export const agent = {
         aiSearchBadge: "AI 语义搜索",
         bm25Fallback: "BM25 回退",
     },
-    folderTip: {
-        title: "打开本地文件夹",
-        description: "选择文件夹后，AI 可以读取、编辑其中的文件，并将内容保存到本地。",
-        selectFolder: "选择文件夹",
-        later: "稍后",
-    },
-
     pageWriteAuth: {
         title: "AI 请求操作当前页面",
         approve: "允许",

@@ -83,11 +83,6 @@ interface TopBarProps {
   onWorkflowOpen?: () => void
   /** Create a new conversation */
   onNewConversation?: () => void
-  /**
-   * Forwarded to the FolderSelector's "open folder" / "add" button so that
-   * external UI (e.g. FolderTipBubble) can anchor to it.
-   */
-  folderButtonRef?: React.RefObject<HTMLButtonElement | null>
 }
 
 export function TopBar({
@@ -107,7 +102,6 @@ export function TopBar({
   onProjectSwitcherOpenChange,
   onSelectWorkspace,
   onWorkflowOpen,
-  folderButtonRef,
   onNewConversation,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -258,7 +252,7 @@ export function TopBar({
           <div className="flex items-center gap-2">
             {/* Folder Selector */}
             <div className="shrink-0">
-              <FolderSelector buttonRef={folderButtonRef} />
+              <FolderSelector />
             </div>
 
             {/* API Key status - consistent button style */}
@@ -364,7 +358,7 @@ export function TopBar({
               <div className="mb-1.5 text-[11px] font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('topbar.mobile.workDirectory')}
               </div>
-              <FolderSelector buttonRef={folderButtonRef} />
+              <FolderSelector />
             </div>
 
             {/* Model switcher */}

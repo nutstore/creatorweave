@@ -48,7 +48,6 @@ import {
   buildEnhancedCommands,
   type Command,
 } from '@/components/workspace'
-import { FolderTipBubble } from '@/components/agent/FolderTipBubble'
 import { ExportPanel, useExport } from '@/components/export'
 import { initializeTheme, useThemeStore } from '@/store/theme.store'
 import { useExtensionStore } from '@/store/extension.store'
@@ -121,7 +120,6 @@ export function WorkspaceLayout({
   const loadFromDB = useConversationStore((s) => s.loadFromDB)
   const directoryHandle = useAgentStore((s) => s.directoryHandle)
   const roots = useFolderAccessStore((s) => s.roots)
-  const addRoot = useFolderAccessStore((s) => s.addRoot)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
   const projectIsLoading = useProjectStore((s) => s.isLoading)
   // Snapshot workspace-store flags so we can gate on workspace readiness.
@@ -152,7 +150,6 @@ export function WorkspaceLayout({
   const skillsScanVersion = useSkillsStore((s) => s.skillsScanVersion)
   const providerType = useSettingsStore((s) => s.providerType)
   const modelName = useSettingsStore((s) => s.modelName)
-  const hasApiKey = useSettingsStore((s) => s.hasApiKey)
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
   // `showPreview` is a boolean state field controlling the sync preview drawer.
@@ -189,46 +186,6 @@ export function WorkspaceLayout({
   const [showRecentFiles, setShowRecentFiles] = useState(false)
   const [showMcpSettings, setShowMcpSettings] = useState(false)
   const [showGoToFile, setShowGoToFile] = useState(false)
-  // Show a lightweight folder tip after model is first connected
-  const [showFolderTip, setShowFolderTip] = useState(false)
-  // Ref to the FolderSelector's "open folder" button, used by FolderTipBubble
-  // to anchor visually and to invoke the add-root action via the store.
-  const folderButtonRef = useRef<HTMLButtonElement | null>(null)
-
-  // Trigger the native folder picker. Used by FolderTipBubble in place of the
-  // old DOM-hack that synthesized a click on the TopBar button.
-  const handleOpenFolder = useCallback(async () => {
-    try {
-      await addRoot()
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[WorkspaceLayout] addRoot failed:', err)
-    }
-  }, [addRoot])
-
-  // Show the folder tip bubble unless a local folder is already mounted
-  // (roots.length > 0) — the tip would only be redundant in that case.
-  const maybeShowFolderTip = useCallback(() => {
-    if (useFolderAccessStore.getState().roots.length > 0) return
-    setShowFolderTip(true)
-  }, [])
-
-  // Auto-show folder tip when hasApiKey becomes true (first time only)
-  useEffect(() => {
-    if (!hasApiKey) return
-    const SEEN_KEY = 'creatorweave:folder-tip-seen'
-    if (localStorage.getItem(SEEN_KEY)) return
-    // Already mounted a local folder → no need to nudge
-    if (useFolderAccessStore.getState().roots.length > 0) return
-    // Small delay to let TopBar render the folder button
-    const timer = setTimeout(() => {
-      // Re-check at show time: a root may have been added while waiting
-      if (useFolderAccessStore.getState().roots.length > 0) return
-      setShowFolderTip(true)
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [hasApiKey])
-
   // React to "open in preview" requests from sidebar/list rows
   // (e.g. PendingSyncPanel's preview button). `openInFilePreview()` in the
   // workspace store bumps `filePreviewRequestSeq` and writes the path to
@@ -784,7 +741,6 @@ export function WorkspaceLayout({
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-white dark:bg-neutral-950">
       {/* Header */}
       <TopBar
-        folderButtonRef={folderButtonRef}
         onSkillsManagerOpen={handleSkillsManagerOpen}
         onToolsPanelOpen={() => setToolsPanelOpen(true)}
         onCommandPaletteOpen={() => setShowCommandPalette(true)}
@@ -887,7 +843,6 @@ export function WorkspaceLayout({
                     if (tab) setSettingsInitialTab(tab)
                     setShowWorkspaceSettings(true)
                   }}
-                  onGatewayLoginSuccess={maybeShowFolderTip}
                 />
               </div>
             )}
@@ -1025,19 +980,6 @@ export function WorkspaceLayout({
           </div>
         </div>
       )}
-
-      {/* Folder tip bubble — shown once after model is connected.
-          Suppressed whenever a local folder is already mounted (roots.length > 0):
-          covers the race where roots hydrate after the tip became visible. */}
-      <FolderTipBubble
-        show={showFolderTip && roots.length === 0}
-        anchorRef={folderButtonRef}
-        onOpenFolder={handleOpenFolder}
-        onDismiss={() => {
-          localStorage.setItem('creatorweave:folder-tip-seen', '1')
-          setShowFolderTip(false)
-        }}
-      />
 
       {/* Export Panel */}
       {isExportOpen && (

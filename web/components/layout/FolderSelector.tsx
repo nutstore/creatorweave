@@ -9,7 +9,7 @@
  * - Handles permission restoration
  */
 
-import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   FolderOpen,
@@ -28,30 +28,9 @@ import { useNativeHostPing } from '@/hooks/useNativeHostPing'
 import { cn } from '@/lib/utils'
 import type { RootInfo } from '@/types/folder-access'
 
-interface FolderSelectorProps {
-  /**
-   * Forwarded to the inner "open folder" / "add" button so that external UI
-   * (e.g. FolderTipBubble) can anchor or programmatically focus it.
-   */
-  buttonRef?: MutableRefObject<HTMLButtonElement | null>
-}
-
-export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
+export function FolderSelector() {
   const t = useT()
   const containerRef = useRef<HTMLDivElement>(null)
-
-  // Bridge the parent-provided `RefObject<HTMLButtonElement | null>` (React 19
-  // semantics: `current: HTMLButtonElement | null`) to the button's expected
-  // `LegacyRef<HTMLButtonElement>` (RefObject with `current: HTMLButtonElement`).
-  // Without this wrapper TS rejects passing the nullable ref directly.
-  const setButtonRef = useCallback(
-    (node: HTMLButtonElement | null) => {
-      if (buttonRef) {
-        buttonRef.current = node
-      }
-    },
-    [buttonRef]
-  )
 
   // Multi-root state
   const { roots, activeProjectId, addRoot, addNativeHostRoot, removeRoot, loadRoots, toggleReadOnly } =
@@ -181,7 +160,6 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           type="button"
           onClick={handleAddRoot}
           disabled={!canPickDirectory || isAdding}
-          ref={setButtonRef}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
@@ -231,7 +209,6 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           type="button"
           onClick={handleAddRoot}
           disabled={isAdding}
-          ref={setButtonRef}
           className={cn(
             'flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-border',
             'text-secondary transition-colors hover:border-primary-100 hover:bg-primary-50 hover:text-primary-600',

@@ -43,14 +43,6 @@ export const agent = {
         aiSearchBadge: "AI セマンティック検索",
         bm25Fallback: "BM25 フォールバック",
     },
-    folderTip: {
-        title: "ローカルフォルダを開く",
-        description:
-            "フォルダを許可すると、AI がファイルを読み書きし、ローカルに保存できます。",
-        selectFolder: "フォルダを選択",
-        later: "後で",
-    },
-
     // 検索会話ツール
     searchConversations: {
         failed: "失敗",
