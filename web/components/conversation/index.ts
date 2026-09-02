@@ -8,6 +8,7 @@ export { ConversationBadge } from '@/components/session/SessionBadge'
 export { ConversationStorageBadge } from '@/components/session/SessionBadgeWithStorage'
 export { ConversationSwitcher } from '@/components/session/SessionSwitcher'
 export { ExportConversationDialog } from './ExportConversationDialog'
+export { BatchExportDialog } from './BatchExportDialog'
 
 export type { ConversationBadgeProps } from '@/components/session/SessionBadge'
 export type { ConversationStorageBadgeProps } from '@/components/session/SessionBadgeWithStorage'

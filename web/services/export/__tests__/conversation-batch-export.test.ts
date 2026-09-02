@@ -34,6 +34,7 @@ vi.mock('@/opfs', () => ({
 
 const {
   listConversationsForExport,
+  listProjectsWithCounts,
   exportConversationsBatch,
 } = await import('@/services/export/conversation-batch-export')
 const { unzipSync } = await import('fflate')
@@ -103,6 +104,35 @@ describe('listConversationsForExport', () => {
     await listConversationsForExport({ limit: 10 })
     const [, params] = queryAllMock.mock.calls[0]
     expect(params).toEqual([10])
+  })
+
+  it('projectIds filter matches by id and includes the untitled (NULL) group', async () => {
+    // Only ids → plain IN clause
+    await listConversationsForExport({ projectIds: ['p1', 'p2'] })
+    const [sql1, params1] = queryAllMock.mock.calls[0]
+    expect(sql1).toContain('p.id IN (?,?)')
+    expect(sql1).not.toContain('p.id IS NULL')
+    expect(params1).toEqual(['p1', 'p2', 500])
+
+    // Mixed id + null → IN (…) OR p.id IS NULL
+    await listConversationsForExport({ projectIds: ['p1', null] })
+    const [sql2, params2] = queryAllMock.mock.calls[1]
+    expect(sql2).toContain('(p.id IN (?) OR p.id IS NULL)')
+    expect(params2).toEqual(['p1', 500])
+  })
+
+  it('listProjectsWithCounts groups by project id and exposes counts', async () => {
+    queryAllMock.mockResolvedValueOnce([
+      { projectId: 'p1', name: 'Web', conversationCount: 3 },
+      { projectId: null, name: null, conversationCount: 2 },
+    ])
+    const rows = await listProjectsWithCounts()
+    const [sql] = queryAllMock.mock.calls[0]
+    expect(sql).toContain('GROUP BY p.id, p.name')
+    // No COALESCE: the untitled label is a UI concern — the service must
+    // return the raw null so callers localize it.
+    expect(sql).not.toContain('COALESCE(p.name')
+    expect(rows[1]).toEqual({ projectId: null, name: null, conversationCount: 2 })
   })
 })
 

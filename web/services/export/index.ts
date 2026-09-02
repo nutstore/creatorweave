@@ -51,8 +51,9 @@ export {
 
 export {
   listConversationsForExport,
-  listProjectNames,
+  listProjectsWithCounts,
   exportConversationsBatch,
+  type ProjectWithCount,
   type ConversationListItem,
   type ConversationListFilter,
   type BatchExportSelection,

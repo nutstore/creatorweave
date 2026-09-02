@@ -37,15 +37,20 @@ export interface ConversationListItem {
   conversationId: string
   title: string
   workspaceName: string
-  projectName: string
+  projectName: string | null
   updatedAt: number
   createdAt: number
   messageCount: number
 }
 
 export interface ConversationListFilter {
-  /** Only include conversations of these projects. Empty = all projects. */
+  /** Only include conversations of these projects (by NAME — legacy agent-tool path). Empty = all projects. */
   projects?: string[]
+  /**
+   * Only include conversations of these projects (by ID — UI path). Empty =
+   * all projects. `null` entries select conversations with no project link.
+   */
+  projectIds?: Array<string | null>
   /** Unix epoch ms — only conversations updated at/after this. */
   updatedAfter?: number
   /** Unix epoch ms — only conversations updated at/before this. */
@@ -69,6 +74,7 @@ export async function listConversationsForExport(
 ): Promise<ConversationListItem[]> {
   const {
     projects,
+    projectIds,
     updatedAfter,
     updatedBefore,
     query,
@@ -82,6 +88,20 @@ export async function listConversationsForExport(
   if (projects && projects.length > 0) {
     conditions.push(`p.name IN (${projects.map(() => '?').join(',')})`)
     params.push(...projects)
+  }
+  if (projectIds && projectIds.length > 0) {
+    // NULL projectId selects conversations with no project link (p.id IS NULL
+    // after the LEFT JOINs), matching the synthetic untitled dropdown entry.
+    const nonNull = projectIds.filter((id): id is string => id !== null)
+    const parts: string[] = []
+    if (nonNull.length > 0) {
+      parts.push(`p.id IN (${nonNull.map(() => '?').join(',')})`)
+      params.push(...nonNull)
+    }
+    if (nonNull.length !== projectIds.length) {
+      parts.push('p.id IS NULL')
+    }
+    conditions.push(`(${parts.join(' OR ')})`)
   }
   if (typeof updatedAfter === 'number') {
     conditions.push('c.updated_at >= ?')
@@ -111,7 +131,7 @@ export async function listConversationsForExport(
       c.id AS conversationId,
       c.title,
       COALESCE(w.name, '') AS workspaceName,
-      COALESCE(p.name, '(未命名项目)') AS projectName,
+      p.name AS projectName,
       c.updated_at AS updatedAt,
       c.created_at AS createdAt,
       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS messageCount
@@ -129,17 +149,35 @@ export async function listConversationsForExport(
   return rows
 }
 
-/** All project names that have at least one conversation (for the filter dropdown). */
-export async function listProjectNames(): Promise<string[]> {
+/** All projects that have at least one conversation (for the filter dropdown). */
+export interface ProjectWithCount {
+  /** Project id; null = conversations with no project link (shown as untitled). */
+  projectId: string | null
+  /** Raw project name; null = no project link (callers localize the display label). */
+  name: string | null
+  conversationCount: number
+}
+
+/**
+ * Per-project conversation counts for the batch-export filter dropdown.
+ * Shows counts inline so users can predict what a filter yields before
+ * selecting it; id-based so same-named projects never collide and the
+ * untitled (NULL) group is selectable via the null id.
+ *
+ * No COALESCE on `name`: the untitled label is a UI concern (must be
+ * localized), so the service returns raw null and callers render
+ * `t('...untitledProject')` for `projectId === null` rows.
+ */
+export async function listProjectsWithCounts(): Promise<ProjectWithCount[]> {
   const db = getSQLiteDB()
-  const rows = await db.queryAll<{ projectName: string }>(
-    `SELECT DISTINCT COALESCE(p.name, '(未命名项目)') AS projectName
+  return db.queryAll<ProjectWithCount>(
+    `SELECT p.id AS projectId, p.name AS name, COUNT(*) AS conversationCount
      FROM conversations c
      LEFT JOIN workspaces w ON c.id = w.id
      LEFT JOIN projects p ON w.project_id = p.id
-     ORDER BY projectName`,
+     GROUP BY p.id, p.name
+     ORDER BY name`,
   )
-  return rows.map((r) => r.projectName)
 }
 
 // ============================================================================

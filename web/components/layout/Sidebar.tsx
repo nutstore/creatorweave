@@ -49,6 +49,7 @@ import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
 import { useT } from '@/i18n'
 import { ExportConversationDialog } from '@/components/conversation/ExportConversationDialog'
+import { BatchExportDialog } from '@/components/conversation/BatchExportDialog'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { NativeHostExecutor } from '@/opfs/native-disk/executor-native-host'
 
@@ -814,6 +815,7 @@ export const Sidebar = memo(function Sidebar({
   const [editingTitle, setEditingTitle] = useState('')
   const [composing, setComposing] = useState(false)
   const [exportConvId, setExportConvId] = useState<string | null>(null)
+  const [batchExportOpen, setBatchExportOpen] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [confirmDeletePos, setConfirmDeletePos] = useState<{ x: number; y: number } | null>(null)
   const deleteConfirmRef = useRef<HTMLDivElement>(null)
@@ -1169,6 +1171,15 @@ export const Sidebar = memo(function Sidebar({
           <span className="text-xs font-semibold uppercase tracking-wider text-secondary">{t('sidebar.workspace')}</span>
           <div className="flex items-center gap-1">
             <BrandButton
+              iconButton
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={() => setBatchExportOpen(true)}
+              title={t('conversation.batchExport.title')}
+            >
+              <Download className="h-3 w-3" />
+            </BrandButton>
+            <BrandButton
               variant="ghost"
               className="h-6 px-2 text-[11px]"
               disabled={scopedConversationIds.length === 0 || clearingConversations}
@@ -1450,6 +1461,12 @@ export const Sidebar = memo(function Sidebar({
           conversationId={exportConvId}
         />
       )}
+
+      {/* Batch export dialog (search + export conversations) */}
+      <BatchExportDialog
+        open={batchExportOpen}
+        onOpenChange={setBatchExportOpen}
+      />
 
       {/* Delete confirmation portal - rendered at body level */}
       {confirmDeleteId && confirmDeletePos && createPortal(
