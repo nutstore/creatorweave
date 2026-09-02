@@ -94,5 +94,25 @@
   "recipesInstalled": { "message": "Enabled" },
   "recipesAvailable": { "message": "Available" },
   "recipesEmptyInstalled": { "message": "Nothing enabled yet — turn on a site below to give your agent tools there." },
-  "recipesEmptyAvailable": { "message": "No more sites available in this version." }
+  "recipesEmptyAvailable": { "message": "No more sites available in this version." },
+  "webmcpGuideTitle": { "message": "WebMCP: no tools found — enable the browser switch" },
+  "webmcpGuideTitleNoTools": { "message": "WebMCP is available — but no tools were found yet" },
+  "webmcpGuideChromium": { "message": "Your browser can enable WebMCP with a built-in experiment switch: open the flags page below, search for \"webmcp\", set \"Enables WebMCP API\" to Enabled, then relaunch the browser when prompted." },
+  "webmcpGuideChromiumNew": { "message": "This browser version has removed the WebMCP switch (removed since Chromium 152). Sites now enable WebMCP themselves via an Origin Trial token — there is nothing to toggle in the browser." },
+  "webmcpGuideUnsupported": { "message": "This browser doesn't provide the WebMCP switch. Site tools appear here only in Chromium-based browsers that support WebMCP." },
+  "webmcpGuideOpenFlags": { "message": "Open the switch page (chrome://flags)" },
+  "webmcpGuideOpenDocs": { "message": "How sites enable it (official docs)" },
+  "webmcpGuideOpenReadme": { "message": "Open the setup guide (README)" },
+  "webmcpGuideFlagOn": { "message": "WebMCP is available in this browser. Tools appear here once a supported site is enabled and registers its tools — check the supported-sites list." },
+  "webmcpGuideFlagOnOt": { "message": "Note: on this browser version sites may also need their own Origin Trial token to expose tools." },
+  "webmcpGuideOpenSites": { "message": "Manage supported sites" },
+  "webmcpGuideStateOn": { "message": "available" },
+  "webmcpGuideStateOff": { "message": "off" },
+  "webmcpGuideVersion": {
+    "message": "WebMCP: $STATE$ · Chromium $VERSION$",
+    "placeholders": {
+      "state": { "content": "$1" },
+      "version": { "content": "$2" }
+    }
+  }
 }

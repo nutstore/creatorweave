@@ -251,6 +251,36 @@
       color: #0d9488;
       margin-bottom: 8px;
     }
+    /* Zero-tools setup guide (rendered inside webmcpBox when discovery
+       finds nothing): explains the browser-side WebMCP switch, its
+       Chromium version window, and opens chrome://flags in one click. */
+    .webmcp-guide-text {
+      font-size: 11px;
+      line-height: 1.55;
+      color: #525252;
+    }
+    .webmcp-guide-btn {
+      margin-top: 7px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid #d4d4d4;
+      background: #fafaf8;
+      color: #171717;
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+    .webmcp-guide-btn:hover {
+      background: #efefec;
+      border-color: #bdbdbd;
+    }
+    .webmcp-guide-ver {
+      margin-top: 6px;
+      font-size: 10px;
+      color: #a3a3a3;
+      line-height: 1.5;
+    }
     /* Host card: vertical container — header row + nested group rows */
     .webmcp-host {
       padding: 4px 0;
@@ -481,6 +511,9 @@
     </div>
     <div id="webmcpBox" class="webmcp-box" style="display:none">
       <div id="webmcpSummary" class="webmcp-summary">Scanning tabs…</div>
+      <!-- Zero-tools setup guide: how to enable the browser-side WebMCP
+           switch (built by popup/main.ts renderNoTools → buildGuide). -->
+      <div id="webmcpGuide" style="display:none"></div>
       <div id="webmcpList" class="webmcp-list-scroll"></div>
     </div>
     <!-- External agent MCP bridge — exposes WebMCP tools to out-of-browser

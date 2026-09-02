@@ -94,5 +94,25 @@
   "recipesInstalled": { "message": "已启用" },
   "recipesAvailable": { "message": "可启用" },
   "recipesEmptyInstalled": { "message": "尚未启用任何站点——在下方开启一个，让 AI 在那里获得工具。" },
-  "recipesEmptyAvailable": { "message": "当前版本没有更多可启用的站点。" }
+  "recipesEmptyAvailable": { "message": "当前版本没有更多可启用的站点。" },
+  "webmcpGuideTitle": { "message": "WebMCP：未发现工具——请先打开浏览器开关" },
+  "webmcpGuideTitleNoTools": { "message": "WebMCP 可用——但还没有发现工具" },
+  "webmcpGuideChromium": { "message": "当前浏览器内置了 WebMCP 实验开关：点击下方按钮打开开关页面，搜索 \"webmcp\"，将 \"Enables WebMCP API\" 设为 Enabled，并按提示重启浏览器。" },
+  "webmcpGuideChromiumNew": { "message": "当前浏览器版本已移除 WebMCP 开关（Chromium 152 起移除）。站点需通过 Origin Trial 令牌自行启用 WebMCP，浏览器侧已无开关可开。" },
+  "webmcpGuideUnsupported": { "message": "当前浏览器没有 WebMCP 开关。仅在支持 WebMCP 的 Chromium 内核浏览器中，站点工具才会出现在这里。" },
+  "webmcpGuideOpenFlags": { "message": "打开开关页面（chrome://flags）" },
+  "webmcpGuideOpenDocs": { "message": "站点如何启用（官方文档）" },
+  "webmcpGuideOpenReadme": { "message": "打开设置指引（README）" },
+  "webmcpGuideFlagOn": { "message": "当前浏览器的 WebMCP 可用。启用受支持的站点并等待其注册工具后，工具就会出现在这里——可先查看支持的站点列表。" },
+  "webmcpGuideFlagOnOt": { "message": "注意：在该浏览器版本上，站点可能还需申请 Origin Trial 令牌才能暴露工具。" },
+  "webmcpGuideOpenSites": { "message": "管理支持的站点" },
+  "webmcpGuideStateOn": { "message": "可用" },
+  "webmcpGuideStateOff": { "message": "未开启" },
+  "webmcpGuideVersion": {
+    "message": "WebMCP：$STATE$ · Chromium $VERSION$",
+    "placeholders": {
+      "state": { "content": "$1" },
+      "version": { "content": "$2" }
+    }
+  }
 }

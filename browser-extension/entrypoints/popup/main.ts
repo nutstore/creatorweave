@@ -181,34 +181,134 @@ function renderCapline(): void {
   var box = document.getElementById('webmcpBox');
   var list = document.getElementById('webmcpList');
   var summary = document.getElementById('webmcpSummary');
+  var guide = document.getElementById('webmcpGuide');
   if (!box || !list || !summary) return;
 
   // hostname → latest authorization state (default: enabled)
   var hostEnabled: Record<string, boolean> = {};
 
   function renderIdle() {
+    if (guide) guide.style.display = 'none';
     box.style.display = 'none';
   }
 
   function renderEmpty() {
+    if (guide) guide.style.display = 'none';
     box.style.display = 'none';
     capState.tools = null;
     capState.note = '';
     renderCapline();
   }
 
-  // Debug visibility: with the collapsed design, "no tools" and "discovery
-  // crashed" would be indistinguishable (the section just never appears).
-  // Keep the detail in the capability line's tooltip so issues stay
-  // diagnosable at a glance without cluttering the row.
+  // Zero-tools state: show a guide instead of hiding the section entirely.
+  // The guide FIRST probes the real switch state (see detectWebMCPSwitch):
+  // "0 tools" alone cannot distinguish "switch off" from "switch on but no
+  // site is providing tools", so the message differs per state. When the
+  // switch is missing we explain the version requirement and offer a
+  // one-click jump to chrome://flags — a privileged URL only an extension
+  // page can open (the web app's settings page can never do this).
   function renderNoTools(detail?: string) {
-    box.style.display = 'none';
     capState.tools = null;
     capState.note = detail || '';
+    summary.textContent = detectWebMCPSwitch().on
+      ? t('webmcpGuideTitleNoTools')
+      : t('webmcpGuideTitle');
     renderCapline();
+    if (!guide) {
+      // No guide container (stale HTML?) → keep the old hide behavior.
+      box.style.display = 'none';
+      return;
+    }
+    // renderIdle() hides the whole card at popup boot — un-hide it here.
+    // (Bugfix: only revealing the inner guide left the outer box hidden.)
+    box.style.display = '';
+    guide.style.display = '';
+    if (guide.dataset.built !== '1') {
+      guide.dataset.built = '1';
+      buildGuide();
+    }
+  }
+
+  // Probe: WebMCP is a Blink runtime feature ([RuntimeEnabled=WebMCP]).
+  // When the browser-level switch is on (flag / --enable-blink-features),
+  // the API exists in EVERY document — including this popup. CAVEAT: from
+  // the Origin-Trial era onward the object can also be present WITHOUT any
+  // user-touched switch (built-in rollout / trial tokens), so ON here means
+  // "WebMCP available in this browser", NOT necessarily "user enabled the
+  // flag" — the ON copy stays cause-neutral accordingly. OFF, however, is
+  // conclusive: no built-in and no flag → this browser really has no WebMCP.
+  // The version then picks the remedy: flags entry exists 146–151; removed
+  // since 152 (CL 8330412) → Origin-Trial path.
+  function detectWebMCPSwitch(): { on: boolean; isChromium: boolean; major: number } {
+    var on = !!(document as any).modelContext;
+    var m = /Chrome\/(\d+)\./.exec(navigator.userAgent);
+    var major = m ? parseInt(m[1], 10) : NaN;
+    return { on: on, isChromium: !isNaN(major), major: major };
+  }
+
+  function buildGuide(): void {
+    if (!guide) return;
+    var det = detectWebMCPSwitch();
+    // The three OFF states are only reachable when the probe says OFF:
+    // switch exists but disabled (146–151), switch removed (152+), or a
+    // non-Chromium browser (the Firefox build).
+    var flagAvailable = !det.on && det.isChromium && det.major >= 146 && det.major <= 151;
+    var flagRemoved = !det.on && det.isChromium && det.major >= 152;
+
+    var text = document.createElement('div');
+    text.className = 'webmcp-guide-text';
+    text.textContent = det.on
+      // Cause-neutral: on newer versions the object can be there without
+      // the user ever touching a switch, so don't claim they enabled one.
+      // 148+ additionally gets the site-side Origin Trial hint.
+      ? (t('webmcpGuideFlagOn') + (det.major >= 148 ? ' ' + t('webmcpGuideFlagOnOt') : ''))
+      : flagAvailable
+        ? t('webmcpGuideChromium')
+        : flagRemoved
+          ? t('webmcpGuideChromiumNew')
+          : t('webmcpGuideUnsupported');
+
+    // ON → the missing piece is tool providers, not the browser: open the
+    // supported-sites manager. OFF (146–151) → jump straight to the WebMCP
+    // flag entry on chrome://flags (new tab; popup closes — standard).
+    // OFF (152+) → official docs explain the Origin Trial path. Else → README.
+    var targetUrl = det.on
+      ? chrome.runtime.getURL('/recipes.html')
+      : flagAvailable
+        ? 'chrome://flags/#enable-webmcp-testing'
+        : flagRemoved
+          ? 'https://developer.chrome.com/docs/ai/webmcp'
+          : 'https://github.com/nutstore/creatorweave/blob/main/browser-extension/README.md';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'webmcp-guide-btn';
+    btn.textContent = det.on
+      ? t('webmcpGuideOpenSites')
+      : flagAvailable
+        ? t('webmcpGuideOpenFlags')
+        : flagRemoved
+          ? t('webmcpGuideOpenDocs')
+          : t('webmcpGuideOpenReadme');
+    btn.addEventListener('click', function () {
+      chrome.tabs.create({ url: targetUrl });
+      window.close();
+    });
+
+    var ver = document.createElement('div');
+    ver.className = 'webmcp-guide-ver';
+    ver.textContent = det.isChromium
+      ? t('webmcpGuideVersion', [det.on
+        ? t('webmcpGuideStateOn')
+        : t('webmcpGuideStateOff'), String(det.major)])
+      : '';
+
+    guide.appendChild(text);
+    guide.appendChild(btn);
+    guide.appendChild(ver);
   }
 
   function renderError(detail: string) {
+    if (guide) guide.style.display = 'none';
     box.style.display = 'none';
     capState.tools = null;
     capState.note = (chrome.i18n.getMessage('webmcpDiscoverError') || 'webmcpDiscoverError') + ': ' + detail;
@@ -292,6 +392,7 @@ function renderCapline(): void {
       renderEmpty();
       return;
     }
+    if (guide) guide.style.display = 'none';
     box.style.display = capExpanded ? '' : 'none';
     // Group by hostname → { groups: Map<groupKey, ...>, hostEnabled }
     var byHost: Record<string, {
