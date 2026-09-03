@@ -12,6 +12,7 @@
   },
   "scripts": {
     "test": "cd web && pnpm test",
+    "check": "make lint && make typecheck && make test",
     "host": "cargo build --release --manifest-path browser-extension/native-host/Cargo.toml",
     "host:mac": "cargo build --release --manifest-path browser-extension/native-host/Cargo.toml",
     "host:win": "cargo build --release --target x86_64-pc-windows-gnu --manifest-path browser-extension/native-host/Cargo.toml",
