@@ -106,7 +106,7 @@ class FileContentCache {
 
 ### Case 3: AI Agent working directory ⭐⭐⭐⭐
 
-**Background**: the project has AI Agent features (`web/src/agent/`)
+**Background**: the project has AI Agent features (`web/agent/`)
 
 ```
 While an Agent executes tasks it:

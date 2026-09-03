@@ -81,7 +81,7 @@ pnpm -C web typecheck
 ## 6. 文档索引
 
 1. 系统链路：[`docs/architecture/overview.md`](./overview.md)
-2. 插件系统等内部设计文档：见独立仓库 `weave-docs`（`plugin-system/`）
+2. 插件系统：见仓库根目录的 `plugins/README.md`
 
 ---
 

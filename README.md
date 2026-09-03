@@ -1,8 +1,8 @@
-# CreatorWeave
+# EO2Weave
 
 <div align="center">
 
-**CreatorWeave: a local-first AI-native platform for creation, knowledge workflows, and multi-agent orchestration**
+**EO2Weave: a local-first AI-native platform for creation, knowledge workflows, and multi-agent orchestration**
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -15,11 +15,11 @@ Try the live demo: [weave.eo2suite.com](https://weave.eo2suite.com/)
 
 </div>
 
-## What is CreatorWeave?
+## What is EO2Weave?
 
-CreatorWeave is a **local-first AI-native creation platform**. It combines file workflows, AI copilots, knowledge-base workflows, and multi-agent orchestration in one browser-native product.
+EO2Weave is a **local-first AI-native creation platform**. It combines file workflows, AI copilots, knowledge-base workflows, and multi-agent orchestration in one browser-native product.
 
-## Why CreatorWeave?
+## Why EO2Weave?
 
 - Built first for plain-text creation workflows: reduce context switching between editors, browsers, and terminals.
 - Browser-first by design: quick onboarding without requiring users to install an IDE or a heavy local setup.
@@ -36,7 +36,8 @@ The project is also exploring multi-agent collaboration workflows for content cr
 - **Local File Access**: Direct interaction with files through modern browser APIs (File System Access API)
 - **Code Intelligence**: Understand, analyze, and manipulate code with 30+ intelligent tools
 - **Python Integration**: Execute Python code in the browser with Pyodide (pandas, numpy, matplotlib support)
-- **Privacy First**: All processing happens locally - your data never leaves your browser
+- **WebMCP Support**: Any website can expose agent-callable tools via the standard WebMCP API — the companion browser extension discovers and invokes them automatically
+- **No Backend, No Tracking**: Files, conversations, and settings live in your browser (OPFS); we collect nothing. AI requests go directly from your browser to the LLM provider you configure (BYOK) — they never pass through our servers
 
 ## Features
 
@@ -77,6 +78,13 @@ The project is also exploring multi-agent collaboration workflows for content cr
 - **MCP Integration**: Configure Model Context Protocol providers for extended capabilities
 - **WASM Acceleration**: High-performance file operations using Rust-compiled WebAssembly modules
 
+### WebMCP & Browser Extension
+
+- **WebMCP Tool Discovery**: Any website can register agent-callable tools via the standard WebMCP API (`document.modelContext`) — no private protocol, no allowlist; the extension discovers standard-conforming tools automatically and keeps a live per-tab registry
+- **Authorization Controls**: Grant or revoke access per site and per tool group from the extension popup
+- **Agent Web Access**: Built-in `web_search` / `web_fetch` tools let in-browser agents search and read the web
+- **Native Host (optional)**: Rust companion process provides local disk and command execution bridges
+
 ### User Scenarios
 - **Developers**: Code understanding, refactoring, debugging, and code review
 - **Data Analysts**: Data exploration, visualization, and report generation
@@ -106,7 +114,7 @@ The project is also exploring multi-agent collaboration workflows for content cr
 
 ```bash
 # Clone the repository
-git clone https://github.com/nutstore/creatorweave.git
+git clone https://github.com/nutstore/eo2weave.git
 cd creatorweave
 
 # Install the pinned pnpm version (recommended)
@@ -195,8 +203,8 @@ pnpm -C web run test:e2e
 - [Architecture Overview](./docs/zh/developer/architecture/overview.md) - System architecture and design
 
 ### Technical Documentation
-- [Python Integration](./web/src/python/README.md) - Pyodide integration guide
-- [SQLite Storage](./web/src/sqlite/README.md) - SQLite WASM storage architecture
+- [Python Integration](./web/python/README.md) - Pyodide integration guide
+- [SQLite Storage](./web/sqlite/README.md) - SQLite WASM storage architecture
 
 ### API Documentation
 - [API Index](./docs/zh/developer/reference/README.md) - Stores and services API notes
@@ -204,7 +212,7 @@ pnpm -C web run test:e2e
 ## Roadmap
 
 - [ ] **SubAgent Orchestration (Planned)**: Add native subagent dispatching, parallel execution scheduling, result aggregation, and guardrails for cross-agent context isolation and handoff quality.
-- [ ] **LLM Wiki (Pending)**: Build an evolving knowledge-base workflow for `ingest` / `query` / `lint`, with structured claims and source traceability. Specs live in the internal `weave-docs` repository (`design/llm-wiki-mvp-unified-spec.md`, `design/subagent-prerequisite-for-llm-wiki.md`).
+- [ ] **LLM Wiki (Pending)**: Build an evolving knowledge-base workflow for `ingest` / `query` / `lint`, with structured claims and source traceability.
 
 ## Browser Compatibility
 

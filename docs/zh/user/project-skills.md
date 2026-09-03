@@ -91,7 +91,7 @@ triggers:
 
 ### 3. 自动生效
 
-当你打开项目时，CreatorWeave 会自动扫描 `.skills/` 目录下的所有 `SKILL.md` 文件并加载。AI 会在相关任务中自动匹配和使用这些 Skills。
+当你打开项目时，EO2Weave 会自动扫描 `.skills/` 目录下的所有 `SKILL.md` 文件并加载。AI 会在相关任务中自动匹配和使用这些 Skills。
 
 ## SKILL.md 格式详解
 
@@ -281,7 +281,7 @@ triggers:
 
 ## 在 Skills 管理器中查看
 
-你可以在 CreatorWeave 中查看和管理所有 Skills：
+你可以在 EO2Weave 中查看和管理所有 Skills：
 
 1. 点击侧边栏的 Skills 图标，或使用快捷键打开 Skills 管理器
 2. Skills 按来源分组显示：

@@ -5,7 +5,7 @@ order: 1
 
 # Getting Started
 
-CreatorWeave is a local-first workspace for creators and engineering teams.
+EO2Weave is a local-first workspace for creators and engineering teams.
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ CreatorWeave is a local-first workspace for creators and engineering teams.
 ## Quick Start
 
 ```bash
-git clone https://github.com/nutstore/creatorweave.git
-cd creatorweave
+git clone https://github.com/nutstore/eo2weave.git
+cd eo2weave
 pnpm install
 pnpm -C web run dev
 ```

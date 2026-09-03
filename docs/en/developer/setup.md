@@ -61,8 +61,8 @@ npm --version
 ### 4. Clone the project
 
 ```bash
-git clone https://github.com/nutstore/creatorweave.git
-cd creatorweave
+git clone https://github.com/nutstore/eo2weave.git
+cd eo2weave
 ```
 
 ### 5. Install dependencies
@@ -166,7 +166,7 @@ The project ships a `.vscode/settings.json` containing:
 ## Project Structure
 
 ```
-creatorweave/
+eo2weave/
 ├── wasm/                    # Rust + WASM modules
 │   ├── Cargo.toml           # Workspace config
 │   ├── crates/

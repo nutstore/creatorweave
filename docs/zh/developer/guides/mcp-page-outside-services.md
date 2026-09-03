@@ -5,7 +5,7 @@ order: 140
 
 # 页面外 MCP 服务接入指南
 
-本文说明如何将 **页面外的 MCP 服务** 接入 CreatorWeave 当前平台，包括：
+本文说明如何将 **页面外的 MCP 服务** 接入 EO2Weave 当前平台，包括：
 
 - Figma Remote MCP
 - OpenPencil 本地 MCP
@@ -69,23 +69,23 @@ WebMCP 指的是 **当前页面上下文直接暴露** 的 MCP 能力。
 
 ## 3. 相关代码位置
 
-> 以下路径均相对仓库根目录 `creatorweave/`。
+> 以下路径均相对仓库根目录 `eo2weave/`。
 
 ### Web 侧
 
-- `web/src/services/mcp-client.service.ts`
+- `web/services/mcp-client.service.ts`
   - 正式 MCP client
   - 负责 initialize / tools/list / tools/call / task 轮询
   - 只走插件 bridge，不走页面直连
 
-- `web/src/mcp/`
+- `web/mcp/`
   - MCP 领域模块目录
   - 与页面外 MCP 服务接入直接相关的关键文件包括：
-    - `web/src/mcp/mcp-manager.ts`
-    - `web/src/mcp/preset-providers.ts`
-    - `web/src/mcp/mcp-types.ts`
+    - `web/mcp/mcp-manager.ts`
+    - `web/mcp/preset-providers.ts`
+    - `web/mcp/mcp-types.ts`
 
-- `web/src/components/mcp/MCPSettings.tsx`
+- `web/components/mcp/MCPSettings.tsx`
   - MCP 设置 UI
   - 添加 server、编辑配置、连接、查看状态
 
@@ -190,8 +190,8 @@ Figma Remote 是当前最直接可接入的页面外 MCP 服务。
 
 当前项目已经提供 Figma preset：
 
-- 配置位置：`web/src/mcp/preset-providers.ts`
-- UI 入口：`web/src/components/mcp/MCPSettings.tsx`
+- 配置位置：`web/mcp/preset-providers.ts`
+- UI 入口：`web/components/mcp/MCPSettings.tsx`
 
 ### 6.3 配置步骤
 
@@ -220,7 +220,7 @@ Figma Remote 是当前最直接可接入的页面外 MCP 服务。
 
 ## 7. Mail MCP 接入步骤
 
-Mail MCP 是 CreatorWeave 自研的 streamable_http MCP server，提供邮件起草 / 发送 / 草稿管理能力。典型场景：agent 帮用户写邮件 → 起草 → 二次确认 → 发送。
+Mail MCP 是 EO2Weave 自研的 streamable_http MCP server，提供邮件起草 / 发送 / 草稿管理能力。典型场景：agent 帮用户写邮件 → 起草 → 二次确认 → 发送。
 
 ### 7.1 服务信息
 
@@ -239,10 +239,10 @@ Mail MCP 是 CreatorWeave 自研的 streamable_http MCP server，提供邮件起
 
 1. 用户访问 `/setup` → 点 "生成 token" → 保存 token
 2. 用户在 setup 页填 SMTP 凭据（host / port / user / 授权码）→ 验证 → 保存
-3. 用户在 CreatorWeave MCP Settings 加 Mail MCP preset → 把同一个 token 粘到 Auth Token
+3. 用户在 EO2Weave MCP Settings 加 Mail MCP preset → 把同一个 token 粘到 Auth Token
 4. Agent 调 `tools/call` → server 拿 token 识别该用户 → 用该用户的 SMTP 凭据发送
 
-**关键点**：CreatorWeave 端**不存** SMTP 凭据，只存 Personal Mail Token（由 mail-mcp 自己生成）。server 端用 token 查账号配置并解密 SMTP 密码。CreatorWeave 前端代码无需感知 SMTP 细节。
+**关键点**：EO2Weave 端**不存** SMTP 凭据，只存 Personal Mail Token（由 mail-mcp 自己生成）。server 端用 token 查账号配置并解密 SMTP 密码。EO2Weave 前端代码无需感知 SMTP 细节。
 
 > 旧版「单账号模式」通过环境变量 `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` 等配置，目前保留为向后兼容，不推荐用于多用户共享部署。
 
@@ -250,8 +250,8 @@ Mail MCP 是 CreatorWeave 自研的 streamable_http MCP server，提供邮件起
 
 当前项目已经提供 Mail preset：
 
-- 配置位置：`web/src/mcp/preset-providers.ts`（id: `mail`，category: `communication`，icon: `mail`）
-- UI 入口：`web/src/components/mcp/MCPSettings.tsx`
+- 配置位置：`web/mcp/preset-providers.ts`（id: `mail`，category: `communication`，icon: `mail`）
+- UI 入口：`web/components/mcp/MCPSettings.tsx`
 
 ### 7.4 配置步骤
 
@@ -285,7 +285,7 @@ Mail MCP 是 CreatorWeave 自研的 streamable_http MCP server，提供邮件起
 
 - 没有 "前往 setup 页" 快捷按钮（用户需自己记 `/setup` URL）
 - 发送前**未**弹确认对话框（`send_email` / `send_email_draft` 直接执行，依赖 agent 自觉）
-- `mail-mcp` 已为未来确认对话框预留 `draft_response.preview.text/html` 字段（draft 工具返回 JSON 中），但 CreatorWeave 当前未消费
+- `mail-mcp` 已为未来确认对话框预留 `draft_response.preview.text/html` 字段（draft 工具返回 JSON 中），但 EO2Weave 当前未消费
 
 ---
 
@@ -469,6 +469,6 @@ OpenPencil 更适合作为 **本地桌面应用 + 插件代理** 场景接入。
 在当前平台架构下：
 
 - **Figma Remote**：可以直接作为页面外 MCP 服务接入，推荐优先支持
-- **Mail MCP**：CreatorWeave 自研远程 MCP，已通过 preset 接入，依赖用户在 `/setup` 页自助配置 Personal Mail Token + SMTP 凭据
+- **Mail MCP**：EO2Weave 自研远程 MCP，已通过 preset 接入，依赖用户在 `/setup` 页自助配置 Personal Mail Token + SMTP 凭据
 - **OpenPencil MCP**：技术上可接，但应通过浏览器插件 bridge 代理，不应由页面直连本地地址
-- **通用原则**：所有页面外的 MCP 服务，都通过 `web/src/services/mcp-client.service.ts` + 浏览器插件 bridge 接入
+- **通用原则**：所有页面外的 MCP 服务，都通过 `web/services/mcp-client.service.ts` + 浏览器插件 bridge 接入

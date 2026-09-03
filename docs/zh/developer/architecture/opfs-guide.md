@@ -105,7 +105,7 @@ class FileContentCache {
 
 ### 场景 3：AI Agent 的工作目录 ⭐⭐⭐⭐
 
-**背景**：项目有 AI Agent 功能（`web/src/agent/`）
+**背景**：项目有 AI Agent 功能（`web/agent/`）
 
 ```
 Agent 执行任务时：

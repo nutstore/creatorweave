@@ -80,8 +80,8 @@ For cross-project commands use the root `Makefile` (e.g. `make lint`, `make test
 
 ## 6. Documentation Index
 
-1. System flow: [`docs/zh/developer/architecture/overview.md`](https://github.com/nutstore/creatorweave/blob/main/docs/zh/developer/architecture/overview.md)
-2. Plugin system and other internal design docs: see the separate `weave-docs` repository (`plugin-system/`)
+1. System flow: [`docs/zh/developer/architecture/overview.md`](https://github.com/nutstore/eo2weave/blob/main/docs/zh/developer/architecture/overview.md)
+2. Plugin system: see `plugins/README.md` in the repository root
 
 ---
 

@@ -5,7 +5,7 @@ order: 300
 
 # API 参考
 
-CreatorWeave 的 API 接口文档。
+EO2Weave 的 API 接口文档。
 
 ## 目录
 

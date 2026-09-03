@@ -1,6 +1,6 @@
 # Browser Extension (EO2Weave)
 
-The browser extension powering CreatorWeave: `web_search` / `web_fetch` for in-browser agents, **WebMCP tool discovery** (any website can expose agent-callable tools via the standard WebMCP API), Rust native-host disk/exec access, and an optional **Codex OAuth proxy**.
+The browser extension powering EO2Weave: `web_search` / `web_fetch` for in-browser agents, **WebMCP tool discovery** (any website can expose agent-callable tools via the standard WebMCP API), Rust native-host disk/exec access, and an optional **Codex OAuth proxy**.
 
 Built with [WXT](https://wxt.dev/).
 
@@ -68,13 +68,13 @@ if (window.__agentWeb?.ready) {
 
 ### WebMCP Tool Discovery
 
-Any website can expose tools (functions the AI agent can call) to CreatorWeave by registering them via the **standard WebMCP API** (`document.modelContext`). No private protocol, no allowlist, no registration process — the extension discovers standard-conforming tools automatically, keeps a live per-tab registry, and lets users grant/revoke per-site and per-tool-group authorization from the popup.
+Any website can expose tools (functions the AI agent can call) to EO2Weave by registering them via the **standard WebMCP API** (`document.modelContext`). No private protocol, no allowlist, no registration process — the extension discovers standard-conforming tools automatically, keeps a live per-tab registry, and lets users grant/revoke per-site and per-tool-group authorization from the popup.
 
 → Full integration guide for websites: [WebMCP Tools — Integration Guide](#webmcp-tools--integration-guide-for-websites)
 
 ## WebMCP Tools — Integration Guide for Websites
 
-Any website can expose tools (functions the AI agent can call) to CreatorWeave by registering them via the **standard WebMCP API** (`document.modelContext`). There is **no private protocol, no allowlist, no registration process** — the extension discovers standard-conforming tools automatically.
+Any website can expose tools (functions the AI agent can call) to EO2Weave by registering them via the **standard WebMCP API** (`document.modelContext`). There is **no private protocol, no allowlist, no registration process** — the extension discovers standard-conforming tools automatically.
 
 ### How a website registers tools
 
@@ -119,7 +119,7 @@ page registers tools
       validates and relays as webmcp_tab_report
   → background registry (storage.session-persisted)
       → popup lists sites/groups instantly (no tab scan)
-      → CreatorWeave web app discovers tools via window.__agentWeb.webmcpDiscoverTools()
+      → EO2Weave web app discovers tools via window.__agentWeb.webmcpDiscoverTools()
   → agent invokes a tool via webmcpInvokeTool()
       → authorization gate (host + group) → relayed back into the source tab
 ```
@@ -128,7 +128,7 @@ The legacy scan-on-demand probe still exists as a fallback for tabs opened befor
 
 ### How the agent host invokes a tool
 
-Sites only **register** tools. **Calling** them is done by the agent host (the CreatorWeave web app) through the same `window.__agentWeb` bridge:
+Sites only **register** tools. **Calling** them is done by the agent host (the EO2Weave web app) through the same `window.__agentWeb` bridge:
 
 ```javascript
 // 1. Discover (flat list; each entry carries its own routing identity)
@@ -270,14 +270,14 @@ Tool names follow the provider-safe `host__tool` convention; the per-host/per-gr
 
 > **Distribution note:** this feature ships with the **open-source community version** (build from source or grab the release from GitHub). The **Chrome Web Store version does not include it** — the store build (`build:store` / `zip:store`) strips the Codex OAuth feature entirely at build time (popup box, background handlers, i18n keys).
 
-The extension enables using OpenAI Codex models directly from CreatorWeave, without exposing OAuth tokens to the web app.
+The extension enables using OpenAI Codex models directly from EO2Weave, without exposing OAuth tokens to the web app.
 
 **Flow:**
 
 1. Click the extension icon → **Start Device Code Login**
 2. A new tab opens to `auth.openai.com` — complete authorization
 3. The extension exchanges the device code for access/refresh tokens (stored in `chrome.storage.local`)
-4. CreatorWeave auto-detects the authorized extension and registers `codex-oauth` as an available LLM provider
+4. EO2Weave auto-detects the authorized extension and registers `codex-oauth` as an available LLM provider
 5. All Codex API requests are proxied through the extension's background service worker
 
 **Supported models:**
@@ -333,7 +333,7 @@ browser-extension/
 ## Architecture
 
 ```
-CreatorWeave Web App
+EO2Weave Web App
   │
   ├── pi-ai library → fetch() → codex-bridge-fetch.ts (globalThis.fetch wrapper)
   │       │

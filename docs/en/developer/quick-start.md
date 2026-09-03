@@ -20,8 +20,8 @@ Ensure you have the following installed:
 
 ```bash
 # Clone the repository
-git clone https://github.com/nutstore/creatorweave.git
-cd creatorweave
+git clone https://github.com/nutstore/eo2weave.git
+cd eo2weave
 
 # Install dependencies
 pnpm install
@@ -95,7 +95,7 @@ pnpm run typecheck        # Type check package
 ## 🏗️ Project Structure
 
 ```
-creatorweave/
+eo2weave/
 ├── web/                   # React frontend (Desktop)
 │   ├── src/
 │   │   ├── agent/         # AI agent system
@@ -187,7 +187,7 @@ curl -I https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js
 
 - Architecture overview (Chinese): `docs/zh/developer/architecture/overview.md`
 - API reference (Chinese): `docs/zh/developer/reference/README.md`
-- Python integration: `web/src/python/README.md` (repo root)
+- Python integration: `web/python/README.md` (repo root)
 
 ## 💡 Tips
 
@@ -206,5 +206,5 @@ curl -I https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js
 
 ## 🤝 Need Help?
 
-- Check existing [Issues](https://github.com/nutstore/creatorweave/issues)
-- Start a [Discussion](https://github.com/nutstore/creatorweave/discussions)
+- Check existing [Issues](https://github.com/nutstore/eo2weave/issues)
+- Start a [Discussion](https://github.com/nutstore/eo2weave/discussions)

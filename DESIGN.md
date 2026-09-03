@@ -1,5 +1,5 @@
 ---
-name: CreatorWeave
+name: EO2Weave
 description: AI-native creator workspace — muted teal over warm neutrals.
 colors:
   # ── Primary: Muted Teal ──────────────────────────────
@@ -129,13 +129,13 @@ components:
     padding: "6px 14px"
 ---
 
-# Design System: CreatorWeave
+# Design System: EO2Weave
 
 ## Overview
 
 **Creative North Star: "A well-lit reading room."**
 
-CreatorWeave is a long-session IDE — creators spend hours reading code, agent
+EO2Weave is a long-session IDE — creators spend hours reading code, agent
 output, and docs. The interface must stay legible and calm at that density and
 duration, so the system trades saturation for endurance. Colors are muted, the
 serif display voice keeps large type from feeling industrial, and depth is

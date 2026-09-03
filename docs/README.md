@@ -10,7 +10,7 @@ Each language has two categories served by the docs center:
 - `user/` — product usage guides
 - `developer/` — developer guides (guides / architecture / reference)
 
-Internal-only docs (design specs, plugin system, requirements, product ideas) live in the separate `weave-docs` repository next to this repo.
+Internal-only docs (design specs, requirements, product ideas) are not part of this public repository.
 
 Note: completed feature PRDs / plans / migration designs are removed from the repo once shipped; consult git history (`git log -- docs/`) if needed.
 

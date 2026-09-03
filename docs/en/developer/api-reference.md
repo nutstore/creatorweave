@@ -5,13 +5,13 @@ order: 300
 
 # API Documentation
 
-Complete API reference for CreatorWeave.
+Complete API reference for EO2Weave.
 
 ## Stores (Zustand)
 
 ### Agent Store
 
-**Location**: `web/src/store/agent.store.ts`
+**Location**: `web/store/agent.store.ts`
 
 Manages AI agent state and conversations.
 
@@ -50,7 +50,7 @@ interface ToolCall {
 
 ### Conversation Store (SQLite)
 
-**Location**: `web/src/store/conversation.store.sqlite.ts`
+**Location**: `web/store/conversation.store.sqlite.ts`
 
 Manages conversation threads with SQLite persistence.
 
@@ -79,7 +79,7 @@ interface Conversation {
 
 ### Analysis Store
 
-**Location**: `web/src/store/analysis.store.ts`
+**Location**: `web/store/analysis.store.ts`
 
 Manages file analysis state.
 
@@ -108,7 +108,7 @@ interface AnalysisResult {
 
 ### Settings Store
 
-**Location**: `web/src/store/settings.store.ts`
+**Location**: `web/store/settings.store.ts`
 
 Manages application settings.
 
@@ -137,7 +137,7 @@ interface SettingsState {
 
 ### Workspace Store
 
-**Location**: `web/src/store/workspace.store.ts`
+**Location**: `web/store/workspace.store.ts`
 
 Manages workspace state and file handles.
 
@@ -168,7 +168,7 @@ interface FileNode {
 
 ### Skills Store
 
-**Location**: `web/src/store/skills.store.ts`
+**Location**: `web/store/skills.store.ts`
 
 Manages AI skills configuration.
 
@@ -197,7 +197,7 @@ interface Skill {
 
 ### Theme Store
 
-**Location**: `web/src/store/theme.store.ts`
+**Location**: `web/store/theme.store.ts`
 
 Manages theme selection.
 
@@ -214,7 +214,7 @@ interface ThemeState {
 
 ### File System Service
 
-**Location**: `web/src/services/fs-access.ts`
+**Location**: `web/services/fs-access.ts`
 
 File System Access API wrapper.
 
@@ -239,7 +239,7 @@ class FileSystemAccess {
 
 ### Python Service
 
-**Location**: `web/src/python/manager.ts`
+**Location**: `web/python/manager.ts`
 
 Pyodide Python execution manager.
 
@@ -269,7 +269,7 @@ interface ExecuteResult {
 
 ### Export Service
 
-**Location**: `web/src/export/`
+**Location**: `web/export/`
 
 Data export functionality.
 
@@ -298,7 +298,7 @@ class ExportService {
 
 ### Conversation Repository
 
-**Location**: `web/src/sqlite/repositories/conversation.repository.ts`
+**Location**: `web/sqlite/repositories/conversation.repository.ts`
 
 ```typescript
 class ConversationRepository {
@@ -311,7 +311,7 @@ class ConversationRepository {
 
 ### Skill Repository
 
-**Location**: `web/src/sqlite/repositories/skill.repository.ts`
+**Location**: `web/sqlite/repositories/skill.repository.ts`
 
 ```typescript
 class SkillRepository {
@@ -324,7 +324,7 @@ class SkillRepository {
 
 ### API Key Repository
 
-**Location**: `web/src/sqlite/repositories/api-key.repository.ts`
+**Location**: `web/sqlite/repositories/api-key.repository.ts`
 
 ```typescript
 class ApiKeyRepository {
@@ -337,7 +337,7 @@ class ApiKeyRepository {
 
 ### Session Repository
 
-**Location**: `web/src/sqlite/repositories/session.repository.ts`
+**Location**: `web/sqlite/repositories/session.repository.ts`
 
 ```typescript
 class SessionRepository {
@@ -488,7 +488,7 @@ interface FileTreeProps {
 Common types used across the application.
 
 ```typescript
-// Location: web/src/types/
+// Location: web/types/
 
 type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
@@ -529,5 +529,5 @@ type ExportFormat = 'csv' | 'json' | 'xlsx' | 'pdf' | 'png';
 
 - [Architecture Overview](./architecture-overview.md)
 - [Monorepo Architecture and Boundaries](./monorepo-architecture.md)
-- Python integration: `web/src/python/README.md` (repo root)
-- SQLite storage: `web/src/sqlite/README.md` (repo root)
+- Python integration: `web/python/README.md` (repo root)
+- SQLite storage: `web/sqlite/README.md` (repo root)

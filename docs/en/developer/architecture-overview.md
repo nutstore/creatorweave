@@ -3,7 +3,7 @@ title: Architecture Overview
 order: 201
 ---
 
-# CreatorWeave Architecture Overview
+# EO2Weave Architecture Overview
 
 > This document is based on the current repository code (`master`). Its goal is to give developers an actionable system map: module boundaries, key data flows, startup paths, and troubleshooting entry points.
 
@@ -17,7 +17,7 @@ The repository is a `pnpm workspace` monorepo. The core runtime units are:
 
 ## 2. Frontend Main App (web) Layering
 
-The core layering of `web/src` can be understood as "UI -> Store -> services/runtime -> persistence/external protocols":
+The core layering of `web/` can be understood as "UI -> Store -> services/runtime -> persistence/external protocols":
 
 1. UI layer: `components/`, `hooks/`, `styles/`.
 2. State layer: `store/` (Zustand) — conversations, workspace, settings, etc.
@@ -34,7 +34,7 @@ The core layering of `web/src` can be understood as "UI -> Store -> services/run
 
 ## 3. Startup Flow (Desktop)
 
-Entry: `web/src/main.tsx` -> `web/src/App.tsx`
+Entry: `web/app/layout.tsx` (root layout) -> `web/app/(app)/page.tsx` (main UI, Next.js App Router)
 
 Initialization order (critical path):
 
@@ -87,7 +87,7 @@ Key facts:
 
 ### 5.3 Python (Pyodide)
 
-1. `web/src/python/*` provides the in-browser Python execution entry.
+1. `web/python/*` provides the in-browser Python execution entry.
 2. During build, `web` copies pyodide assets into the output directory.
 3. Agent tools can invoke Python computation and file processing through the bridge.
 
@@ -140,7 +140,7 @@ make test
 
 ## 9. Structural Evolution (Landed)
 
-The Project / Workspace two-layer structure has landed together with multi-root workspace support. Design details live in the internal `weave-docs` repository (`design/multi-root-project.md`).
+The Project / Workspace two-layer structure has landed together with multi-root workspace support.
 
 ---
 

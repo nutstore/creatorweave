@@ -385,7 +385,7 @@ export function DocumentationPage({ language, category, page, onBack }: Document
 
           {/* GitHub Project Link */}
           <a
-            href="https://github.com/nutstore/creatorweave"
+            href="https://github.com/nutstore/eo2weave"
             target="_blank"
             rel="noopener noreferrer"
             className={cn(

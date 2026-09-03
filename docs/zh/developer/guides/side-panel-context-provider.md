@@ -5,18 +5,18 @@ order: 150
 
 # Side Panel Context Provider 集成指南
 
-本文面向**第三方网站开发者**（如坚果云工作台、邮箱、文档、企业内部系统），说明如何让自己的网站在被 CreatorWeave 的浏览器扩展 side panel 唤起时，向 CreatorWeave agent 提供「当前页面上下文」。
+本文面向**第三方网站开发者**（如坚果云工作台、邮箱、文档、企业内部系统），说明如何让自己的网站在被 EO2Weave 的浏览器扩展 side panel 唤起时，向 EO2Weave agent 提供「当前页面上下文」。
 
 ## 1. 什么是 Context Provider
 
-当用户在你网站上点 CreatorWeave 侧边栏按钮时，浏览器扩展会打开 CreatorWeave 的 side panel。CreatorWeave agent 会想知道「用户在网站上正在看什么」，以便基于当前上下文回答问题。
+当用户在你网站上点 EO2Weave 侧边栏按钮时，浏览器扩展会打开 EO2Weave 的 side panel。EO2Weave agent 会想知道「用户在网站上正在看什么」，以便基于当前上下文回答问题。
 
 你只需要在自己的网站（或通过油猴脚本）暴露一个全局函数：
 
 ```js
 window.__sidePanelContextProvider = {
   getContext: () => {
-    // 返回任意格式的对象（CreatorWeave 不解析字段）
+    // 返回任意格式的对象（EO2Weave 不解析字段）
     return {
       type: 'ticket',
       id: '484514',
@@ -28,7 +28,7 @@ window.__sidePanelContextProvider = {
 }
 ```
 
-CreatorWeave 在每次 LLM 调用前都会通过浏览器扩展拉一次这个函数的结果，**原样**拼到 system prompt。
+EO2Weave 在每次 LLM 调用前都会通过浏览器扩展拉一次这个函数的结果，**原样**拼到 system prompt。
 
 ## 2. 核心契约
 
@@ -44,14 +44,14 @@ interface SidePanelContextProvider {
 }
 ```
 
-- **同步返回** 或 **异步返回**（Promise）都行 — CreatorWeave 都支持
+- **同步返回** 或 **异步返回**（Promise）都行 — EO2Weave 都支持
 - **返回任意类型** — string / object / array / 任意 JS 值
-- CreatorWeave **不解析字段**，原样 stringify 后注入 LLM
-- 返回 `null` / `undefined` / 抛错 = 告诉 CreatorWeave「当前没有 context」
+- EO2Weave **不解析字段**，原样 stringify 后注入 LLM
+- 返回 `null` / `undefined` / 抛错 = 告诉 EO2Weave「当前没有 context」
 
 ### 2.3 调用时机
 
-CreatorWeave **每次拼 system prompt 时都会调一次**（即每次 LLM 调用前）。所以：
+EO2Weave **每次拼 system prompt 时都会调一次**（即每次 LLM 调用前）。所以：
 
 - 你的 `getContext` 应该返回**当前**页面状态（不要缓存太久）
 - 如果 context 计算昂贵，可以加内部缓存（如 5 秒 TTL）
@@ -86,7 +86,7 @@ CreatorWeave **每次拼 system prompt 时都会调一次**（即每次 LLM 调�
 
 ```js
 // ==UserScript==
-// @name         My Site → CreatorWeave Context Provider
+// @name         My Site → EO2Weave Context Provider
 // @namespace    https://yourcompany.com
 // @version      1.0.0
 // @match        https://your-site.example.com/*
@@ -118,7 +118,7 @@ CreatorWeave **每次拼 system prompt 时都会调一次**（即每次 LLM 调�
     const url = location.href;
     if (url !== lastUrl) {
       lastUrl = url;
-      // CreatorWeave 会在下次 LLM 调用时重新拉取，不需要主动通知
+      // EO2Weave 会在下次 LLM 调用时重新拉取，不需要主动通知
     }
   }).observe(document, { subtree: true, childList: true });
 })();
@@ -145,7 +145,7 @@ CreatorWeave **每次拼 system prompt 时都会调一次**（即每次 LLM 调�
 
 ## 4. 返回什么字段？
 
-**完全自由**。CreatorWeave 不解析。但有几个建议：
+**完全自由**。EO2Weave 不解析。但有几个建议：
 
 | 场景 | 推荐字段 |
 |------|---------|
@@ -188,7 +188,7 @@ useEffect(() => {
 
 ```js
 // ==UserScript==
-// @name         Mail → CreatorWeave
+// @name         Mail → EO2Weave
 // @match        https://mail.example.com/*
 // ==/UserScript==
 
@@ -218,7 +218,7 @@ useEffect(() => {
 
 ## 6. 调试
 
-打开 CreatorWeave side panel 后，浏览器控制台（DevTools for the side panel）会显示：
+打开 EO2Weave side panel 后，浏览器控制台（DevTools for the side panel）会显示：
 
 ```
 [Workspace Assistant] Side panel mode: hostname: workspace.jianguoyun.com tabId: 123
@@ -240,15 +240,15 @@ useEffect(() => {
 
 ❌ **不要在 URL 里拼字段**（如 `?ticket_id=484514&title=...`）：
    - URL 长度有限制
-   - 硬编码字段名，CreatorWeave 不解析
+   - 硬编码字段名，EO2Weave 不解析
 
 ❌ **不要注册成 WebMCP tool**：
    - WebMCP tool 会出现在 agent 的工具 catalog 里
    - 这跟「system prompt 注入」语义不同
 
-❌ **不要 push 到 CreatorWeave 的 window**：
-   - CreatorWeave 主动拉（pull 模式），不接受 push
-   - CreatorWeave 不挂任何 setContext 回调
+❌ **不要 push 到 EO2Weave 的 window**：
+   - EO2Weave 主动拉（pull 模式），不接受 push
+   - EO2Weave 不挂任何 setContext 回调
 
 ## 8. 安全考虑
 
@@ -258,5 +258,5 @@ useEffect(() => {
 
 ## 9. 相关文档
 
-- [页面外 MCP 服务接入指南](./mcp-page-outside-services.md) — CreatorWeave 这边的接入架构
+- [页面外 MCP 服务接入指南](./mcp-page-outside-services.md) — EO2Weave 这边的接入架构
 - 浏览器扩展源码：`browser-extension/entrypoints/background.ts` 中的 `requestSidePanelContext` handler

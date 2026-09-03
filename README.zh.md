@@ -1,8 +1,8 @@
-# CreatorWeave
+# EO2Weave
 
 <div align="center">
 
-**CreatorWeave：本地优先的 AI 原生创作平台，支持创作、知识沉淀与多代理编排**
+**EO2Weave：本地优先的 AI 原生创作平台，支持创作、知识沉淀与多代理编排**
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -17,9 +17,9 @@
 
 ## 项目简介
 
-CreatorWeave 是一款 **本地优先的 AI 原生创作平台**。它将本地文件工作流、AI 对话协作、知识沉淀与多代理能力整合在同一套浏览器应用中。
+EO2Weave 是一款 **本地优先的 AI 原生创作平台**。它将本地文件工作流、AI 对话协作、知识沉淀与多代理能力整合在同一套浏览器应用中。
 
-## 项目初衷（Why CreatorWeave）
+## 项目初衷（Why EO2Weave）
 
 - 面向纯文本内容创作：减少在编辑器、浏览器、终端之间来回切换导致的思路中断。
 - 从浏览器优先出发：开箱即用，不需要先安装 IDE 或复杂本地环境。
@@ -34,6 +34,8 @@ CreatorWeave 是一款 **本地优先的 AI 原生创作平台**。它将本地�
 - **本地优先**：通过浏览器 File System Access API 与本地文件交互
 - **高性能存储**：SQLite WASM + OPFS（支持 IndexedDB 回退）
 - **Python 集成**：基于 Pyodide 在浏览器中运行 Python
+- **WebMCP 支持**：任何网站都能通过标准 WebMCP API 把能力暴露成 agent 可调用的工具，配套浏览器扩展自动发现与授权
+- **无后端、不收集**：文件、对话、配置全部存于浏览器本地（OPFS）；AI 请求由浏览器直连你配置的模型服务商（BYOK），不经手我们的服务器
 - **数据与可视化**：支持表格、图表、导出等数据分析流程
 
 ## 快速开始
@@ -47,7 +49,7 @@ CreatorWeave 是一款 **本地优先的 AI 原生创作平台**。它将本地�
 ### 安装
 
 ```bash
-git clone https://github.com/nutstore/creatorweave.git
+git clone https://github.com/nutstore/eo2weave.git
 cd creatorweave
 
 # 推荐：按项目配置安装 pnpm 10.21.0
@@ -84,13 +86,13 @@ make build
 - [开发者文档入口（中文）](./docs/developer/guides/index.md)
 - [开发指南（English）](./docs/development/README.md)
 - [架构文档](./docs/architecture/overview.md)
-- [SQLite 存储说明](./web/src/sqlite/README.md)
+- [SQLite 存储说明](./web/sqlite/README.md)
 
 ## Roadmap（待实现）
 
-- [ ] **附件目录（规划中）**：工作区级附件存储，支持在对话中上传文件。Agent 通过 `vfs://attachments/` 路径使用现有 `read`/`ls` 工具访问附件。详见 [附件目录设计](./docs/design/attachment-directory-design.md)。
+- [ ] **附件目录（规划中）**：工作区级附件存储，支持在对话中上传文件。Agent 通过 `vfs://attachments/` 路径使用现有 `read`/`ls` 工具访问附件。设计文档整理中。
 - [ ] **SubAgent 编排能力（规划中）**：提供原生 SubAgent 分发、并行调度、结果聚合，以及跨代理上下文隔离与交接质量保障能力。
-- [ ] **LLM Wiki（规划中）**：构建可持续演进的知识库流程（`ingest` / `query` / `lint`），支持结构化 claim 与来源可追溯。参考：[LLM Wiki 统一技术规格](./docs/design/llm-wiki-mvp-unified-spec.md)、[LLM Wiki 的 SubAgent 前置能力](./docs/design/subagent-prerequisite-for-llm-wiki.md)。
+- [ ] **LLM Wiki（规划中）**：构建可持续演进的知识库流程（`ingest` / `query` / `lint`），支持结构化 claim 与来源可追溯。技术规格文档整理中。
 
 ## 参与贡献
 

@@ -1,4 +1,4 @@
-# CreatorWeave - Developer Guide
+# EO2Weave - Developer Guide
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@
 
 ## Project Overview
 
-CreatorWeave is an AI-native creator workspace built with React, TypeScript, and Rust/WASM. It enables natural language interaction with local files through modern browser APIs.
+EO2Weave is an AI-native creator workspace built with React, TypeScript, and Rust/WASM. It enables natural language interaction with local files through modern browser APIs.
 
 ### Technology Stack
 
@@ -106,8 +106,8 @@ CreatorWeave is an AI-native creator workspace built with React, TypeScript, and
 
 ```bash
 # Clone the repository
-git clone https://github.com/nutstore/creatorweave.git
-cd creatorweave
+git clone https://github.com/nutstore/eo2weave.git
+cd eo2weave
 
 # Install dependencies
 pnpm install
@@ -158,7 +158,7 @@ Option 2: Browser storage reset
 ## Project Structure
 
 ```
-creatorweave/
+eo2weave/
 ├── web/                          # Main web application
 │   ├── src/
 │   │   ├── agent/               # AI agent system
@@ -216,12 +216,12 @@ creatorweave/
 
 ### Tool Definition
 
-Tools are defined in `/web/src/agent/tools/` and registered in `tool-registry.ts`.
+Tools are defined in `/web/agent/tools/` and registered in `tool-registry.ts`.
 
 ### Tool Template
 
 ```typescript
-// /web/src/agent/tools/my-tool.ts
+// /web/agent/tools/my-tool.ts
 
 import type { Tool, ToolContext, ToolResult } from '../tool-registry';
 
@@ -271,7 +271,7 @@ export const myTool: Tool<MyToolParams> = {
 ### Registering a Tool
 
 ```typescript
-// /web/src/agent/tool-registry.ts
+// /web/agent/tool-registry.ts
 
 import { myTool } from './tools/my-tool';
 
@@ -322,7 +322,7 @@ interface ToolContext {
 
 ### Unit Tests
 
-Located in `/web/src/**/__tests__/` directories.
+Located in `/web/**/__tests__/` directories.
 
 #### Running Unit Tests
 
@@ -343,7 +343,7 @@ pnpm run test:coverage
 #### Writing Unit Tests
 
 ```typescript
-// /web/src/agent/tools/__tests__/my-tool.test.ts
+// /web/agent/tools/__tests__/my-tool.test.ts
 
 import { describe, it, expect, vi } from 'vitest';
 import { myTool } from '../my-tool';
@@ -471,7 +471,7 @@ pnpm run build:gh-pages
 ```bash
 # .env.production
 VITE_API_ENDPOINT=https://api.example.com
-VITE_APP_NAME=CreatorWeave
+VITE_APP_NAME=EO2Weave
 VITE_ENABLE_ANALYTICS=false
 ```
 
@@ -604,7 +604,7 @@ chore: update dependencies
 - [Conversation Threading](./web/THREADING_IMPLEMENTATION.md)
 - [Batch Operations](./BATCH_OPERATIONS_IMPLEMENTATION.md)
 - [Phase 4 Implementation](./web/PHASE4_IMPLEMENTATION_SUMMARY.md)
-- [SQLite Storage](./web/src/sqlite/README.md)
+- [SQLite Storage](./web/sqlite/README.md)
 
 ### External Resources
 
@@ -617,5 +617,5 @@ chore: update dependencies
 
 ---
 
-**Last Updated**: 2025-02-08
+**Last Updated**: 2026-09-03
 **Version**: 0.2.0

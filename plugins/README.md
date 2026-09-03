@@ -1,6 +1,6 @@
-# CreatorWeave - Plugin Development Guide
+# EO2Weave - Plugin Development Guide
 
-This guide explains how to create, build, and integrate plugins for the CreatorWeave.
+This guide explains how to create, build, and integrate plugins for the EO2Weave.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This guide explains how to create, build, and integrate plugins for the CreatorW
 
 ## Overview
 
-Plugins are WASM modules that extend the file analysis capabilities of the CreatorWeave. Each plugin runs in an isolated Web Worker for security and performance.
+Plugins are WASM modules that extend the file analysis capabilities of the EO2Weave. Each plugin runs in an isolated Web Worker for security and performance.
 
 ### Key Features
 
@@ -312,7 +312,7 @@ pub struct PluginInfo {
     pub id: String,           // Unique identifier (e.g., "md5-calculator")
     pub name: String,         // Human-readable name
     pub version: String,      // Semver version
-    pub api_version: String,  // Required CreatorWeave API version (must be "2.0.0")
+    pub api_version: String,  // Required EO2Weave API version (must be "2.0.0")
     pub description: String,  // Short description
     pub author: String,       // Plugin author/maintainer
     pub capabilities: PluginCapabilities,

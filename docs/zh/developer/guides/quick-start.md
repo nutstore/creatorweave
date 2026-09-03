@@ -5,7 +5,7 @@ order: 101
 
 # 开发环境搭建
 
-快速搭建 CreatorWeave 的本地开发环境。
+快速搭建 EO2Weave 的本地开发环境。
 
 ## 环境要求
 
@@ -29,8 +29,8 @@ order: 101
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/nutstore/creatorweave.git
-cd creatorweave
+git clone https://github.com/nutstore/eo2weave.git
+cd eo2weave
 ```
 
 ### 2. 安装依赖
@@ -68,7 +68,7 @@ cd web && pnpm dev
 ## 项目结构
 
 ```
-creatorweave/
+eo2weave/
 ├── web/              # React 前端应用
 ├── packages/         # 共享包
 ├── wasm/            # Rust WASM 模块

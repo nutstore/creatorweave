@@ -5,18 +5,18 @@ order: 150
 
 # Side Panel Context Provider Integration Guide
 
-This guide is for **third-party website developers** (e.g. Jianguoyun workbench, webmail, docs, internal enterprise systems). It explains how to make your website provide "current page context" to the CreatorWeave agent when opened from the CreatorWeave browser extension's side panel.
+This guide is for **third-party website developers** (e.g. Jianguoyun workbench, webmail, docs, internal enterprise systems). It explains how to make your website provide "current page context" to the EO2Weave agent when opened from the EO2Weave browser extension's side panel.
 
 ## 1. What Is a Context Provider
 
-When the user clicks the CreatorWeave sidebar button on your site, the browser extension opens the CreatorWeave side panel. The CreatorWeave agent wants to know "what the user is currently looking at" so it can answer based on the current context.
+When the user clicks the EO2Weave sidebar button on your site, the browser extension opens the EO2Weave side panel. The EO2Weave agent wants to know "what the user is currently looking at" so it can answer based on the current context.
 
 All you need to do is expose a global function on your site (or via a userscript):
 
 ```js
 window.__sidePanelContextProvider = {
   getContext: () => {
-    // Return an object of any shape (CreatorWeave does not parse fields)
+    // Return an object of any shape (EO2Weave does not parse fields)
     return {
       type: 'ticket',
       id: '484514',
@@ -28,7 +28,7 @@ window.__sidePanelContextProvider = {
 }
 ```
 
-Before every LLM call, CreatorWeave pulls this function's result through the browser extension and appends it **verbatim** to the system prompt.
+Before every LLM call, EO2Weave pulls this function's result through the browser extension and appends it **verbatim** to the system prompt.
 
 ## 2. Core Contract
 
@@ -44,14 +44,14 @@ interface SidePanelContextProvider {
 }
 ```
 
-- **Synchronous** or **asynchronous** (Promise) returns both work — CreatorWeave supports both
+- **Synchronous** or **asynchronous** (Promise) returns both work — EO2Weave supports both
 - **Any return type** — string / object / array / any JS value
-- CreatorWeave **does not parse fields**; the value is stringified as-is and injected into the LLM
-- Returning `null` / `undefined` / throwing = telling CreatorWeave "no context right now"
+- EO2Weave **does not parse fields**; the value is stringified as-is and injected into the LLM
+- Returning `null` / `undefined` / throwing = telling EO2Weave "no context right now"
 
 ### 2.3 When it is called
 
-CreatorWeave calls it **every time it builds the system prompt** (i.e. before every LLM call). So:
+EO2Weave calls it **every time it builds the system prompt** (i.e. before every LLM call). So:
 
 - Your `getContext` should return the **current** page state (don't cache for too long)
 - If context is expensive to compute, add internal caching (e.g. a 5-second TTL)
@@ -86,7 +86,7 @@ If you don't maintain the site, use a userscript:
 
 ```js
 // ==UserScript==
-// @name         My Site → CreatorWeave Context Provider
+// @name         My Site → EO2Weave Context Provider
 // @namespace    https://yourcompany.com
 // @version      1.0.0
 // @match        https://your-site.example.com/*
@@ -118,7 +118,7 @@ If you don't maintain the site, use a userscript:
     const url = location.href;
     if (url !== lastUrl) {
       lastUrl = url;
-      // CreatorWeave re-pulls on the next LLM call; no need to notify
+      // EO2Weave re-pulls on the next LLM call; no need to notify
     }
   }).observe(document, { subtree: true, childList: true });
 })();
@@ -145,7 +145,7 @@ If you don't maintain the site, use a userscript:
 
 ## 4. What Fields to Return
 
-**Completely free.** CreatorWeave does not parse them. Suggestions:
+**Completely free.** EO2Weave does not parse them. Suggestions:
 
 | Scenario | Recommended fields |
 |------|---------|
@@ -188,7 +188,7 @@ useEffect(() => {
 
 ```js
 // ==UserScript==
-// @name         Mail → CreatorWeave
+// @name         Mail → EO2Weave
 // @match        https://mail.example.com/*
 // ==/UserScript==
 
@@ -218,7 +218,7 @@ useEffect(() => {
 
 ## 6. Debugging
 
-With the CreatorWeave side panel open, the browser console (DevTools for the side panel) shows:
+With the EO2Weave side panel open, the browser console (DevTools for the side panel) shows:
 
 ```
 [Workspace Assistant] Side panel mode: hostname: workspace.jianguoyun.com tabId: 123
@@ -240,15 +240,15 @@ Possible causes:
 
 ❌ **Don't append fields to the URL** (e.g. `?ticket_id=484514&title=...`):
    - URLs have length limits
-   - Hardcoded field names; CreatorWeave doesn't parse them
+   - Hardcoded field names; EO2Weave doesn't parse them
 
 ❌ **Don't register as a WebMCP tool**:
    - WebMCP tools appear in the agent's tool catalog
    - That has different semantics from "system prompt injection"
 
-❌ **Don't push to CreatorWeave's window**:
-   - CreatorWeave pulls (pull mode); it doesn't accept pushes
-   - CreatorWeave attaches no setContext callback
+❌ **Don't push to EO2Weave's window**:
+   - EO2Weave pulls (pull mode); it doesn't accept pushes
+   - EO2Weave attaches no setContext callback
 
 ## 8. Security Considerations
 
@@ -258,5 +258,5 @@ Possible causes:
 
 ## 9. Related Docs
 
-- [Integrating Out-of-Page MCP Services](./mcp-page-outside-services.md) — CreatorWeave-side integration architecture
+- [Integrating Out-of-Page MCP Services](./mcp-page-outside-services.md) — EO2Weave-side integration architecture
 - Browser extension source: the `requestSidePanelContext` handler in `browser-extension/entrypoints/background.ts`

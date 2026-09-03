@@ -37,8 +37,8 @@ rustc -V
 克隆仓库：
 
 ```bash
-git clone https://github.com/nutstore/creatorweave.git
-cd creatorweave
+git clone https://github.com/nutstore/eo2weave.git
+cd eo2weave
 ```
 
 ## 2. 编译扩展（browser-extension）
@@ -91,7 +91,7 @@ EXT_ID="你的扩展ID"
 cat > "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.creatorweave.nativehost.json" <<EOF
 {
   "name": "com.creatorweave.nativehost",
-  "description": "CreatorWeave Native Host — disk file I/O",
+  "description": "EO2Weave Native Host — disk file I/O",
   "path": "$(pwd)/target/release/cw-native-host",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://$EXT_ID/"]

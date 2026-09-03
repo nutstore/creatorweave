@@ -3,7 +3,7 @@ title: 架构总览
 order: 201
 ---
 
-# CreatorWeave 架构总览
+# EO2Weave 架构总览
 
 > 本文档基于当前仓库代码（`master`）整理，目标是给开发者一个可执行的系统地图：模块边界、关键数据流、启动路径、以及排障入口。
 
@@ -17,7 +17,7 @@ order: 201
 
 ## 2. 前端主应用（web）分层
 
-`web/src` 的核心分层可以按“UI -> Store -> 服务/运行时 -> 持久化/外部协议”理解：
+`web/` 的核心分层可以按“UI -> Store -> 服务/运行时 -> 持久化/外部协议”理解：
 
 1. UI 层：`components/`、`hooks/`、`styles/`。
 2. 状态层：`store/`（Zustand），包含对话、工作区、设置等。
@@ -34,7 +34,7 @@ order: 201
 
 ## 3. 启动流程（桌面端）
 
-入口：`web/src/main.tsx` -> `web/src/App.tsx`
+入口：`web/app/layout.tsx`（根布局）-> `web/app/(app)/page.tsx`（主界面，Next.js App Router）
 
 初始化顺序（关键路径）：
 
@@ -87,7 +87,7 @@ order: 201
 
 ### 5.3 Python（Pyodide）
 
-1. `web/src/python/*` 提供浏览器内 Python 执行入口。
+1. `web/python/*` 提供浏览器内 Python 执行入口。
 2. 构建阶段 `web` 会将 pyodide 资源复制到产物目录。
 3. Agent 工具可通过桥接调用 Python 计算与文件处理能力。
 
@@ -140,7 +140,7 @@ make test
 
 ## 9. 结构演进（已落地）
 
-Project / Workspace 双层结构已随多根工作区（multi-root）支持落地，设计细节见内部仓库 `weave-docs`（`design/multi-root-project.md`）。
+Project / Workspace 双层结构已随多根工作区（multi-root）支持落地，
 
 ---
 

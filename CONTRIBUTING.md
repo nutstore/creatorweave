@@ -1,10 +1,10 @@
-# Contributing to CreatorWeave
+# Contributing to EO2Weave
 
 Thanks for your interest in contributing! 🎉
 
 ## Why Contribute?
 
-CreatorWeave is exploring what's possible when you combine **AI**, **browser-native computing**, and **local-first privacy** in a single product. We believe the browser can be a powerful platform for creative work — and we'd love your help building it.
+EO2Weave is exploring what's possible when you combine **AI**, **browser-native computing**, and **local-first privacy** in a single product. We believe the browser can be a powerful platform for creative work — and we'd love your help building it.
 
 **What you'll get from contributing:**
 - Work with cutting-edge browser APIs (File System Access, OPFS, SharedArrayBuffer)
@@ -16,8 +16,8 @@ CreatorWeave is exploring what's possible when you combine **AI**, **browser-nat
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/creatorweave.git
-cd creatorweave
+git clone https://github.com/YOUR_USERNAME/eo2weave.git
+cd eo2weave
 
 # 2. Install dependencies
 pnpm install
@@ -34,7 +34,7 @@ For detailed setup, see the [Quick Start Guide](./docs/development/quick-start.m
 
 ### 🟢 Good First Issues
 
-Look for issues labeled [`good first issue`](https://github.com/nutstore/creatorweave/labels/good%20first%20issue) or [`help wanted`](https://github.com/nutstore/creatorweave/labels/help%20wanted). These are specifically chosen to be approachable for new contributors.
+Look for issues labeled [`good first issue`](https://github.com/nutstore/eo2weave/labels/good%20first%20issue) or [`help wanted`](https://github.com/nutstore/eo2weave/labels/help%20wanted). These are specifically chosen to be approachable for new contributors.
 
 ### 🔧 Areas Where We Need Help
 
@@ -52,7 +52,7 @@ Look for issues labeled [`good first issue`](https://github.com/nutstore/creator
 
 ### 💬 Not Sure Where to Start?
 
-Open a [GitHub Discussion](https://github.com/nutstore/creatorweave/discussions) and tell us:
+Open a [GitHub Discussion](https://github.com/nutstore/eo2weave/discussions) and tell us:
 - What technologies you're comfortable with
 - What kind of contribution you're interested in
 - How much time you can commit
@@ -98,7 +98,7 @@ pnpm -C web run test -- --run
 ## Project Architecture
 
 ```
-creatorweave/
+eo2weave/
 ├── web/                   # React frontend (Desktop) — main application
 │   ├── src/agent/         # AI agent system, tools, LLM adapters
 │   ├── src/components/    # React UI components (30+ directories)
@@ -137,6 +137,6 @@ By contributing, you agree that your contributions will be licensed under the [M
 
 <div align="center">
 
-**Questions?** Open a [Discussion](https://github.com/nutstore/creatorweave/discussions) or reach out!
+**Questions?** Open a [Discussion](https://github.com/nutstore/eo2weave/discussions) or reach out!
 
 </div>

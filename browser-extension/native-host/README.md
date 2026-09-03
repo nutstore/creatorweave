@@ -1,4 +1,4 @@
-# CreatorWeave Native Host
+# EO2Weave Native Host
 
 Browser extension disk executor via Chrome Native Messaging. See [`/STATUS.md`](../../STATUS.md) for the full design.
 
@@ -51,7 +51,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 `install.ps1` writes the manifest to
-`%LOCALAPPDATA%\CreatorWeave\NativeMessagingHosts\com.creatorweave.nativehost.json`
+`%LOCALAPPDATA%\EO2Weave\NativeMessagingHosts\com.creatorweave.nativehost.json`
 and registers it under `HKCU\Software\Google\Chrome\NativeMessagingHosts\`
 (HKCU only — no admin rights needed; an Edge key is registered too).
 Uninstall with `uninstall.ps1`. See STATUS.md §8 for the Windows design.

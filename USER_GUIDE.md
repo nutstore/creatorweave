@@ -1,4 +1,4 @@
-# CreatorWeave - User Guide
+# EO2Weave - User Guide
 
 ## Table of Contents
 
@@ -371,9 +371,9 @@ The command palette is the fastest way to access any feature:
 
 - [Developer Guide](./DEVELOPER_GUIDE.md) - For contributors and developers
 - [Changelog](./CHANGELOG.md) - Version history and new features
-- [GitHub Issues](https://github.com/nutstore/creatorweave/issues) - Report bugs
+- [GitHub Issues](https://github.com/nutstore/eo2weave/issues) - Report bugs
 
 ---
 
-**Last Updated**: 2025-02-08
+**Last Updated**: 2026-09-03
 **Version**: 0.2.0

@@ -91,7 +91,7 @@ Use these markers:
 
 ### 3. Automatic activation
 
-When you open the project, CreatorWeave automatically scans all `SKILL.md` files under `.skills/` and loads them. The AI automatically matches and uses these Skills in relevant tasks.
+When you open the project, EO2Weave automatically scans all `SKILL.md` files under `.skills/` and loads them. The AI automatically matches and uses these Skills in relevant tasks.
 
 ## SKILL.md Format Reference
 
@@ -281,7 +281,7 @@ When the user says "help me analyze this sales data":
 
 ## Viewing in the Skills Manager
 
-You can view and manage all Skills in CreatorWeave:
+You can view and manage all Skills in EO2Weave:
 
 1. Click the Skills icon in the sidebar, or use the shortcut to open the Skills Manager
 2. Skills are grouped by source:

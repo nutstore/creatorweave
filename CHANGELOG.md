@@ -1,9 +1,15 @@
 # Changelog
 
-All notable changes to CreatorWeave will be documented in this file.
+All notable changes to EO2Weave will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Changed
+
+- Renamed product and repository to **EO2Weave** (formerly CreatorWeave). GitHub repo is now `nutstore/eo2weave` (old links redirect); internal package scope `@creatorweave/*` and native host id `com.creatorweave.nativehost` unchanged.
 
 ## [0.3.0] - 2025-06-02
 

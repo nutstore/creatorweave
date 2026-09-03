@@ -5,7 +5,7 @@ order: 200
 
 # 架构文档
 
-本节包含 CreatorWeave 的系统架构介绍。
+本节包含 EO2Weave 的系统架构介绍。
 
 ## 目录
 
