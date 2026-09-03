@@ -14,6 +14,7 @@ export const keyboardShortcuts = {
     toggleSidebar: "사이드바 전환",
     openWorkspaceSettings: "작업 공간 설정 열기",
     toggleShortcutsHelp: "단축키 도움말 전환",
+    toggleWordWrap: "자동 줄바꿈 전환",
     closePanels: "패널 / 대화상자 닫기",
   },
 } as const

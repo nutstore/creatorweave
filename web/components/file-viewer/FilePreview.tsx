@@ -1088,7 +1088,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               minimap: { enabled: display.showMiniMap },
               lineNumbers: display.showLineNumbers ? 'on' : 'off',
               scrollBeyondLastLine: false,
-              wordWrap: 'on',
+              wordWrap: display.wordWrap ? 'on' : 'off',
               automaticLayout: true,
               fontSize: display.fontSize === 'small' ? 13 : display.fontSize === 'large' ? 16 : 14,
               padding: { top: 8, bottom: 8 },

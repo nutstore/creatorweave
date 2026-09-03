@@ -14,6 +14,7 @@ export const keyboardShortcuts = {
     toggleSidebar: "サイドバーの切り替え",
     openWorkspaceSettings: "ワークスペース設定を開く",
     toggleShortcutsHelp: "ショートカットヘルプの切り替え",
+    toggleWordWrap: "折り返しの切り替え",
     closePanels: "パネル / ダイアログを閉じる",
   },
 } as const

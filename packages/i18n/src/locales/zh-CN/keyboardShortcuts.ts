@@ -14,6 +14,7 @@ export const keyboardShortcuts = {
     toggleSidebar: "切换侧边栏",
     openWorkspaceSettings: "打开工作区设置",
     toggleShortcutsHelp: "切换快捷键帮助",
+    toggleWordWrap: "切换自动换行",
     closePanels: "关闭面板 / 对话框",
   },
 } as const

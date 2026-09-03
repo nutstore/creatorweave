@@ -14,6 +14,7 @@ export const keyboardShortcuts = {
     toggleSidebar: "Toggle sidebar",
     openWorkspaceSettings: "Open workspace settings",
     toggleShortcutsHelp: "Toggle this shortcuts help",
+    toggleWordWrap: "Toggle word wrap",
     closePanels: "Close panels / dialogs",
   },
 } as const
