@@ -177,6 +177,8 @@ export function WorkspaceLayout({
   const setActiveResourceTab = useWorkspacePreferencesStore((s) => s.setActiveResourceTab)
   const panelSizes = useWorkspacePreferencesStore((s) => s.panelSizes)
   const filePreviewMode = useWorkspacePreferencesStore((s) => s.filePreviewMode)
+  const wordWrapEnabled = useWorkspacePreferencesStore((s) => s.display.wordWrap)
+  const setWordWrap = useWorkspacePreferencesStore((s) => s.setWordWrap)
 
   // Phase 4: Dialog states
   const [showCommandPalette, setShowCommandPalette] = useState(false)
@@ -528,6 +530,14 @@ export function WorkspaceLayout({
         return
       }
 
+      // Alt + Z to toggle word wrap. Match on e.code (physical key) so it
+      // works on macOS too, where Alt+Z produces 'Ω' as e.key.
+      if (e.altKey && e.code === 'KeyZ' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        setWordWrap(!wordWrapEnabled)
+        return
+      }
+
       // ESC to close panels
       if (e.key === 'Escape') {
         if (showCommandPalette) {
@@ -568,6 +578,8 @@ export function WorkspaceLayout({
     setSidebarCollapsed,
     setActiveResourceTab,
     closeWebContainerPanel,
+    wordWrapEnabled,
+    setWordWrap,
   ])
 
   // hasActiveConversation is computed via store selector above (avoids re-renders)

@@ -238,4 +238,10 @@ export const DEFAULT_SHORTCUTS: (Omit<KeyboardShortcut, 'handler' | 'disabled' |
     description: 'Close panels / dialogs',
     labelKey: 'keyboardShortcuts.actions.closePanels',
   },
+  {
+    key: 'z',
+    altKey: true,
+    description: 'Toggle word wrap',
+    labelKey: 'keyboardShortcuts.actions.toggleWordWrap',
+  },
 ]
