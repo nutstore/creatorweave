@@ -6,7 +6,7 @@ version: "1.0.1"
 
 # XLSX To Wiki
 
-这个 skill 按 `SKILL.md + scripts/ + references/` 结构组织，适合接入 CreatorWeave 的按需加载模型。
+这个 skill 按 `SKILL.md + scripts/ + references/` 结构组织，适合接入 EO2Weave 的按需加载模型。
 
 不要从当前工作目录、项目目录结构或文档路径推导 skill 根路径。脚本路径与资源路径应以运行时提供的信息、`read_skill` 返回内容或 skill loader 注入结果为准。
 
@@ -81,7 +81,7 @@ version: "1.0.1"
 - 修改规则与定位方法：`references/editing-rules.md`
 - 返回 schema、错误码与 guard：`references/contracts.md`
 - Pyodide 约束与运行方式：`references/runtime-constraints.md`
-- 内置 skill 接入注意事项：`references/creatorweave-builtin.md`
+- 内置 skill 接入注意事项：`references/platform-builtin.md`
 
 如果用户目标是分析 / 洞察 / 报告，再继续读取：
 
@@ -93,7 +93,7 @@ version: "1.0.1"
 
 ## 环境准备
 
-Pyodide 默认可能不带 `pyyaml`。优先复用运行时已安装的依赖；确认缺失并且确实需要时再安装一次。脚本目录不要自行猜测，优先使用运行时提供的 Python execution path；在 CreatorWeave 内置 skill 场景下，通常会挂载到 `/mnt_skills/builtin/<skill-name>/scripts/`。
+Pyodide 默认可能不带 `pyyaml`。优先复用运行时已安装的依赖；确认缺失并且确实需要时再安装一次。脚本目录不要自行猜测，优先使用运行时提供的 Python execution path；在 EO2Weave 内置 skill 场景下，通常会挂载到 `/mnt_skills/builtin/<skill-name>/scripts/`。
 
 对 builtin skill，推荐直接使用：
 

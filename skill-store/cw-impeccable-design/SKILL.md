@@ -1,6 +1,6 @@
 ---
 name: cw-impeccable-design
-description: "Frontend design skill from pbakaus/impeccable, ported for CreatorWeave. Trigger when user asks to design, redesign, refine, polish, audit, critique, distill, harden, animate, colorize, typeset, layout, clarify, adapt, optimize, extract, document, init, shape, bolder, quieter, delight, overdrive, onboard, live-iterate, or ux-review any frontend UI work. Covers websites, landing pages, dashboards, product UI, app shells, components, forms, settings, onboarding, empty states. Handles visual hierarchy, information architecture, cognitive load, a11y, performance, responsive, theming, anti-patterns, typography, spacing, alignment, color, motion, micro-interactions, UX copy, error states, edge cases, i18n, design systems, tokens. Also use for bland designs that need to become bolder, loud designs that need to become quieter, or ambitious visual effects that should feel technically extraordinary."
+description: "Frontend design skill from pbakaus/impeccable, ported for EO2Weave. Trigger when user asks to design, redesign, refine, polish, audit, critique, distill, harden, animate, colorize, typeset, layout, clarify, adapt, optimize, extract, document, init, shape, bolder, quieter, delight, overdrive, onboard, live-iterate, or ux-review any frontend UI work. Covers websites, landing pages, dashboards, product UI, app shells, components, forms, settings, onboarding, empty states. Handles visual hierarchy, information architecture, cognitive load, a11y, performance, responsive, theming, anti-patterns, typography, spacing, alignment, color, motion, micro-interactions, UX copy, error states, edge cases, i18n, design systems, tokens. Also use for bland designs that need to become bolder, loud designs that need to become quieter, or ambitious visual effects that should feel technically extraordinary."
 category: general
 tags: [design, frontend, ux, ui, review, polish, anti-pattern, design-system]
 triggers:
@@ -80,7 +80,7 @@ triggers:
 
 # Impeccable Design
 
-> Port of [pbakaus/impeccable](https://github.com/pbakaus/impeccable) (Apache 2.0) — 1 skill, 23 commands, fight AI design slop. Original repo uses `npx impeccable install` for Claude Code/Cursor/Codex; this version is a pure-prompt skill for CreatorWeave, no install needed.
+> Port of [pbakaus/impeccable](https://github.com/pbakaus/impeccable) (Apache 2.0) — 1 skill, 23 commands, fight AI design slop. Original repo uses `npx impeccable install` for Claude Code/Cursor/Codex; this version is a pure-prompt skill for EO2Weave, no install needed.
 
 ## 何时使用本 skill
 
@@ -241,8 +241,8 @@ that earns to be called out-of-distribution craft:
 |---------|-----------|--------|
 | `audit.native.md` | iOS/Android 原生版的 audit 变体 |
 | `adapt.native.md` | iOS/Android 原生版的 adapt 变体 |
-| `hooks.md` | 设计 detector hook 管理（CreatorWeave 不直接支持，留作参考） |
-| `doctor.md` | 报告/修复 drift（CreatorWeave 不直接支持，留作参考） |
+| `hooks.md` | 设计 detector hook 管理（EO2Weave 不直接支持，留作参考） |
+| `doctor.md` | 报告/修复 drift（EO2Weave 不直接支持，留作参考） |
 
 ---
 
@@ -336,7 +336,7 @@ that earns to be called out-of-distribution craft:
 | `android` | 原生 Android app | `references/android.md`（Material Design 3 摘要） |
 | `adaptive` | 跨平台（Flutter / React Native / KMP） | `references/ios.md` + `references/android.md` |
 
-PRODUCT.md 的 `## Platform` 字段决定加载哪些。CreatorWeave 中：用户告诉你在哪个平台，或者在 PRODUCT.md / 对话中推断（web 默认）。
+PRODUCT.md 的 `## Platform` 字段决定加载哪些。EO2Weave 中：用户告诉你在哪个平台，或者在 PRODUCT.md / 对话中推断（web 默认）。
 
 ---
 
@@ -360,13 +360,13 @@ PRODUCT.md 的 `## Platform` 字段决定加载哪些。CreatorWeave 中：用�
 
 ## 重要 caveat
 
-**本 skill 是 prompt-based**，原版 Impeccable 的以下功能在 CreatorWeave 中**不可用**（或不直接支持）：
+**本 skill 是 prompt-based**，原版 Impeccable 的以下功能在 EO2Weave 中**不可用**（或不直接支持）：
 
 - ❌ `npx impeccable detect <file>` CLI detector（bash sandbox 无 npx/node）→ 改用 `assets/anti-patterns.md` 设计原则，**让 LLM 在 review 时手动执行**
-- ❌ Provider hooks（自动 PostToolUse 触发 detector）→ CreatorWeave 无 hook 机制
-- ❌ `npx impeccable live` 浏览器实时迭代（需 puppeteer）→ CreatorWeave 本身就是浏览器 IDE，用户直接在文件树挑元素即可
+- ❌ Provider hooks（自动 PostToolUse 触发 detector）→ EO2Weave 无 hook 机制
+- ❌ `npx impeccable live` 浏览器实时迭代（需 puppeteer）→ EO2Weave 本身就是浏览器 IDE，用户直接在文件树挑元素即可
 
-**这些限制不影响核心价值**：23 个 command 的 prompt 内容、4 mode 哲学、craft-floor 禁令都是**纯文档**，可以 100% 在 CreatorWeave skill 体系中复用。
+**这些限制不影响核心价值**：23 个 command 的 prompt 内容、4 mode 哲学、craft-floor 禁令都是**纯文档**，可以 100% 在 EO2Weave skill 体系中复用。
 
 ---
 
@@ -377,4 +377,4 @@ PRODUCT.md 的 `## Platform` 字段决定加载哪些。CreatorWeave 中：用�
 - **协议**：Apache 2.0（attribution 已保留在 NOTICE.md）
 - **iOS / Android 平台指南**：[ehmo/platform-design-skills](https://github.com/ehmo/platform-design-skills) (MIT)
 - **Port 时间**：2026-07-31
-- **Port 作者**：CreatorWeave AI assistant
+- **Port 作者**：EO2Weave AI assistant

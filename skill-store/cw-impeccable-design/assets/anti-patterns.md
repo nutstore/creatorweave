@@ -4,7 +4,7 @@
 > **Original count**: 59 deterministic rules across 2 categories (slop / quality).
 > **This file**: ~45 core rules organized for LLM scanning. The full 59-rule set lives upstream in `cli/engine/rules/checks.mjs` and `cli/engine/registry/antipatterns.mjs`.
 
-The original Impeccable detector runs these as regex + DOM checks in jsdom. Since CreatorWeave has no CLI/node runtime, the LLM performs these checks semantically during `audit`, `critique`, and any refine/enhance command. Apply the same eye the detector would.
+The original Impeccable detector runs these as regex + DOM checks in jsdom. Since EO2Weave has no CLI/node runtime, the LLM performs these checks semantically during `audit`, `critique`, and any refine/enhance command. Apply the same eye the detector would.
 
 **How to use**: When running `/impeccable audit` or `/impeccable critique`, walk through each category. For each rule, ask "do I see this in the current artifact?" If yes, mark it as a finding with severity (P0-P3) per the `audit` scoring rubric.
 

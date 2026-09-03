@@ -19,7 +19,7 @@ Resolve one stable target, run two independent assessments, synthesize a design 
    - "the homepage" → `site/pages/index.astro` or `index.html`
    - "the settings modal" → the primary component file
    - "this page" → the current URL or source file
-2. **Confirm the target slugs cleanly** (best-effort; missing helper is not a failure in CreatorWeave). In CreatorWeave, slug is derived locally from the resolved target.
+2. **Confirm the target slugs cleanly** (best-effort; missing helper is not a failure in EO2Weave). In EO2Weave, slug is derived locally from the resolved target.
 3. **Read `.impeccable/critique/ignore.md`** if it exists. Drop matching findings silently; it is the only prior-run input critique consumes.
 
 ### Assessment Orchestration
@@ -47,13 +47,13 @@ Return: design-specificity verdict, heuristic scores, cognitive load, emotional 
 
 Run the bundled detector and browser visualization evidence. Assessment B is mandatory and must remain isolated from Assessment A until both are complete.
 
-**CreatorWeave adaptation**: there is no `detect.mjs` runtime (no Node, no npx in the bash sandbox). Substitute `assets/anti-patterns.md` (the LLM-driven detector equivalent) and run an in-context review against each rule. Browser visualization requires CreatorWeave's web_fetch + web_search to inspect the live page; when not available, skip visualization and report the fallback signal.
+**EO2Weave adaptation**: there is no `detect.mjs` runtime (no Node, no npx in the bash sandbox). Substitute `assets/anti-patterns.md` (the LLM-driven detector equivalent) and run an in-context review against each rule. Browser visualization requires EO2Weave's web_fetch + web_search to inspect the live page; when not available, skip visualization and report the fallback signal.
 
 CLI scan equivalent: review the target's source for anti-pattern hits per `assets/anti-patterns.md` (slop / quality categories). Return: rule hits with snippets, false positives, skipped rules with reasons.
 
-Browser visualization is required for a viewable target when browser automation is available. Use CreatorWeave's `web_fetch` against a localhost dev/static URL for local files; avoid `file://`. Overlay flow:
+Browser visualization is required for a viewable target when browser automation is available. Use EO2Weave's `web_fetch` against a localhost dev/static URL for local files; avoid `file://`. Overlay flow:
 
-1. Create a fresh page request and fetch. Prefer CreatorWeave's web_fetch path before hand-rolling a script; only fall back to a custom script when no native web tool is exposed.
+1. Create a fresh page request and fetch. Prefer EO2Weave's web_fetch path before hand-rolling a script; only fall back to a custom script when no native web tool is exposed.
 2. If mutation is unavailable, skip live server, browser presentation, and injection; report fallback signal.
 3. If a real browser session is available (e.g. via the web extension), start a local server in the background, present the browser if supported, label `[Human]`, scroll top, inject the detector, wait 2-3 seconds, read console messages, then stop the live server.
 4. For multi-view targets, inspect 3-5 representative pages.
@@ -151,13 +151,13 @@ Provocative questions that might unlock better solutions.
 - Prioritize ruthlessly. If everything is important, nothing is.
 - Don't soften criticism. Developers need honest feedback to ship great design.
 
-### Persist the Snapshot (best-effort in CreatorWeave)
+### Persist the Snapshot (best-effort in EO2Weave)
 
-In Impeccable's native flow, write the body to `.impeccable/critique/<slug>.md` so the user can refer back. In CreatorWeave, the equivalent is to write to a project file like `.impeccable/critique/<slug>.md` (or surface it in the conversation if the project structure doesn't permit).
+In Impeccable's native flow, write the body to `.impeccable/critique/<slug>.md` so the user can refer back. In EO2Weave, the equivalent is to write to a project file like `.impeccable/critique/<slug>.md` (or surface it in the conversation if the project structure doesn't permit).
 
 If the Setup slug was null (vague or root-level target), skip this step.
 
-In CreatorWeave, persistence is best-effort; failures don't block the critique.
+In EO2Weave, persistence is best-effort; failures don't block the critique.
 
 ### Ask the User
 
@@ -304,4 +304,4 @@ Red Flags: Important actions at top of screen, no state persistence, large text 
 | Data-heavy / analytics | Alex, Sam |
 | Form-heavy / wizard | Jordan, Sam, Casey |
 
-**CreatorWeave adaptation**: there is no `critique-storage.mjs` to persist snapshots. If the project has a `.impeccable/` directory, write the snapshot there; otherwise surface the critique in the conversation and offer to save it as a project file.
+**EO2Weave adaptation**: there is no `critique-storage.mjs` to persist snapshots. If the project has a `.impeccable/` directory, write the snapshot there; otherwise surface the critique in the conversation and offer to save it as a project file.

@@ -1,7 +1,7 @@
 # 微信读书 API 接口参考（v1.0.3）
 
 所有接口统一入口：`POST https://i.weread.qq.com/api/agent/gateway`
-鉴权：`Authorization: Bearer ${WEREAD_API_KEY}`（CreatorWeave 用 `${WEREAD_API_KEY}` 模板，自动注入）
+鉴权：`Authorization: Bearer ${WEREAD_API_KEY}`（EO2Weave 用 `${WEREAD_API_KEY}` 模板，自动注入）
 Body：`{"api_name": "<接口>", "skill_version": "1.0.3", ...业务参数平铺}`
 
 ---

@@ -15,7 +15,7 @@ metadata:
 - **AI 带读**：逐章讲解、答疑讨论，用你的划线/笔记做个性化锚点
 - **笔记交叉分析**：跨书聚合笔记、发现主题、识别盲区、生成阅读画像
 
-## ⚠️ CreatorWeave 环境约束
+## ⚠️ EO2Weave 环境约束
 
 1. **必须用 `web_fetch` 调用 API**（不能 python 直连——Pyodide 在浏览器 Web Worker 里，跨域被 CORS 拦截）
 2. **密钥走 `${WEREAD_API_KEY}` 模板**（web_fetch 自动从 Secret Manager 解析，永远不要写明文）
@@ -45,9 +45,9 @@ metadata:
 
 用简洁友好的语言告知：
 
-> 你的 CreatorWeave 浏览器扩展似乎未安装或未启用。微信读书助手依赖它来发起网络请求。
+> 你的 EO2Weave 浏览器扩展似乎未安装或未启用。微信读书助手依赖它来发起网络请求。
 >
-> **安装方式**：请按 CreatorWeave 文档安装浏览器扩展，安装后确保在当前页面启用，然后回来重试。
+> **安装方式**：请按 EO2Weave 文档安装浏览器扩展，安装后确保在当前页面启用，然后回来重试。
 
 不要尝试自动安装或跳过——扩展安装是用户手动操作。
 
@@ -60,7 +60,7 @@ metadata:
 > **获取方式**（约 1 分钟）：
 > 1. 打开 https://weread.qq.com/r/weread-skills ，微信扫码登录
 > 2. 复制你的 API Key（格式 `wrk-xxxxxxxx`）
-> 3. 在 CreatorWeave 的 **Settings → Secret Manager** 中，新增一个名为 `WEREAD_API_KEY` 的密钥，粘贴该值
+> 3. 在 EO2Weave 的 **Settings → Secret Manager** 中，新增一个名为 `WEREAD_API_KEY` 的密钥，粘贴该值
 > 4. 回到这里重新对我说「带我读」
 
 **重要**：

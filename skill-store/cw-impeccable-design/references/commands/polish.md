@@ -26,7 +26,7 @@ Use the feature yourself at representative desktop and mobile sizes. Determine:
 - known constraints or deliberately unfinished work;
 - the states, content lengths, roles, and input methods users will actually encounter.
 
-In CreatorWeave, no `critique-storage.mjs` is available. Use the conversation history and any prior `critique` runs from this session as the prior-snapshot equivalent. If a critique exists, incorporate its P0/P1 findings and name the snapshot read. Otherwise perform an independent pass.
+In EO2Weave, no `critique-storage.mjs` is available. Use the conversation history and any prior `critique` runs from this session as the prior-snapshot equivalent. If a critique exists, incorporate its P0/P1 findings and name the snapshot read. Otherwise perform an independent pass.
 
 ## 3. Triage
 
@@ -86,6 +86,6 @@ Walk the complete path again with mouse, keyboard, and touch where applicable. C
 - console errors, layout shift, interaction latency, image loading, and supported browsers;
 - agreement with DESIGN.md, neighboring features, and the user's scope.
 
-In CreatorWeave, no automatic detector runs on edit. Run a single manual pass against `assets/anti-patterns.md` at the end. Fix real defects and document only narrow intentional exceptions. A clean scan does not replace visual judgment.
+In EO2Weave, no automatic detector runs on edit. Run a single manual pass against `assets/anti-patterns.md` at the end. Fix real defects and document only narrow intentional exceptions. A clean scan does not replace visual judgment.
 
 Finish with a source diff: remove accidental churn, orphaned code, redundant values, and temporary artifacts. Ship only when the feature is functionally complete and consistently finished across the path.

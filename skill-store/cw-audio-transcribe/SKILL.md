@@ -58,7 +58,7 @@ $50 免费额度对个人用户非常充裕（约 300+ 小时录音）。
 > **获取方式**（约 2 分钟）：
 > 1. 打开 https://www.assemblyai.com/ 注册/登录
 > 2. 在 Dashboard 获取你的 API Key
-> 3. 在 CreatorWeave 的 **Settings → Secret Manager** 中，新增一个名为 `ASSEMBLYAI_API_KEY` 的密钥，粘贴该值
+> 3. 在 EO2Weave 的 **Settings → Secret Manager** 中，新增一个名为 `ASSEMBLYAI_API_KEY` 的密钥，粘贴该值
 > 4. 回来重新对我说「转写这个音频」
 
 **重要**：
@@ -66,9 +66,9 @@ $50 免费额度对个人用户非常充裕（约 300+ 小时录音）。
 - 不要让用户把密钥粘贴到对话里——必须存到 Secret Manager
 - 引导时介绍免费额度信息（$50 / 约 300+ 小时），降低用户顾虑
 
-## ⚠️ CreatorWeave 环境约束
+## ⚠️ EO2Weave 环境约束
 
-1. **密钥走环境变量**：CreatorWeave 把 Secret Manager 中的 `ASSEMBLYAI_API_KEY` 自动注入为 Pyodide 环境变量，脚本通过 `os.getenv("ASSEMBLYAI_API_KEY")` 读取。**永远不要把密钥写在对话、脚本或配置文件里。**
+1. **密钥走环境变量**：EO2Weave 把 Secret Manager 中的 `ASSEMBLYAI_API_KEY` 自动注入为 Pyodide 环境变量，脚本通过 `os.getenv("ASSEMBLYAI_API_KEY")` 读取。**永远不要把密钥写在对话、脚本或配置文件里。**
 2. **API 调用走 Pyodide pyfetch**：AssemblyAI 的 API 通过 Pyodide 的 `pyfetch` 发起（脚本内部已处理），不需要浏览器扩展。
 3. **文件路径**：上传的文件在 `/mnt_assets/` 下，工作区文件在 `/mnt/{rootName}/` 下。
 

@@ -124,4 +124,4 @@ Recommend the next action from the actual project state:
 
 If init was invoked by another request, resume without rerunning context.mjs; the native reference above is the one thing that run could not have given you, and new-work owns later visual decisions.
 
-**CreatorWeave adaptation**: no `context.mjs`. Read PRODUCT.md / DESIGN.md directly. If missing, suggest running `/impeccable init` first. The interview format is the same; respect that the user may be unattended in CreatorWeave's headless mode (schedule runs) and the mechanical-test rule from the original applies.
+**EO2Weave adaptation**: no `context.mjs`. Read PRODUCT.md / DESIGN.md directly. If missing, suggest running `/impeccable init` first. The interview format is the same; respect that the user may be unattended in EO2Weave's headless mode (schedule runs) and the mechanical-test rule from the original applies.

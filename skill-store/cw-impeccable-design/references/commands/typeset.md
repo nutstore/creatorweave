@@ -21,7 +21,7 @@ When a sub-agent tool is available and permitted, run these independently; other
    - **Reading:** Does body copy stay within a comfortable 45–75 character measure? Are line height, paragraph rhythm, contrast, and tracking tuned to the actual face, width, language, and surface?
    - **Stress:** What happens with long headings, localization expansion, zoom, narrow containers, missing weights, and font fallback?
    - **Delivery:** Are only used assets loaded? Do fallback metrics, loading strategy, and variable-font settings avoid invisible text and disruptive reflow?
-2. **Mechanical scan:** in CreatorWeave, use `assets/anti-patterns.md` (section D: Typography) as the rule reference; there is no `detect.mjs` runtime. Synthesize both assessments before editing, noting what each caught alone. A clean scan is a floor, not proof of good typography.
+2. **Mechanical scan:** in EO2Weave, use `assets/anti-patterns.md` (section D: Typography) as the rule reference; there is no `detect.mjs` runtime. Synthesize both assessments before editing, noting what each caught alone. A clean scan is a floor, not proof of good typography.
 
 ## Set the system
 

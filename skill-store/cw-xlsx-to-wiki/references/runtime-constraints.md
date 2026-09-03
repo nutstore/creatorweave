@@ -10,7 +10,7 @@
 
 ## 对 skill 的调用约束
 
-- 优先通过 CreatorWeave 的 `read_skill` / `read_skill_resource` 机制理解这个 skill，不要依赖一次性把全部资源塞进上下文
+- 优先通过 EO2Weave 的 `read_skill` / `read_skill_resource` 机制理解这个 skill，不要依赖一次性把全部资源塞进上下文
 - 不要绕过 `scripts/run_workbook_tool.py` 和 `xlsx_skill_runtime.workbook_tools` 自行实现新的正式流程
 - 不要自行写新的 OOXML 直改逻辑来替代当前 runtime
 - 若需要扩展流程，优先在现有 runtime 导出函数之上增加薄适配层

@@ -75,4 +75,4 @@ When deriving OKLCH ramps, vary lightness and reduce chroma near white and black
 
 When the palette earns its place, hand off to `polish` for the final pass.
 
-**CreatorWeave adaptation**: OKLCH works natively in CSS Color 4. Use CSS custom properties for the token system; `light-dark()` (or `@media (prefers-color-scheme)`) for theme switching; `color-mix()` for derivation. Run a contrast check (Lighthouse / axe) before declaring done; the LLM can simulate the math in the head but should not skip it.
+**EO2Weave adaptation**: OKLCH works natively in CSS Color 4. Use CSS custom properties for the token system; `light-dark()` (or `@media (prefers-color-scheme)`) for theme switching; `color-mix()` for derivation. Run a contrast check (Lighthouse / axe) before declaring done; the LLM can simulate the math in the head but should not skip it.
