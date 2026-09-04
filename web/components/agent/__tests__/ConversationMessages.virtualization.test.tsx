@@ -84,7 +84,7 @@ vi.mock('../QueuedMessageCard', () => ({
   QueuedMessageCard: () => <div data-testid="queued-card" />,
 }))
 
-/** Interleaved user/assistant pairs → 2 turns per pair. */
+/** Interleaved user/assistant pairs → 2 messages per pair. */
 function makeMessages(pairs: number): Message[] {
   const messages: Message[] = []
   for (let i = 0; i < pairs; i++) {
@@ -136,35 +136,46 @@ describe('ConversationMessages virtualization', () => {
   })
 
   it('renders short conversations with the plain renderer (no Virtuoso)', () => {
-    // 5 pairs → 10 turns, below the 30-turn threshold
-    const { container } = renderConversation(makeMessages(5))
+    // 45 pairs → 90 messages, below the 100-message threshold
+    const { container } = renderConversation(makeMessages(45))
     expect(container.querySelector('[data-testid="virtuoso-mock"]')).toBeNull()
-    expect(container.querySelectorAll('[data-testid="message-bubble"]')).toHaveLength(5)
-    expect(container.querySelectorAll('[data-testid="assistant-turn"]')).toHaveLength(5)
+    expect(container.querySelectorAll('[data-testid="message-bubble"]')).toHaveLength(45)
+    expect(container.querySelectorAll('[data-testid="assistant-turn"]')).toHaveLength(45)
     // data-turn-index is only stamped on user turns (MessageNavBar contract)
-    expect(container.querySelectorAll('[data-turn-index]')).toHaveLength(5)
+    expect(container.querySelectorAll('[data-turn-index]')).toHaveLength(45)
     expect(container.querySelector('[data-testid="usage-bar"]')).not.toBeNull()
     expect(virtuosoSpy).not.toHaveBeenCalled()
   })
 
   it('renders long conversations through Virtuoso with header/footer intact', async () => {
-    // 20 pairs → 40 turns, above the threshold
-    const { container } = renderConversation(makeMessages(20))
+    // 55 pairs → 110 messages, above the threshold
+    const { container } = renderConversation(makeMessages(55))
     await waitFor(() => {
       expect(container.querySelector('[data-testid="virtuoso-mock"]')).not.toBeNull()
     })
     // All turns handed to Virtuoso as data
-    expect(virtuosoSpy.mock.calls[0][0].data).toHaveLength(40)
+    expect(virtuosoSpy.mock.calls[0][0].data).toHaveLength(110)
     // Header (usage bar) and Footer (messagesEnd div) rendered inside the list
     expect(container.querySelector('[data-testid="usage-bar"]')).not.toBeNull()
-    expect(container.querySelectorAll('[data-turn-index]')).toHaveLength(20)
+    expect(container.querySelectorAll('[data-testid="message-bubble"]')).toHaveLength(55)
     // followOutput / atBottomStateChange wired
     expect(typeof virtuosoSpy.mock.calls[0][0].followOutput).toBe('function')
     expect(typeof virtuosoSpy.mock.calls[0][0].atBottomStateChange).toBe('function')
   })
 
+  it('never paints a full plain-list frame for large conversations', () => {
+    // Regression guard for the mount guard: the resolution effect is a
+    // useLayoutEffect, so within a single committed tree Virtuoso must always
+    // be present once the threshold is crossed — the expensive plain list is
+    // never committed as a visible frame.
+    const { container } = renderConversation(makeMessages(55))
+    expect(container.querySelector('[data-testid="virtuoso-mock"]')).not.toBeNull()
+    // And the full plain list is NOT in the DOM beside it
+    expect(container.querySelectorAll('[data-testid="message-bubble"]')).toHaveLength(55)
+  })
+
   it('resolves the customScrollParent from the nearest overflow ancestor', async () => {
-    const { container } = renderConversation(makeMessages(20))
+    const { container } = renderConversation(makeMessages(55))
     const scrollContainer = container.querySelector('[data-testid="scroll-container"]')
     await waitFor(() => {
       expect(virtuosoSpy).toHaveBeenCalled()
@@ -179,7 +190,7 @@ describe('ConversationMessages virtualization', () => {
   })
 
   it('delegates scrollToTurnIndex to Virtuoso in virtualized mode', async () => {
-    const { handleRef } = renderMessages(makeMessages(20))
+    const { handleRef } = renderMessages(makeMessages(55))
     await waitFor(() => {
       expect(handleRef.current).not.toBeNull()
       expect(virtuosoSpy).toHaveBeenCalled()

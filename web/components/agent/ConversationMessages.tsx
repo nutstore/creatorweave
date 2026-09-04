@@ -8,7 +8,7 @@
  * streaming token (~60fps). Only this component tree re-renders.
  */
 
-import { memo, useMemo, forwardRef, useImperativeHandle, useCallback, useRef, useState, useEffect, useContext, createContext } from 'react'
+import { memo, useMemo, forwardRef, useImperativeHandle, useCallback, useRef, useState, useLayoutEffect, useContext, createContext } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import type { VirtuosoHandle } from 'react-virtuoso'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
@@ -25,11 +25,12 @@ import type { DraftAssistantStep, Message, ToolCall } from '@/agent/message-type
 import type { FileMentionItem } from './FileMentionExtension'
 
 /**
- * Threshold (in turns) above which the message list switches to virtualized
- * rendering. Below it, the plain `.map` renderer is used — identical behavior
- * to before, so short conversations keep their exact layout/DOM structure.
+ * Threshold (in messages) above which the conversation switches to virtualized
+ * rendering. Counted in raw messages rather than turns because agent
+ * conversations are message-dense (a single user turn can fan out into dozens
+ * of tool/assistant messages inside the agent loop).
  */
-const VIRTUALIZATION_THRESHOLD = 30
+const VIRTUALIZATION_THRESHOLD = 100
 
 /** Async window sizing of the Virtuoso scroller (px). */
 const SCROLL_DECCELERATION = 700
@@ -401,19 +402,20 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   const turns = useMemo(() => groupMessagesIntoTurns(activeMessages), [activeMessages])
   const lastTurn = turns[turns.length - 1]
 
-  // ── Virtualization (only above VIRTUALIZATION_THRESHOLD turns) ──
-  const shouldVirtualize = turns.length > VIRTUALIZATION_THRESHOLD
+  // ── Virtualization (only above VIRTUALIZATION_THRESHOLD messages) ──
+  const shouldVirtualize = activeMessages.length > VIRTUALIZATION_THRESHOLD
   const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null)
   // Virtuoso's own at-bottom tracking (drives followOutput). Seeded from the
   // shared isUserAtBottomRef maintained by ConversationView/ScrollToBottomButton
   // so the very first streaming turn respects the current scroll position.
   const [isUserAtBottom, setIsUserAtBottom] = useState(() => isUserAtBottomRef?.current ?? true)
   const rootRef = useRef<HTMLDivElement | null>(null)
-  // Resolve the scroll parent after mount. Until then we deliberately render
-  // the plain list — switching Virtuoso between its own-scroller and
-  // customScrollParent modes mid-flight is not supported, so Virtuoso is only
-  // mounted once the parent element is known.
-  useEffect(() => {
+  // Resolve the scroll parent synchronously during the layout phase, BEFORE the
+  // browser paints. Virtuoso mounts on the very first commit for large
+  // conversations — the plain renderer must never paint a full (expensive) list
+  // frame just to resolve the container. (useEffect would paint one full frame
+  // first; that frame is precisely the jank we are virtualizing away.)
+  useLayoutEffect(() => {
     if (!shouldVirtualize || scrollParent) return
     // The scroll container lives in ConversationView. Resolve it lazily from
     // our own position in the DOM (nearest overflow-y-auto ancestor) so this
