@@ -1,16 +1,19 @@
 /**
- * 打包 Chrome Web Store / 自分发上传用的扩展 zip（保留 Codex OAuth）。
+ * Pack a self-distribution zip of the extension (Codex OAuth kept).
  *
- * 与 `zip:store` 的区别：本脚本不设置 CW_CODEX_OAUTH=0，不做 Codex 功能裁剪
- * （__CW_CODEX_OAUTH__ 保持 true，popup 的 Codex 登录块与相关 locale 完整保留）。
- * 需要"无 Codex"的商店包时用 `pnpm zip:store`。
+ * Difference from `zip:store`: this script does NOT set CW_STORE_BUILD=1, so
+ * the manifest keeps the pinned extension `key` (stable ID → native messaging
+ * allowed_origins stays valid). `zip:store` is the CWS variant: CW_STORE_BUILD=1
+ * omits the `key` because CWS rejects manifests that carry one. Both variants
+ * keep Codex OAuth by default; set CW_CODEX_OAUTH=0 on either to strip Codex
+ * at build time (the two flags are orthogonal).
  *
- * 流程：pnpm exec wxt zip（= 完整 build + 打包 dist/chrome-mv3，zip 根即扩展根，
- * manifest.json 位于根目录，满足 CWS 上传要求）→ 校验产物 → 清理旧 zip →
- * 重命名为 eo2weave-chrome-v{version}.zip。
+ * Flow: pnpm exec wxt zip (= full build + zip dist/chrome-mv3, zip root IS the
+ * extension root so manifest.json sits at the top level as CWS requires) →
+ * validate output → remove stale zips → rename to eo2weave-chrome-v{version}.zip.
  *
- * 用法：pnpm pack:release
- * 产物：browser-extension/dist/eo2weave-chrome-v{version}.zip
+ * Usage: pnpm pack:release
+ * Output: browser-extension/dist/eo2weave-chrome-v{version}.zip
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync } from 'node:fs'
@@ -26,7 +29,8 @@ const version = pkg.version
 const wxtZipName = `${pkg.name}-${version}-chrome.zip`
 
 console.log(`[pack:release] building & zipping v${version} (Codex OAuth kept)...`)
-// 继承当前环境；不强制 CW_CODEX_OAUTH，保留 Codex OAuth 功能。
+// Inherit the current environment; CW_CODEX_OAUTH is not forced here, so Codex
+// OAuth stays in the bundle.
 execFileSync('pnpm', ['exec', 'wxt', 'zip'], { cwd: extDir, stdio: 'inherit' })
 
 const produced = path.join(distDir, wxtZipName)
@@ -35,7 +39,8 @@ if (!existsSync(produced)) {
   process.exit(1)
 }
 
-// wxt zip 打的就是 chrome-mv3（不带 modeSuffix 的构建输出），直接校验该目录。
+// wxt zip packs dist/chrome-mv3 (the build output without modeSuffix), so
+// validate that directory directly.
 const outDir = path.join(distDir, 'chrome-mv3')
 if (!existsSync(path.join(outDir, 'manifest.json'))) {
   console.error(`[pack:release] missing manifest.json in ${outDir}`)
@@ -51,15 +56,26 @@ if (manifest.manifest_version !== 3) {
   problems.push(`unexpected manifest_version=${manifest.manifest_version}`)
 }
 if (manifest.name !== '__MSG_extensionName__' && manifest.name !== 'EO2Weave') {
-  // dev 构建用 __MSG_extensionNameDev__；出现在发布包说明打错了目录
+  // dev builds use __MSG_extensionNameDev__; seeing it in a release package
+  // means the wrong output directory was packed.
   problems.push(`manifest.name=${manifest.name} looks like a dev build`)
 }
 if (!existsSync(path.join(outDir, '_locales', 'en', 'messages.json'))) {
   problems.push('_locales/en/messages.json missing (default_locale would dangle)')
 }
+// Self-distribution builds MUST keep the pinned key (stable ID → native-host
+// allowed_origins stays valid); store builds (CW_STORE_BUILD=1) are the
+// opposite — CWS rejects any manifest that contains a `key` field.
+if (process.env.CW_STORE_BUILD === '1' && manifest.key) {
+  problems.push('manifest.key present in store build — CWS upload will be REJECTED (清单文件中不允许使用 key 字段)')
+}
+if (process.env.CW_STORE_BUILD !== '1' && !manifest.key) {
+  problems.push('manifest.key missing in self-distribution build — native-host allowed_origins would break (ID drift)')
+}
 
-// Chrome MV3 禁止加载以下划线开头的资源路径（_locales 除外）。
-// `_virtual_*` chunk 是历史坑，wxt.config.ts 的 sanitize 插件负责改名，这里兜底复查。
+// Chrome MV3 refuses to load resource paths starting with "_" (_locales
+// excepted). The `_virtual_*` chunk was a past incident — the sanitize plugin
+// in wxt.config.ts renames it; this is a defensive re-check.
 const reserved = []
 const walk = (dir) => {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -71,7 +87,8 @@ const walk = (dir) => {
 walk(outDir)
 for (const f of reserved) problems.push(`reserved "_"-prefixed file in output: ${f}`)
 
-// 清掉 dist 下的旧版本 zip（1.1.4 旧包曾残留导致差点上传过期版本），只留本次产物。
+// Remove stale zips from dist (a leftover 1.1.4 zip once nearly got uploaded
+// as "the latest"); keep only this run's output.
 for (const f of readdirSync(distDir)) {
   if (f.endsWith('.zip') && f !== wxtZipName) {
     unlinkSync(path.join(distDir, f))

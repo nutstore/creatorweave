@@ -6,16 +6,18 @@ Built with [WXT](https://wxt.dev/).
 
 ## Distribution
 
-| Variant | Codex OAuth | How to get |
-|---------|-------------|------------|
-| Chrome Web Store | ❌ stripped at build time | Web Store listing |
-| Open-source community version | ✅ included | Build from source / GitHub release |
+| Variant | Codex OAuth | Manifest key | How to get |
+|---------|-------------|--------------|------------|
+| Chrome Web Store | ✅ included | omitted (CWS assigns its own ID) | `npm run build:store` / `npm run zip:store` |
+| Self-distribution / dev | ✅ included | pinned (stable ID for native messaging) | `npm run build` / `npm run zip` / `npm run pack:release` |
+
+Both variants keep Codex OAuth. The store variant only omits the pinned manifest `key` (CWS rejects manifests carrying one); set `CW_CODEX_OAUTH=0` on either if a Codex-free bundle is ever needed.
 
 ```bash
-npm run build          # Full build (community version, Codex OAuth included)
-npm run zip            # Full .zip package
-npm run build:store    # Store build (CW_CODEX_OAUTH=0, strips Codex OAuth entirely)
-npm run zip:store      # Store .zip (Codex-stripped)
+npm run build          # Self-distribution build (pinned manifest key, Codex OAuth included)
+npm run zip            # Self-distribution .zip package
+npm run build:store    # Store build (CW_STORE_BUILD=1, omits the manifest key for CWS)
+npm run zip:store      # Store .zip (key omitted)
 ```
 
 ## Setup & Development
@@ -268,7 +270,7 @@ Tool names follow the provider-safe `host__tool` convention; the per-host/per-gr
 
 ## Codex OAuth Proxy (Open-Source Community Version)
 
-> **Distribution note:** this feature ships with the **open-source community version** (build from source or grab the release from GitHub). The **Chrome Web Store version does not include it** — the store build (`build:store` / `zip:store`) strips the Codex OAuth feature entirely at build time (popup box, background handlers, i18n keys).
+> **Distribution note:** this feature ships in **both** self-distribution and Chrome Web Store builds by default. The build-time strip flag `CW_CODEX_OAUTH=0` removes it entirely (popup box, background handlers, i18n keys) if a Codex-free variant is ever needed — it is orthogonal to the store/self-distribution split (`CW_STORE_BUILD`).
 
 The extension enables using OpenAI Codex models directly from EO2Weave, without exposing OAuth tokens to the web app.
 

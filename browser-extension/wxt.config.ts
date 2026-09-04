@@ -10,6 +10,11 @@ import pkg from './package.json';
 // becomes `false` and treeshaking removes every OpenAI endpoint / client_id /
 // UA string from the bundle. Default ON (internal builds keep full features).
 const CODEX_OAUTH = process.env.CW_CODEX_OAUTH !== '0';
+// Store-build marker (independent of Codex stripping): the CWS build omits the
+// pinned manifest `key` (see below). Set CW_STORE_BUILD=1 via `build:store` /
+// `zip:store`. Combine with CW_CODEX_OAUTH=0 if a Codex-free store zip is ever
+// needed — the two flags are orthogonal by design.
+const IS_STORE_BUILD = process.env.CW_STORE_BUILD === '1';
 
 // Stable Chromium extension key (RSA public key DER, base64).
 // Keeps a consistent extension ID across loads/updates so the native messaging
@@ -217,8 +222,20 @@ export default defineConfig({
     description: '__MSG_extensionDescription__',
     default_locale: 'en',
     version: pkg.version,
-    // Pin a stable extension ID derived from a fixed public key.
-    key: process.env.CREATORWEAVE_CHROMIUM_EXTENSION_KEY || DEFAULT_CHROMIUM_EXTENSION_KEY,
+    // Pin a stable extension ID derived from a fixed public key — for unpacked
+    // loads (dev + self-distribution zips) so the native messaging manifest's
+    // `allowed_origins` stays valid across reinstalls.
+    //
+    // CWS REJECTS uploads whose manifest contains `key` ("清单文件中不允许使用
+    // key 字段") — the store derives its own key/ID when the item is created.
+    // So store builds omit it; the store item therefore gets a DIFFERENT
+    // extension ID than kdnnhmagmghdhfinoipgbcddnpmffbkp. Once the item exists
+    // and its ID is known, add that ID to native-host allowed_origins (or pin
+    // the store item's public key via CREATORWEAVE_CHROMIUM_EXTENSION_KEY to
+    // unify both IDs).
+    ...(IS_STORE_BUILD
+      ? {}
+      : { key: process.env.CREATORWEAVE_CHROMIUM_EXTENSION_KEY || DEFAULT_CHROMIUM_EXTENSION_KEY }),
     permissions: ['scripting', 'tabs', 'storage', 'alarms', 'notifications', 'sidePanel', 'nativeMessaging'],
     host_permissions: ['<all_urls>'],
     // Fixed Firefox add-on ID for native messaging registration.
