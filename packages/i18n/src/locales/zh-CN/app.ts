@@ -13,6 +13,12 @@ export const app = {
     migrationComplete: "数据迁移完成",
     conversationsMigrated: "{count} 个对话",
     // App toast messages
+    pwaInstall: {
+      title: "安装为桌面应用",
+      description: "像原生应用一样在独立窗口中运行，可从桌面直接启动",
+      action: "安装",
+      dismiss: "暂不",
+    },
     resetDatabaseFailed: "重置数据库失败，请手动刷新页面",
     localDataCleared: "已清空本地数据，可以重新开始了",
     clearFailedCloseOtherTabs:

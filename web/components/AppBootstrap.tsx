@@ -23,6 +23,7 @@ import { getPendingRecipePrompt, RECIPE_REPROBE_INTERVAL_MS, type RecipePromptSt
 // ExecAuthModal. They now forward into the shared tool-auth.store queue.
 import { ToolAuthModal } from '@/components/agent/ToolAuthModal'
 import { ServiceWorkerBridge } from '@/components/ServiceWorkerBridge'
+import { PwaInstallCard } from '@/components/pwa/PwaInstallCard'
 
 /**
  * AppBootstrap — storage-initialization gate + global chrome.
@@ -616,6 +617,9 @@ export function AppBootstrap({ children }: { children?: React.ReactNode }) {
         />
       )}
       <ToolAuthModal />
+      {/* PWA install offer — after storage init so it never competes with the
+          loading/error gates; dismissal state is owned by pwa/install-prompt. */}
+      <PwaInstallCard />
       <Toaster position="bottom-right" />
     </>
   )

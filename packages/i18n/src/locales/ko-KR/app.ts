@@ -14,6 +14,13 @@ export const app = {
     migrationComplete: "마이그레이션 완료",
     conversationsMigrated: "{count}개 대화",
     // App toast messages
+    pwaInstall: {
+      title: "데스크톱 앱으로 설치",
+      description:
+        "네이티브 앱처럼 전용 창에서 실행되며 바탕화면에서 바로 시작할 수 있습니다",
+      action: "설치",
+      dismiss: "나중에",
+    },
     resetDatabaseFailed:
       "데이터베이스 재설정에 실패했습니다. 페이지를 수동으로 새로고침해 주세요",
     localDataCleared:

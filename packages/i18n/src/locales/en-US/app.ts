@@ -14,6 +14,13 @@ export const app = {
     migrationComplete: "Migration complete",
     conversationsMigrated: "{count} conversations",
     // App toast messages
+    pwaInstall: {
+      title: "Install as a desktop app",
+      description:
+        "Runs in its own dedicated window like a native app — launch it straight from your desktop",
+      action: "Install",
+      dismiss: "Not now",
+    },
     resetDatabaseFailed:
       "Failed to reset database, please refresh the page manually",
     localDataCleared: "Local data cleared, you can start fresh",

@@ -14,6 +14,13 @@ export const app = {
     migrationComplete: "移行完了",
     conversationsMigrated: "{count} 件の会話",
     // App toast messages
+    pwaInstall: {
+      title: "デスクトップアプリとしてインストール",
+      description:
+        "ネイティブアプリのように専用ウィンドウで実行され、デスクトップから直接起動できます",
+      action: "インストール",
+      dismiss: "後で",
+    },
     resetDatabaseFailed:
       "データベースのリセットに失敗しました。ページを手動で更新してください",
     localDataCleared: "ローカルデータが消去されました。最初からやり直せます",

@@ -26,9 +26,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#4D9F98',
     categories: ['utilities', 'developer', 'productivity'],
     icons: [
-      // Icons are copied from browser-extension/public by scripts/prepare-pwa.mjs
-      // (the web app shares the extension's logo; no separate icon set exists).
+      // icon-192/icon-512 are required by Chrome's installability criteria
+      // (beforeinstallprompt / address-bar install). Generated from the
+      // 1024px brand logo; full-bleed artwork so they ship as purpose "any".
+      // The 128px maskable entry covers Android adaptive-icon masking.
       { src: '/icons/icon-128.png', sizes: '128x128', type: 'image/png', purpose: 'maskable' },
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
     ],
     shortcuts: [
@@ -39,7 +43,6 @@ export default function manifest(): MetadataRoute.Manifest {
           ? '开启一个新的创作工作台会话'
           : 'Start a new creator workspace session',
         url: '/?new=true',
-        icons: [{ src: '/icons/icon-128.png', sizes: '128x128', type: 'image/png' }],
       },
     ],
   }
