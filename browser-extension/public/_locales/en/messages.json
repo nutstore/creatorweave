@@ -1,118 +1,371 @@
 {
-  "extensionName": { "message": "EO2Weave" },
-  "extensionNameDev": { "message": "EO2Weave Dev" },
+  "extensionName": {
+    "message": "EO2Weave"
+  },
+  "extensionNameDev": {
+    "message": "EO2Weave Dev"
+  },
   "webmcpFoundSummary": {
     "message": "WebMCP: $HOSTS$ site(s), $TOOLS$ tool(s) available",
     "placeholders": {
-      "hosts": { "content": "$1" },
-      "tools": { "content": "$2" }
+      "hosts": {
+        "content": "$1"
+      },
+      "tools": {
+        "content": "$2"
+      }
     }
   },
-  "webmcpToggleHostTitle": { "message": "Allow the agent to use this site's WebMCP tools" },
-  "webmcpHostDisabled": { "message": "Disabled — tools from this site are blocked" },
-  "webmcpDiscoverError": { "message": "WebMCP discovery failed" },
-  "webmcpToggleGroupTitle": { "message": "Allow the agent to use this tool group" },
-  "webmcpGroupDisabled": { "message": "Disabled — this tool group is blocked" },
-  "extensionDescription": { "message": "Provides web search and content fetching capabilities for in-browser agents" },
-  "popupSubtitle": { "message": "Your AI workbench in the browser" },
-  "openWorkbench": { "message": "Open workbench" },
-  "openWorkbenchHint": { "message": "Chat with AI, search the web, and act on pages — in the side panel" },
-  "capReady": { "message": "Ready · search & page reading available" },
-  "capInactive": { "message": "Refresh this page to enable page reading" },
-  "capInternal": { "message": "Open any web page to get started" },
-  "capUnavailable": { "message": "Cannot access the current page" },
-  "capCheckFailed": { "message": "Status check failed" },
+  "webmcpToggleHostTitle": {
+    "message": "Allow the agent to use this site's WebMCP tools"
+  },
+  "webmcpHostDisabled": {
+    "message": "Disabled — tools from this site are blocked"
+  },
+  "webmcpDiscoverError": {
+    "message": "WebMCP discovery failed"
+  },
+  "webmcpToggleGroupTitle": {
+    "message": "Allow the agent to use this tool group"
+  },
+  "webmcpGroupDisabled": {
+    "message": "Disabled — this tool group is blocked"
+  },
+  "extensionDescription": {
+    "message": "AI workspace in your browser sidebar, using the current page to help you read, write, analyze, and act with WebMCP authorization."
+  },
+  "popupSubtitle": {
+    "message": "Your AI workbench in the browser"
+  },
+  "openWorkbench": {
+    "message": "Open workbench"
+  },
+  "openWorkbenchHint": {
+    "message": "Chat with AI, search the web, and act on pages — in the side panel"
+  },
+  "capReady": {
+    "message": "Ready · search & page reading available"
+  },
+  "capInactive": {
+    "message": "Refresh this page to enable page reading"
+  },
+  "capInternal": {
+    "message": "Open any web page to get started"
+  },
+  "capUnavailable": {
+    "message": "Cannot access the current page"
+  },
+  "capCheckFailed": {
+    "message": "Status check failed"
+  },
   "capTools": {
     "message": "$N$ site(s) provide AI tools",
-    "placeholders": { "n": { "content": "$1" } }
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
-  "manageTools": { "message": "Manage ▾" },
-  "hideTools": { "message": "Hide ▴" },
-  "checking": { "message": "Checking…" },
-  "cannotAccessCurrentPage": { "message": "Cannot access the current page" },
-  "browserInternalPage": { "message": "Browser internal pages do not support injection" },
-  "injectionCheckFailed": { "message": "Injection check failed" },
-  "checkingAuthStatus": { "message": "Checking auth status…" },
-  "statusCheckFailed": { "message": "Status check failed" },
-  "authorized": { "message": "Authorized" },
-  "authorizationPending": { "message": "Authorization pending…" },
-  "tokenExpired": { "message": "Token expired. Please authorize again." },
-  "notAuthorized": { "message": "Not authorized. Click below to start." },
-  "checkingAuthorization": { "message": "Checking authorization status…" },
-  "authorizedCanUseCodex": { "message": "Authorized! You can now use Codex." },
-  "authorizedCanUseWebApp": { "message": "Authorized! You can now use Codex in the web app." },
-  "waitingForAuthorization": { "message": "Waiting for authorization…" },
-  "authorizationFailed": { "message": "Authorization failed" },
-  "authorizationCodeExpired": { "message": "Authorization code expired. Please try again." },
-  "failedToCheckStatus": { "message": "Failed to check status" },
-  "codexUsage": { "message": "Codex Usage" },
-  "deviceCode": { "message": "Device Code" },
-  "copyCode": { "message": "Copy code" },
-  "startDeviceCodeLogin": { "message": "Start Device Code Login" },
-  "resetLogin": { "message": "Start over (clear state)" },
-  "documentation": { "message": "Documentation" },
-  "github": { "message": "GitHub" },
-  "sidePanelButtonLabel": { "message": "EO2Weave" },
-  "sidePanelButtonTitle": { "message": "Open EO2Weave in the side panel" },
-  "resetCreditsAvailable": { "message": "Banked reset credits" },
-  "availableCount": { "message": "$COUNT$ available", "placeholders": { "count": { "content": "$1" } } },
-  "resetCreditExpires": { "message": "Expires $DATE$", "placeholders": { "date": { "content": "$1" } } },
-  "useResetCredit": { "message": "Use one reset" },
-  "useResetCreditConfirm": { "message": "Use one Codex reset credit now? This restores your weekly usage window." },
-  "resetCreditUsed": { "message": "Reset credit used successfully." },
-  "resetCreditFailed": { "message": "Could not use the reset credit: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
-  "resetting": { "message": "resetting…" },
-  "todayAt": { "message": "today $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "resetsAt": { "message": "resets $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "percentLeft": { "message": "$PERCENT$% left", "placeholders": { "percent": { "content": "$1" } } },
-  "updatedAt": { "message": "Updated $TIME$", "placeholders": { "time": { "content": "$1" } } },
-  "loginStateCleared": { "message": "Login state cleared. Click Start Device Code Login to begin again." },
-  "resumingLogin": { "message": "Resuming the previous login flow" },
-  "startError": { "message": "Start error: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
-  "noBackgroundResponse": { "message": "Start error: no response from the background service. Reload the extension after starting watch mode." },
-  "pollError": { "message": "Authorization polling error: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
-  "authorizationSucceeded": { "message": "Authorized!" },
-  "authorizationPendingLog": { "message": "Authorization pending: $CODE$", "placeholders": { "code": { "content": "$1" } } },
-  "authorizationExpiredLog": { "message": "Authorization expired. Please try again." },
-  "supportedSites": { "message": "Supported Sites" },
-  "bridgeTitle": { "message": "Agent bridge (MCP)" },
-  "bridgeOff": { "message": "Off — expose WebMCP tools to MCP clients (Codex, Claude Code, Cursor, …) on this machine" },
-  "bridgeStarting": { "message": "Starting bridge daemon…" },
-  "bridgeStopping": { "message": "Stopping…" },
-  "bridgeRunning": { "message": "Running on 127.0.0.1:$PORT$ — MCP clients can use these tools", "placeholders": { "port": { "content": "$1" } } },
-  "bridgeError": { "message": "Bridge error" },
-  "bridgeMcpCmdTitle": { "message": "MCP client setup command (click to copy)" },
-  "bridgeCopied": { "message": "Copied!" },
-  "bridgeCopyFailed": { "message": "Copy failed — select manually" },
+  "manageTools": {
+    "message": "Manage ▾"
+  },
+  "hideTools": {
+    "message": "Hide ▴"
+  },
+  "checking": {
+    "message": "Checking…"
+  },
+  "cannotAccessCurrentPage": {
+    "message": "Cannot access the current page"
+  },
+  "browserInternalPage": {
+    "message": "Browser internal pages do not support injection"
+  },
+  "injectionCheckFailed": {
+    "message": "Injection check failed"
+  },
+  "checkingAuthStatus": {
+    "message": "Checking auth status…"
+  },
+  "statusCheckFailed": {
+    "message": "Status check failed"
+  },
+  "authorized": {
+    "message": "Authorized"
+  },
+  "authorizationPending": {
+    "message": "Authorization pending…"
+  },
+  "tokenExpired": {
+    "message": "Token expired. Please authorize again."
+  },
+  "notAuthorized": {
+    "message": "Not authorized. Click below to start."
+  },
+  "checkingAuthorization": {
+    "message": "Checking authorization status…"
+  },
+  "authorizedCanUseCodex": {
+    "message": "Authorized! You can now use Codex."
+  },
+  "authorizedCanUseWebApp": {
+    "message": "Authorized! You can now use Codex in the web app."
+  },
+  "waitingForAuthorization": {
+    "message": "Waiting for authorization…"
+  },
+  "authorizationFailed": {
+    "message": "Authorization failed"
+  },
+  "authorizationCodeExpired": {
+    "message": "Authorization code expired. Please try again."
+  },
+  "failedToCheckStatus": {
+    "message": "Failed to check status"
+  },
+  "codexUsage": {
+    "message": "Codex Usage"
+  },
+  "deviceCode": {
+    "message": "Device Code"
+  },
+  "copyCode": {
+    "message": "Copy code"
+  },
+  "startDeviceCodeLogin": {
+    "message": "Start Device Code Login"
+  },
+  "resetLogin": {
+    "message": "Start over (clear state)"
+  },
+  "documentation": {
+    "message": "Documentation"
+  },
+  "github": {
+    "message": "GitHub"
+  },
+  "sidePanelButtonLabel": {
+    "message": "EO2Weave"
+  },
+  "sidePanelButtonTitle": {
+    "message": "Open EO2Weave in the side panel"
+  },
+  "resetCreditsAvailable": {
+    "message": "Banked reset credits"
+  },
+  "availableCount": {
+    "message": "$COUNT$ available",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "resetCreditExpires": {
+    "message": "Expires $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "useResetCredit": {
+    "message": "Use one reset"
+  },
+  "useResetCreditConfirm": {
+    "message": "Use one Codex reset credit now? This restores your weekly usage window."
+  },
+  "resetCreditUsed": {
+    "message": "Reset credit used successfully."
+  },
+  "resetCreditFailed": {
+    "message": "Could not use the reset credit: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "resetting": {
+    "message": "resetting…"
+  },
+  "todayAt": {
+    "message": "today $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "resetsAt": {
+    "message": "resets $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "percentLeft": {
+    "message": "$PERCENT$% left",
+    "placeholders": {
+      "percent": {
+        "content": "$1"
+      }
+    }
+  },
+  "updatedAt": {
+    "message": "Updated $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1"
+      }
+    }
+  },
+  "loginStateCleared": {
+    "message": "Login state cleared. Click Start Device Code Login to begin again."
+  },
+  "resumingLogin": {
+    "message": "Resuming the previous login flow"
+  },
+  "startError": {
+    "message": "Start error: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "noBackgroundResponse": {
+    "message": "Start error: no response from the background service. Reload the extension after starting watch mode."
+  },
+  "pollError": {
+    "message": "Authorization polling error: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "authorizationSucceeded": {
+    "message": "Authorized!"
+  },
+  "authorizationPendingLog": {
+    "message": "Authorization pending: $CODE$",
+    "placeholders": {
+      "code": {
+        "content": "$1"
+      }
+    }
+  },
+  "authorizationExpiredLog": {
+    "message": "Authorization expired. Please try again."
+  },
+  "supportedSites": {
+    "message": "Supported Sites"
+  },
+  "bridgeTitle": {
+    "message": "Agent bridge (MCP)"
+  },
+  "bridgeOff": {
+    "message": "Off — expose WebMCP tools to MCP clients (Codex, Claude Code, Cursor, …) on this machine"
+  },
+  "bridgeStarting": {
+    "message": "Starting bridge daemon…"
+  },
+  "bridgeStopping": {
+    "message": "Stopping…"
+  },
+  "bridgeRunning": {
+    "message": "Running on 127.0.0.1:$PORT$ — MCP clients can use these tools",
+    "placeholders": {
+      "port": {
+        "content": "$1"
+      }
+    }
+  },
+  "bridgeError": {
+    "message": "Bridge error"
+  },
+  "bridgeMcpCmdTitle": {
+    "message": "MCP client setup command (click to copy)"
+  },
+  "bridgeCopied": {
+    "message": "Copied!"
+  },
+  "bridgeCopyFailed": {
+    "message": "Copy failed — select manually"
+  },
   "recipesCount": {
     "message": "$COUNT$ of $TOTAL$ enabled",
     "placeholders": {
-      "count": { "content": "$1" },
-      "total": { "content": "$2" }
+      "count": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
     }
   },
-  "recipesInstalled": { "message": "Enabled" },
-  "recipesAvailable": { "message": "Available" },
-  "recipesEmptyInstalled": { "message": "Nothing enabled yet — turn on a site below to give your agent tools there." },
-  "recipesEmptyAvailable": { "message": "No more sites available in this version." },
-  "webmcpGuideTitle": { "message": "WebMCP: no tools found — enable the browser switch" },
-  "webmcpGuideTitleNoTools": { "message": "WebMCP is available — but no tools were found yet" },
-  "webmcpGuideChromium": { "message": "Your browser can enable WebMCP with a built-in experiment switch: open the flags page below, search for \"webmcp\", set \"Enables WebMCP API\" to Enabled, then relaunch the browser when prompted." },
-  "webmcpGuideChromiumNew": { "message": "This browser version has removed the WebMCP switch (removed since Chromium 152). Sites now enable WebMCP themselves via an Origin Trial token — there is nothing to toggle in the browser." },
-  "webmcpGuideUnsupported": { "message": "This browser doesn't provide the WebMCP switch. Site tools appear here only in Chromium-based browsers that support WebMCP." },
-  "webmcpGuideOpenFlags": { "message": "Open the switch page (chrome://flags)" },
-  "webmcpGuideOpenDocs": { "message": "How sites enable it (official docs)" },
-  "webmcpGuideOpenReadme": { "message": "Open the setup guide (README)" },
-  "webmcpGuideFlagOn": { "message": "WebMCP is available in this browser. Tools appear here once a supported site is enabled and registers its tools — check the supported-sites list." },
-  "webmcpGuideFlagOnOt": { "message": "Note: on this browser version sites may also need their own Origin Trial token to expose tools." },
-  "webmcpGuideOpenSites": { "message": "Manage supported sites" },
-  "webmcpGuideStateOn": { "message": "available" },
-  "webmcpGuideStateOff": { "message": "off" },
+  "recipesInstalled": {
+    "message": "Enabled"
+  },
+  "recipesAvailable": {
+    "message": "Available"
+  },
+  "recipesEmptyInstalled": {
+    "message": "Nothing enabled yet — turn on a site below to give your agent tools there."
+  },
+  "recipesEmptyAvailable": {
+    "message": "No more sites available in this version."
+  },
+  "webmcpGuideTitle": {
+    "message": "WebMCP: no tools found — enable the browser switch"
+  },
+  "webmcpGuideTitleNoTools": {
+    "message": "WebMCP is available — but no tools were found yet"
+  },
+  "webmcpGuideChromium": {
+    "message": "Your browser can enable WebMCP with a built-in experiment switch: open the flags page below, search for \"webmcp\", set \"Enables WebMCP API\" to Enabled, then relaunch the browser when prompted."
+  },
+  "webmcpGuideChromiumNew": {
+    "message": "This browser version has removed the WebMCP switch (removed since Chromium 152). Sites now enable WebMCP themselves via an Origin Trial token — there is nothing to toggle in the browser."
+  },
+  "webmcpGuideUnsupported": {
+    "message": "This browser doesn't provide the WebMCP switch. Site tools appear here only in Chromium-based browsers that support WebMCP."
+  },
+  "webmcpGuideOpenFlags": {
+    "message": "Open the switch page (chrome://flags)"
+  },
+  "webmcpGuideOpenDocs": {
+    "message": "How sites enable it (official docs)"
+  },
+  "webmcpGuideOpenReadme": {
+    "message": "Open the setup guide (README)"
+  },
+  "webmcpGuideFlagOn": {
+    "message": "WebMCP is available in this browser. Tools appear here once a supported site is enabled and registers its tools — check the supported-sites list."
+  },
+  "webmcpGuideFlagOnOt": {
+    "message": "Note: on this browser version sites may also need their own Origin Trial token to expose tools."
+  },
+  "webmcpGuideOpenSites": {
+    "message": "Manage supported sites"
+  },
+  "webmcpGuideStateOn": {
+    "message": "available"
+  },
+  "webmcpGuideStateOff": {
+    "message": "off"
+  },
   "webmcpGuideVersion": {
     "message": "WebMCP: $STATE$ · Chromium $VERSION$",
     "placeholders": {
-      "state": { "content": "$1" },
-      "version": { "content": "$2" }
+      "state": {
+        "content": "$1"
+      },
+      "version": {
+        "content": "$2"
+      }
     }
   }
 }
