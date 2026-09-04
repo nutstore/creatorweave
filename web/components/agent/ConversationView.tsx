@@ -429,6 +429,7 @@ export function ConversationView({
               onRegenerate={handleRegenerate}
               onCancel={handleCancel}
               messagesEndRef={messagesEndRef}
+              isUserAtBottomRef={isUserAtBottomRef}
               conversationId={convId}
               mentionAgents={mentionAgents}
               onSearchFiles={debouncedSearchFiles}

@@ -1,0 +1,224 @@
+/**
+ * ConversationMessages virtualization tests.
+ *
+ * react-virtuoso is mocked with a pass-through renderer so we can verify OUR
+ * wiring (threshold switching, prop plumbing, nav delegation) without
+ * depending on Virtuoso's real DOM measurement inside happy-dom.
+ */
+
+import { render, waitFor } from '@testing-library/react'
+import { forwardRef, useImperativeHandle } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Message } from '@/agent/message-types'
+import { ConversationMessages } from '../ConversationMessages'
+import type { ConversationMessagesHandle } from '../ConversationMessages'
+
+const {
+  virtuosoSpy,
+  virtuosoScrollToIndexSpy,
+} = vi.hoisted(() => ({
+  virtuosoSpy: vi.fn(),
+  virtuosoScrollToIndexSpy: vi.fn(),
+}))
+
+vi.mock('react-virtuoso', () => ({
+  Virtuoso: forwardRef(function VirtuosoMock(props: Record<string, unknown>, ref) {
+    virtuosoSpy(props)
+    useImperativeHandle(ref, () => ({
+      scrollToIndex: virtuosoScrollToIndexSpy,
+      scrollIntoView: vi.fn(),
+      scrollTo: vi.fn(),
+      scrollBy: vi.fn(),
+    }))
+    const components = (props.components ?? {}) as {
+      Header?: () => React.ReactNode
+      Footer?: () => React.ReactNode
+    }
+    const data = (props.data ?? []) as unknown[]
+    const itemContent = props.itemContent as (index: number, item: unknown) => React.ReactNode
+    const computeItemKey = props.computeItemKey as (index: number, item: unknown) => string
+    return (
+      <div data-testid="virtuoso-mock">
+        {components.Header ? <components.Header /> : null}
+        {data.map((item, index) => (
+          <div key={computeItemKey(index, item)} data-virtuoso-index={index}>
+            {itemContent(index, item)}
+          </div>
+        ))}
+        {components.Footer ? <components.Footer /> : null}
+      </div>
+    )
+  }),
+}))
+
+vi.mock('@/store/conversation-runtime.store', () => {
+  const state = {
+    runtimes: new Map(),
+    pendingMessageQueues: new Map(),
+  }
+  const useConversationRuntimeStore = (selector?: (s: typeof state) => unknown) =>
+    selector ? selector(state) : state
+  ;(useConversationRuntimeStore as unknown as { getState: () => typeof state }).getState = () => state
+  return { useConversationRuntimeStore }
+})
+
+vi.mock('@/i18n', () => ({
+  useT: () => (key: string) => key,
+}))
+
+vi.mock('../MessageBubble', () => ({
+  MessageBubble: ({ message }: { message: Message }) => (
+    <div data-testid="message-bubble" data-message-id={message.id} />
+  ),
+}))
+
+vi.mock('../AssistantTurnBubble', () => ({
+  AssistantTurnBubble: () => <div data-testid="assistant-turn" />,
+}))
+
+vi.mock('../ConversationUsageBar', () => ({
+  ConversationUsageBar: () => <div data-testid="usage-bar" />,
+}))
+
+vi.mock('../QueuedMessageCard', () => ({
+  QueuedMessageCard: () => <div data-testid="queued-card" />,
+}))
+
+/** Interleaved user/assistant pairs → 2 turns per pair. */
+function makeMessages(pairs: number): Message[] {
+  const messages: Message[] = []
+  for (let i = 0; i < pairs; i++) {
+    messages.push({
+      id: `u-${i}`,
+      role: 'user',
+      content: `user question ${i}`,
+      timestamp: i * 10,
+    } as Message)
+    messages.push({
+      id: `a-${i}`,
+      role: 'assistant',
+      content: `answer ${i}`,
+      timestamp: i * 10 + 1,
+    } as Message)
+  }
+  return messages
+}
+
+function renderMessages(messages: Message[]) {
+  const handleRef = { current: null as ConversationMessagesHandle | null }
+  const messagesEndRef = { current: null as HTMLDivElement | null }
+  const noop = vi.fn()
+  render(
+    <div className="overflow-y-auto" data-testid="scroll-container">
+      <ConversationMessages
+        ref={handleRef}
+        activeMessages={messages}
+        toolResults={new Map()}
+        isProcessing={false}
+        status="idle"
+        onDeleteAgentLoop={noop}
+        onEditAndResend={noop}
+        onRegenerate={undefined}
+        onCancel={noop}
+        messagesEndRef={messagesEndRef}
+        conversationId="conv-1"
+        mentionAgents={[]}
+      />
+    </div>,
+  )
+  return { handleRef }
+}
+
+describe('ConversationMessages virtualization', () => {
+  beforeEach(() => {
+    virtuosoSpy.mockClear()
+    virtuosoScrollToIndexSpy.mockClear()
+  })
+
+  it('renders short conversations with the plain renderer (no Virtuoso)', () => {
+    // 5 pairs → 10 turns, below the 30-turn threshold
+    const { container } = renderConversation(makeMessages(5))
+    expect(container.querySelector('[data-testid="virtuoso-mock"]')).toBeNull()
+    expect(container.querySelectorAll('[data-testid="message-bubble"]')).toHaveLength(5)
+    expect(container.querySelectorAll('[data-testid="assistant-turn"]')).toHaveLength(5)
+    // data-turn-index is only stamped on user turns (MessageNavBar contract)
+    expect(container.querySelectorAll('[data-turn-index]')).toHaveLength(5)
+    expect(container.querySelector('[data-testid="usage-bar"]')).not.toBeNull()
+    expect(virtuosoSpy).not.toHaveBeenCalled()
+  })
+
+  it('renders long conversations through Virtuoso with header/footer intact', async () => {
+    // 20 pairs → 40 turns, above the threshold
+    const { container } = renderConversation(makeMessages(20))
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="virtuoso-mock"]')).not.toBeNull()
+    })
+    // All turns handed to Virtuoso as data
+    expect(virtuosoSpy.mock.calls[0][0].data).toHaveLength(40)
+    // Header (usage bar) and Footer (messagesEnd div) rendered inside the list
+    expect(container.querySelector('[data-testid="usage-bar"]')).not.toBeNull()
+    expect(container.querySelectorAll('[data-turn-index]')).toHaveLength(20)
+    // followOutput / atBottomStateChange wired
+    expect(typeof virtuosoSpy.mock.calls[0][0].followOutput).toBe('function')
+    expect(typeof virtuosoSpy.mock.calls[0][0].atBottomStateChange).toBe('function')
+  })
+
+  it('resolves the customScrollParent from the nearest overflow ancestor', async () => {
+    const { container } = renderConversation(makeMessages(20))
+    const scrollContainer = container.querySelector('[data-testid="scroll-container"]')
+    await waitFor(() => {
+      expect(virtuosoSpy).toHaveBeenCalled()
+    })
+    // Mount guard: Virtuoso is never mounted before the parent resolves, so
+    // every observed call must already carry the resolved scroll container
+    // (RTL's act() flushes the resolution effect synchronously, so the
+    // transient plain-render frame is not observable here).
+    for (const call of virtuosoSpy.mock.calls) {
+      expect(call[0].customScrollParent).toBe(scrollContainer)
+    }
+  })
+
+  it('delegates scrollToTurnIndex to Virtuoso in virtualized mode', async () => {
+    const { handleRef } = renderMessages(makeMessages(20))
+    await waitFor(() => {
+      expect(handleRef.current).not.toBeNull()
+      expect(virtuosoSpy).toHaveBeenCalled()
+    })
+    handleRef.current!.scrollToTurnIndex(7)
+    expect(virtuosoScrollToIndexSpy).toHaveBeenCalledWith({ index: 7, align: 'start' })
+  })
+
+  it('keeps scrollToTurnIndex on the DOM path in plain mode', () => {
+    const { handleRef } = renderMessages(makeMessages(5))
+    handleRef.current!.scrollToTurnIndex(1)
+    expect(virtuosoScrollToIndexSpy).not.toHaveBeenCalled()
+    // DOM query path ran without throwing (no matching node inside jsdom-free
+    // container is fine — the important part is it did NOT touch virtuoso)
+  })
+})
+
+/** Helper so tests can also reach the rendered container. */
+function renderConversation(messages: Message[]) {
+  const handleRef = { current: null as ConversationMessagesHandle | null }
+  const messagesEndRef = { current: null as HTMLDivElement | null }
+  const noop = vi.fn()
+  const { container } = render(
+    <div className="overflow-y-auto" data-testid="scroll-container">
+      <ConversationMessages
+        ref={handleRef}
+        activeMessages={messages}
+        toolResults={new Map()}
+        isProcessing={false}
+        status="idle"
+        onDeleteAgentLoop={noop}
+        onEditAndResend={noop}
+        onRegenerate={undefined}
+        onCancel={noop}
+        messagesEndRef={messagesEndRef}
+        conversationId="conv-1"
+        mentionAgents={[]}
+      />
+    </div>,
+  )
+  return { container, handleRef }
+}

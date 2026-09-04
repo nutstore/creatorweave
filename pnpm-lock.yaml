@@ -425,6 +425,9 @@ importers:
       react-split-pane:
         specifier: ^3.2.0
         version: 3.2.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react-virtuoso:
+        specifier: 2.13.2
+        version: 2.13.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-zoom-pan-pinch:
         specifier: ^4.0.4
         version: 4.0.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -3499,6 +3502,15 @@ packages:
 
   '@upsetjs/venn.js@2.0.0':
     resolution: {integrity: sha512-WbBhLrooyePuQ1VZxrJjtLvTc4NVfpOyKx0sKqioq9bX1C1m7Jgykkn8gLrtwumBioXIqam8DLxp88Adbue6Hw==}
+
+  '@virtuoso.dev/react-urx@0.2.13':
+    resolution: {integrity: sha512-MY0ugBDjFb5Xt8v2HY7MKcRGqw/3gTpMlLXId2EwQvYJoC8sP7nnXjAxcBtTB50KTZhO0SbzsFimaZ7pSdApwA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>=16'
+
+  '@virtuoso.dev/urx@0.2.13':
+    resolution: {integrity: sha512-iirJNv92A1ZWxoOHHDYW/1KPoi83939o83iUBQHIim0i3tMeSKEh+bxhJdTHQ86Mr4uXx9xGUTq69cp52ZP8Xw==}
 
   '@vitest/coverage-v8@2.1.9':
     resolution: {integrity: sha512-Z2cOr0ksM00MpEfyVE8KXIYPEcBFxdbLSs56L8PO0QQMxt/6bDj45uQfxoc96v05KW3clk7vvgP0qfDit9DmfQ==}
@@ -6778,6 +6790,13 @@ packages:
     peerDependencies:
       react: '>=16.6.0'
       react-dom: '>=16.6.0'
+
+  react-virtuoso@2.13.2:
+    resolution: {integrity: sha512-DuZpTCC0rY5SAKPHQoZPKX3xAYN2iAGcG3P1Z7JVjq/8727usIwpSwvXGomyCvBIC2DHBX4yX46nVZ97+C6Pkw==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>=16 || >=17 || >= 18'
+      react-dom: '>=16 || >=17 || >= 18'
 
   react-zoom-pan-pinch@4.0.4:
     resolution: {integrity: sha512-P0D7lfNHyJCNuUozoVdt0WNWcQ34ZbbD71B8pb+UtF7Th8MKBnxYiPApDfPZZmr+Gk0l0WmGTXL8R36JirHcQQ==}
@@ -11910,6 +11929,13 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
+  '@virtuoso.dev/react-urx@0.2.13(react@18.3.1)':
+    dependencies:
+      '@virtuoso.dev/urx': 0.2.13
+      react: 18.3.1
+
+  '@virtuoso.dev/urx@0.2.13': {}
+
   '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@20.19.32)(happy-dom@20.5.0)(terser@5.46.0))':
     dependencies:
       '@ampproject/remapping': 2.3.0
@@ -15644,6 +15670,13 @@ snapshots:
       dom-helpers: 5.2.1
       loose-envify: 1.4.0
       prop-types: 15.8.1
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  react-virtuoso@2.13.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      '@virtuoso.dev/react-urx': 0.2.13(react@18.3.1)
+      '@virtuoso.dev/urx': 0.2.13
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 

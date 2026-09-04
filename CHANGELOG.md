@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Virtualized conversation scrolling** — conversations with more than 30 turns now render through `react-virtuoso` (windowed rendering with dynamic height measurement), keeping long agent conversations smooth instead of mounting every message turn in the DOM. Short conversations keep the original plain renderer; streaming auto-follow, scroll-to-bottom button, message nav rail, and queued-message footer all work unchanged in both modes.
+
 ### Changed
 
 - Renamed product and repository to **EO2Weave** (formerly CreatorWeave). GitHub repo is now `nutstore/eo2weave` (old links redirect); internal package scope `@creatorweave/*` and native host id `com.creatorweave.nativehost` unchanged.

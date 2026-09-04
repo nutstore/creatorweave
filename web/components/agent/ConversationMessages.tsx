@@ -8,18 +8,219 @@
  * streaming token (~60fps). Only this component tree re-renders.
  */
 
-import { Fragment, memo, useMemo, forwardRef, useImperativeHandle, useCallback } from 'react'
+import { memo, useMemo, forwardRef, useImperativeHandle, useCallback, useRef, useState, useEffect, useContext, createContext } from 'react'
+import { Virtuoso } from 'react-virtuoso'
+import type { VirtuosoHandle } from 'react-virtuoso'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useShallow } from 'zustand/react/shallow'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { ConversationUsageBar } from './ConversationUsageBar'
 import { groupMessagesIntoTurns } from './group-messages'
+import type { Turn } from './group-messages'
 import { QueuedMessageCard } from './QueuedMessageCard'
 import { Clock } from 'lucide-react'
 import { useT } from '@/i18n'
 import type { DraftAssistantStep, Message, ToolCall } from '@/agent/message-types'
 import type { FileMentionItem } from './FileMentionExtension'
+
+/**
+ * Threshold (in turns) above which the message list switches to virtualized
+ * rendering. Below it, the plain `.map` renderer is used — identical behavior
+ * to before, so short conversations keep their exact layout/DOM structure.
+ */
+const VIRTUALIZATION_THRESHOLD = 30
+
+/** Async window sizing of the Virtuoso scroller (px). */
+const SCROLL_DECCELERATION = 700
+
+/**
+ * Skip placeholder churn during very fast scroolling: turn bubbles are
+ * expensive to remount, so only engage scroll-seek above this velocity.
+ */
+const SCROLL_SEEK_VELOCITY = 800
+
+/** Extra rendered runway (px) on both sides of the visible window. */
+const INCREASE_VIEWPORT_BY = 900
+
+/**
+ * React context bridging ConversationMessages state into Virtuoso's
+ * Header/Footer components (which render outside the data flow of itemContent).
+ */
+type VirtuosoContextValue = {
+  usageBarProps: { messages: Message[] }
+  footerNode: React.ReactNode
+}
+const VirtuosoContext = createContext<VirtuosoContextValue>({ usageBarProps: { messages: [] }, footerNode: null })
+
+type TurnRendererProps = {
+  turn: Turn
+  turnIndex: number
+  /** Shared streaming/toolResults context for this render pass. */
+  ctx: {
+    toolResults: Map<string, string>
+    isProcessing: boolean
+    status: string
+    isWaitingForModel: boolean
+    runtimeProps: ReturnType<typeof getRuntimeProps>
+    streamingContent: { reasoning: string; content: string } | undefined
+    totalTurns: number
+    iterationLimitReached: number | null
+    conversationId?: string | null
+    onPreviewAsset?: (name: string, blob: Blob) => void
+  }
+  onDeleteAgentLoop: (messageId: string) => void
+  onEditAndResend: (userMessageId: string, newContent: string) => void
+  onRegenerate: ((userMessageId: string) => void) | undefined
+  onCancel: () => void
+  mentionAgents: { id: string; name?: string }[]
+  onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
+}
+
+/**
+ * Render a single message turn (user bubble or assistant turn).
+ * Shared by the plain renderer and the virtualized renderer so both stay
+ * visually and behaviorally identical.
+ */
+const TurnRenderer = memo(function TurnRenderer({
+  turn,
+  turnIndex,
+  ctx,
+  onDeleteAgentLoop,
+  onEditAndResend,
+  onRegenerate,
+  onCancel,
+  mentionAgents,
+  onSearchFiles,
+}: TurnRendererProps) {
+  const isLast = ctx.isProcessing && turnIndex === ctx.totalTurns - 1
+  return turn.type === 'user' ? (
+    <div data-turn-index={turnIndex}>
+      <MessageBubble
+        message={turn.message}
+        onDeleteAgentLoop={onDeleteAgentLoop}
+        onEditAndResend={onEditAndResend}
+        onRegenerate={onRegenerate}
+        onCancel={onCancel}
+        disableDeleteActions={ctx.isProcessing}
+        isProcessing={ctx.isProcessing}
+        mentionAgents={mentionAgents}
+        onSearchFiles={onSearchFiles}
+        onPreviewAsset={ctx.onPreviewAsset}
+      />
+    </div>
+  ) : (
+    <AssistantTurnBubble
+      turn={turn}
+      toolResults={ctx.toolResults}
+      isProcessing={isLast}
+      isWaiting={ctx.runtimeProps.isWaiting}
+      streamingState={ctx.runtimeProps.streamingState}
+      streamingContent={ctx.streamingContent}
+      currentToolCall={ctx.runtimeProps.currentToolCall}
+      streamingToolArgs={ctx.runtimeProps.streamingToolArgs}
+      streamingToolArgsByCallId={ctx.runtimeProps.streamingToolArgsByCallId}
+      runtimeToolCalls={ctx.runtimeProps.runtimeToolCalls}
+      runtimeSteps={ctx.runtimeProps.runtimeSteps}
+      conversationId={ctx.conversationId}
+      onPreviewAsset={ctx.onPreviewAsset}
+      iterationLimitReached={turnIndex === ctx.totalTurns - 1 ? ctx.iterationLimitReached : null}
+    />
+  )
+})
+
+/** Footer (draft bubble + queued messages) — shared by both render paths. */
+type ConversationFooterProps = {
+  shouldRenderDraftAssistant: boolean
+  draftRuntimeProps: ReturnType<typeof getRuntimeProps>
+  toolResults: Map<string, string>
+  conversationId?: string | null
+  isProcessing: boolean
+  queuedMessages: { text: string; assets?: unknown[]; enqueuedAt: number }[]
+  mentionAgents: { id: string; name?: string }[]
+  onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
+  messagesEndRef: React.RefObject<HTMLDivElement>
+  t: ReturnType<typeof useT>
+}
+
+function ConversationFooterInner({
+  shouldRenderDraftAssistant,
+  draftRuntimeProps,
+  toolResults,
+  conversationId,
+  isProcessing,
+  queuedMessages,
+  mentionAgents,
+  onSearchFiles,
+  messagesEndRef,
+  t,
+}: ConversationFooterProps) {
+  return (
+    <>
+      {/* Draft assistant turn */}
+      {shouldRenderDraftAssistant && (
+        <AssistantTurnBubble
+          key="draft-assistant"
+          turn={{ type: 'assistant', messages: [], timestamp: Date.now(), totalUsage: null }}
+          toolResults={toolResults}
+          showAvatar
+          isProcessing={true}
+          conversationId={conversationId}
+          {...draftRuntimeProps}
+        />
+      )}
+
+      {/* Queued messages — shown while agent is processing */}
+      {isProcessing && queuedMessages.length > 0 && (
+        <div className="space-y-2">
+          {/* Queue divider */}
+          <div className="flex items-center gap-2 text-xs text-primary-500 dark:text-primary-400">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span>{t('conversation.queue.divider', { count: queuedMessages.length })}</span>
+            <div className="h-px flex-1 bg-primary-200 dark:bg-primary-800" />
+          </div>
+          {/* Queued message cards */}
+          {queuedMessages.map((msg, idx) => (
+            <QueuedMessageCard
+              key={`queued-${idx}-${msg.enqueuedAt}`}
+              conversationId={conversationId ?? ''}
+              index={idx}
+              total={queuedMessages.length}
+              text={msg.text}
+              assets={msg.assets as never}
+              mentionAgents={mentionAgents}
+              onSearchFiles={onSearchFiles}
+              onUpdate={(i, patch) => {
+                if (conversationId) {
+                  useConversationRuntimeStore.getState().updateQueuedMessage(conversationId, i, patch)
+                }
+              }}
+              onRemove={(i) => {
+                if (conversationId) {
+                  useConversationRuntimeStore.getState().removeQueuedMessage(conversationId, i)
+                }
+              }}
+              onMoveUp={(i) => {
+                if (conversationId) {
+                  useConversationRuntimeStore.getState().moveQueuedMessage(conversationId, i, i - 1)
+                }
+              }}
+              onMoveDown={(i) => {
+                if (conversationId) {
+                  useConversationRuntimeStore.getState().moveQueuedMessage(conversationId, i, i + 1)
+                }
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div ref={messagesEndRef} />
+    </>
+  )
+}
+
+const ConversationFooter = memo(ConversationFooterInner)
 
 type ConversationMessagesProps = {
   activeMessages: Message[]
@@ -32,6 +233,8 @@ type ConversationMessagesProps = {
   onRegenerate: ((userMessageId: string) => void) | undefined
   onCancel: () => void
   messagesEndRef: React.RefObject<HTMLDivElement>
+  /** Shared ref tracking whether the user is scrolled to the bottom (seed for virtualized followOutput) */
+  isUserAtBottomRef?: React.MutableRefObject<boolean>
   /** Conversation ID for bridging ask_user_question UI back to executor */
   conversationId?: string | null
   /** Agent candidates for @ mention in edit mode */
@@ -90,6 +293,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   onRegenerate,
   onCancel,
   messagesEndRef,
+  isUserAtBottomRef,
   conversationId,
   mentionAgents,
   onSearchFiles,
@@ -197,6 +401,31 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   const turns = useMemo(() => groupMessagesIntoTurns(activeMessages), [activeMessages])
   const lastTurn = turns[turns.length - 1]
 
+  // ── Virtualization (only above VIRTUALIZATION_THRESHOLD turns) ──
+  const shouldVirtualize = turns.length > VIRTUALIZATION_THRESHOLD
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null)
+  // Virtuoso's own at-bottom tracking (drives followOutput). Seeded from the
+  // shared isUserAtBottomRef maintained by ConversationView/ScrollToBottomButton
+  // so the very first streaming turn respects the current scroll position.
+  const [isUserAtBottom, setIsUserAtBottom] = useState(() => isUserAtBottomRef?.current ?? true)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  // Resolve the scroll parent after mount. Until then we deliberately render
+  // the plain list — switching Virtuoso between its own-scroller and
+  // customScrollParent modes mid-flight is not supported, so Virtuoso is only
+  // mounted once the parent element is known.
+  useEffect(() => {
+    if (!shouldVirtualize || scrollParent) return
+    // The scroll container lives in ConversationView. Resolve it lazily from
+    // our own position in the DOM (nearest overflow-y-auto ancestor) so this
+    // component has no coupling to how the parent lays out.
+    const el = rootRef.current
+    if (!el) return
+    const parent = el.closest('[class*="overflow-y-auto"]') as HTMLElement | null
+    if (parent) setScrollParent(parent)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot resolution; scrollParent intentionally omitted
+  }, [shouldVirtualize, conversationId])
+  const virtuosoRef = useRef<VirtuosoHandle | null>(null)
+
   // ── Expose navigation handle to parent ──
   useImperativeHandle(ref, useCallback(() => ({
     getUserNavItems: () => {
@@ -216,7 +445,13 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
       }
       return items
     },
-    scrollToTurnIndex: (index: number, _align: 'start' | 'center' | 'end' = 'start') => {
+    scrollToTurnIndex: (index: number, align: 'start' | 'center' | 'end' = 'start') => {
+      // Virtualized path: off-window turns are not in the DOM, so delegate to
+      // Virtuoso's scrollToIndex (which routes through the customScrollParent).
+      if (shouldVirtualize && virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({ index, align: align === 'center' ? 'center' : align === 'end' ? 'end' : 'start' })
+        return
+      }
       const el = document.querySelector(`[data-turn-index="${index}"]`)
       if (!el) return
       // Find the scroll container (nearest overflow-y-auto ancestor)
@@ -226,124 +461,136 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
         container.scrollTo({ top: targetTop, behavior: 'smooth' })
       }
     },
-  }), [turns]))
+  }), [turns, shouldVirtualize]))
 
   const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
   const shouldAttachRuntimeToDraft = shouldRenderDraftAssistant
-  return (
-    <div className="min-h-0 px-2 py-3 sm:px-4 sm:py-4">
-      <div className="mx-auto w-full max-w-3xl space-y-4 px-3 sm:px-0">
-        {/* Cumulative token usage across all turns in this conversation */}
-        <ConversationUsageBar messages={activeMessages} />
-        {turns.map((turn, idx) => {
-          const isLast = isProcessing && idx === turns.length - 1
-          const runtime = getRuntimeProps(
-            isLast, isWaitingForModel, activeDraftAssistant, activeStreamingState,
-            streamingState, streamingContentMessage, status,
-          )
 
-          return turn.type === 'user' ? (
-            <div key={turn.message.id} data-turn-index={idx}>
-              <MessageBubble
-                message={turn.message}
-              onDeleteAgentLoop={onDeleteAgentLoop}
-              onEditAndResend={onEditAndResend}
-              onRegenerate={onRegenerate}
-              onCancel={onCancel}
-              disableDeleteActions={isProcessing}
-              isProcessing={isProcessing}
-              mentionAgents={mentionAgents}
-              onSearchFiles={onSearchFiles}
-              onPreviewAsset={onPreviewAsset}
+  // ── Shared per-render context for turn rendering (both paths) ──
+  const renderCtx = useMemo(() => ({
+    toolResults,
+    isProcessing,
+    status,
+    isWaitingForModel,
+    runtimeProps: getRuntimeProps(
+      true, isWaitingForModel, activeDraftAssistant, activeStreamingState,
+      streamingState, streamingContentMessage, status,
+    ),
+    streamingContent: streamingContentMessage,
+    totalTurns: turns.length,
+    iterationLimitReached: streamingData?.iterationLimitReached ?? null,
+    conversationId,
+    onPreviewAsset,
+  }), [
+    toolResults, isProcessing, status, isWaitingForModel, activeDraftAssistant,
+    activeStreamingState, streamingState, streamingContentMessage, turns.length,
+    streamingData?.iterationLimitReached, conversationId, onPreviewAsset,
+  ])
+
+  const sharedTurnProps = {
+    onDeleteAgentLoop,
+    onEditAndResend,
+    onRegenerate,
+    onCancel,
+    mentionAgents,
+    onSearchFiles,
+  }
+
+  const draftRuntimeProps = getRuntimeProps(
+    shouldAttachRuntimeToDraft, isWaitingForModel, activeDraftAssistant,
+    activeStreamingState, streamingState, streamingContentMessage, status,
+  )
+
+  const footer = (
+    <ConversationFooter
+      shouldRenderDraftAssistant={shouldRenderDraftAssistant}
+      draftRuntimeProps={draftRuntimeProps}
+      toolResults={toolResults}
+      conversationId={conversationId}
+      isProcessing={isProcessing}
+      queuedMessages={queuedMessages}
+      mentionAgents={mentionAgents}
+      onSearchFiles={onSearchFiles}
+      messagesEndRef={messagesEndRef}
+      t={t}
+    />
+  )
+
+  // ── Short conversations (or before the scroll parent resolves): plain renderer ──
+  if (!shouldVirtualize || !scrollParent) {
+    return (
+      <div ref={rootRef} className="min-h-0 px-2 py-3 sm:px-4 sm:py-4">
+        <div className="mx-auto w-full max-w-3xl space-y-4 px-3 sm:px-0">
+          {/* Cumulative token usage across all turns in this conversation */}
+          <ConversationUsageBar messages={activeMessages} />
+          {turns.map((turn, idx) => (
+            <TurnRenderer
+              key={turn.type === 'user' ? turn.message.id : turn.messages[0].id}
+              turn={turn}
+              turnIndex={idx}
+              ctx={renderCtx}
+              {...sharedTurnProps}
             />
-            </div>
-          ) : (
-            <Fragment key={turn.messages[0].id}>
-              <AssistantTurnBubble
-                turn={turn}
-                toolResults={toolResults}
-                isProcessing={isLast}
-                isWaiting={runtime.isWaiting}
-                streamingState={runtime.streamingState}
-                streamingContent={runtime.streamingContent}
-                currentToolCall={runtime.currentToolCall}
-                streamingToolArgs={runtime.streamingToolArgs}
-                streamingToolArgsByCallId={runtime.streamingToolArgsByCallId}
-                runtimeToolCalls={runtime.runtimeToolCalls}
-                runtimeSteps={runtime.runtimeSteps}
-                conversationId={conversationId}
-                onPreviewAsset={onPreviewAsset}
-                iterationLimitReached={idx === turns.length - 1 ? streamingData?.iterationLimitReached ?? null : null}
-              />
-            </Fragment>
-          )
-        })}
-
-        {/* Draft assistant turn */}
-        {shouldRenderDraftAssistant && (
-          <Fragment>
-            <AssistantTurnBubble
-              key="draft-assistant"
-              turn={{ type: 'assistant', messages: [], timestamp: Date.now(), totalUsage: null }}
-              toolResults={toolResults}
-              showAvatar
-              isProcessing={true}
-              conversationId={conversationId}
-              {...getRuntimeProps(
-                shouldAttachRuntimeToDraft, isWaitingForModel, activeDraftAssistant,
-                activeStreamingState, streamingState, streamingContentMessage, status,
-              )}
-            />
-          </Fragment>
-        )}
-
-        {/* Queued messages — shown while agent is processing */}
-        {isProcessing && queuedMessages.length > 0 && (
-          <div className="space-y-2">
-            {/* Queue divider */}
-            <div className="flex items-center gap-2 text-xs text-primary-500 dark:text-primary-400">
-              <Clock className="h-3 w-3 shrink-0" />
-              <span>{t('conversation.queue.divider', { count: queuedMessages.length })}</span>
-              <div className="h-px flex-1 bg-primary-200 dark:bg-primary-800" />
-            </div>
-            {/* Queued message cards */}
-            {queuedMessages.map((msg, idx) => (
-              <QueuedMessageCard
-                key={`queued-${idx}-${msg.enqueuedAt}`}
-                conversationId={conversationId ?? ''}
-                index={idx}
-                total={queuedMessages.length}
-                text={msg.text}
-                assets={msg.assets}
-                mentionAgents={mentionAgents}
-                onSearchFiles={onSearchFiles}
-                onUpdate={(i, patch) => {
-                  if (conversationId) {
-                    useConversationRuntimeStore.getState().updateQueuedMessage(conversationId, i, patch)
-                  }
-                }}
-                onRemove={(i) => {
-                  if (conversationId) {
-                    useConversationRuntimeStore.getState().removeQueuedMessage(conversationId, i)
-                  }
-                }}
-                onMoveUp={(i) => {
-                  if (conversationId) {
-                    useConversationRuntimeStore.getState().moveQueuedMessage(conversationId, i, i - 1)
-                  }
-                }}
-                onMoveDown={(i) => {
-                  if (conversationId) {
-                    useConversationRuntimeStore.getState().moveQueuedMessage(conversationId, i, i + 1)
-                  }
-                }}
-              />
-            ))}
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
+          ))}
+          {footer}
+        </div>
       </div>
-    </div>
+    )
+  }
+
+  // ── Long conversations: virtualized renderer ──
+  const scrollSeekConfiguration = {
+    enter: (velocity: number) => Math.abs(velocity) > SCROLL_SEEK_VELOCITY,
+    exit: (velocity: number) => Math.abs(velocity) < SCROLL_DECCELERATION,
+  }
+
+  return (
+    <VirtuosoContext.Provider value={{ usageBarProps: { messages: activeMessages }, footerNode: footer }}>
+      <div className="min-h-0 px-2 py-3 sm:px-4 sm:py-4">
+        <div className="mx-auto w-full max-w-3xl px-3 sm:px-0">
+          <Virtuoso
+            ref={virtuosoRef}
+            customScrollParent={scrollParent ?? undefined}
+            data={turns}
+            computeItemKey={(_index, turn) => (turn.type === 'user' ? turn.message.id : turn.messages[0].id)}
+            initialTopMostItemIndex={Math.max(0, turns.length - 1)}
+            followOutput={() => (isUserAtBottom ? 'smooth' : false)}
+            atBottomStateChange={setIsUserAtBottom}
+            increaseViewportBy={INCREASE_VIEWPORT_BY}
+            scrollSeekConfiguration={scrollSeekConfiguration}
+            components={{
+              Header: VirtualHeader,
+              Footer: VirtualFooter,
+              ScrollSeekPlaceholder: TurnPlaceholder,
+            }}
+            itemContent={(index, turn) => (
+              <TurnRenderer
+                turn={turn}
+                turnIndex={index}
+                ctx={renderCtx}
+                {...sharedTurnProps}
+              />
+            )}
+          />
+        </div>
+      </div>
+    </VirtuosoContext.Provider>
   )
 }))
+
+/** Renders the cumulative token usage bar as the Virtuoso list header. */
+function VirtualHeader() {
+  const { usageBarProps } = useContext(VirtuosoContext)
+  return <ConversationUsageBar messages={usageBarProps.messages} />
+}
+
+/** Renders the draft bubble / queued messages as the Virtuoso list footer. */
+function VirtualFooter() {
+  const { footerNode } = useContext(VirtuosoContext)
+  return <>{footerNode}</>
+}
+
+/** Lightweight placeholder shown for off-window turns during fast scrolling. */
+function TurnPlaceholder({ height }: { height: number }) {
+  return <div style={{ height }} className="animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800/60" />
+}
