@@ -173,6 +173,8 @@ interface AgentWebFetchResponse {
   status: number
   headers: Record<string, string>
   body: string
+  /** Final URL after redirects (the base used to resolve relative links). */
+  finalUrl?: string
   truncated?: boolean
   readability?: {
     title: string
@@ -451,6 +453,7 @@ export const webFetchExecutor: ToolExecutor = async (args, context) => {
       status: result.status,
       headers: redactSecretHeaders(result.headers, resolvedSecretValues),
       body: safeBody,
+      ...(result.finalUrl ? { finalUrl: result.finalUrl } : {}),
       ...(result.truncated ? { truncated: true } : {}),
       ...(result.readability ? { readability: result.readability } : {}),
       ...(resolvedSecretValues.length ? { secretsResolved: resolvedSecretValues.length } : {}),

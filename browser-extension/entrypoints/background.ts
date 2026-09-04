@@ -378,6 +378,11 @@ async function handleFetch(message) {
       status,
       headers: respHeaders,
       body: responseBody,
+      // Final URL after redirects — the authoritative base for resolving
+      // relative links in the body (consumed by htmlToMarkdown in
+      // injected.content.ts). Using the requested URL instead would break
+      // pages that redirected somewhere else (different origin/path).
+      finalUrl: resp.url || url,
     };
     if (truncated) result.truncated = true;
     return result;
@@ -451,7 +456,12 @@ async function handleFetchRender(message) {
         const title = document.title || '';
         const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
 
-        return { html, title, metaDesc };
+        // The rendered document's actual URL (after HTTP redirects and JS
+        // navigation) — used as the base for resolving relative links so the
+        // Markdown pipeline pins them to the fetched page, not the app origin.
+        const finalUrl = location.href;
+
+        return { html, title, metaDesc, finalUrl };
       },
     });
 
@@ -484,6 +494,7 @@ async function handleFetchRender(message) {
       },
       body: responseBody,
       rendered: true,
+      finalUrl: data.finalUrl || url,
     };
     if (truncated) response.truncated = true;
     return response;

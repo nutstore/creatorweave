@@ -343,8 +343,15 @@ export default defineContentScript({
      * Convert HTML to clean Markdown.
      * Pipeline: Readability (extract main content) → Turndown (HTML→Markdown).
      * Falls back to Turndown on the full page if Readability fails.
+     *
+     * `sourceUrl` MUST be the fetched page's own URL (post-redirect), never
+     * left undefined: this function runs in the app page's MAIN world, and a
+     * DOMParser-created Document inherits the HOST page's base URL. Without
+     * pinning the source, Readability's _fixRelativeUris resolves every
+     * relative link/img in the fetched HTML against the app origin,
+     * producing bogus absolute URLs (e.g. https://<app-origin>/assets/x.png).
      */
-    function htmlToMarkdown(body: string): {
+    function htmlToMarkdown(body: string, sourceUrl?: string): {
       body: string;
       readability?: {
         title: string;
@@ -356,10 +363,19 @@ export default defineContentScript({
     } {
       try {
         const doc = new DOMParser().parseFromString(body, 'text/html');
-        // Set document URL so Readability can resolve relative links
-        const baseHref = doc.querySelector('base')?.href;
-        if (baseHref) {
-          try { doc.documentURI = baseHref; } catch {}
+        // Pin the base URL so Readability resolves relative links against the
+        // fetched page's own origin. document.baseURI already honors an
+        // explicit <base href> if the page declares one — only inject ours
+        // when absent. NOTE: doc.documentURI is read-only; an earlier version
+        // assigned it here and the assignment silently did nothing.
+        if (sourceUrl && !doc.querySelector('base[href]')) {
+          try {
+            const baseEl = doc.createElement('base');
+            baseEl.href = sourceUrl;
+            doc.head.prepend(baseEl);
+          } catch {
+            // Malformed sourceUrl — links stay host-relative rather than fail
+          }
         }
         const reader = new Readability(doc);
         const article = reader.parse();
@@ -583,7 +599,10 @@ export default defineContentScript({
 
         // Helper: apply Readability + Turndown to a response
         function toMarkdown(response: any) {
-          const result = htmlToMarkdown(response.body);
+          // Prefer the response's final (post-redirect) URL; fall back to the
+          // requested URL. Must never be undefined — the host page's URL would
+          // otherwise become the base for the fetched page's relative links.
+          const result = htmlToMarkdown(response.body, response.finalUrl || url);
           return {
             ...response,
             body: result.body,
